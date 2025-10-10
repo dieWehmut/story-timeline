@@ -1,0 +1,28 @@
+.auth-button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  background-color: var(--button-bg);
+  backdrop-filter: blur(10px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-color);
+  transition: all 0.18s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  z-index: 1000;
+}
+
+.auth-button:hover {
+  background-color: var(--button-hover);
+  transform: scale(1.02);
+}
+
+.auth-button svg {
+  stroke: var(--text-color);
+  width: 30px;
+  height: 30px;
+}

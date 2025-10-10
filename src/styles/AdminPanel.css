@@ -1,0 +1,382 @@
+.admin-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--overlay-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fadeIn 0.3s;
+}
+
+.admin-panel {
+  background-color: var(--panel-bg);
+  padding: 40px;
+  border-radius: 15px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  position: relative;
+  animation: slideUp 0.3s;
+}
+
+.admin-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.admin-panel::-webkit-scrollbar-track {
+  background: var(--bg-color);
+  border-radius: 4px;
+}
+
+.admin-panel::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.admin-panel .close-button {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s;
+}
+
+.admin-panel .close-button:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.admin-panel .close-button svg {
+  stroke: var(--text-color);
+}
+
+.admin-panel h2 {
+  margin-bottom: 30px;
+  color: var(--text-color);
+  text-align: center;
+}
+
+.admin-section {
+  margin-bottom: 40px;
+  padding-bottom: 30px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.admin-section:last-of-type {
+  border-bottom: none;
+}
+
+.admin-section h3 {
+  margin-bottom: 20px;
+  color: var(--text-color);
+  font-size: 18px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-color);
+  font-weight: 500;
+}
+
+.form-group input[type="text"],
+.form-group input[type="file"] {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-size: 14px;
+}
+
+.form-group input[type="text"]:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.input-with-button {
+  display: flex;
+  gap: 10px;
+}
+
+.input-with-button input {
+  flex: 1;
+}
+
+.input-with-button button {
+  padding: 10px 20px;
+  background-color: var(--primary);
+  color: white;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.input-with-button button:hover {
+  background-color: #0056b3;
+}
+
+.music-upload-form button[type="submit"] {
+  width: 100%;
+  padding: 12px;
+  background-color: var(--primary);
+  color: white;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: background-color 0.3s;
+}
+
+.music-upload-form button[type="submit"]:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.music-upload-form button[type="submit"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.file-preview {
+  padding: 10px;
+  background-color: var(--bg-color);
+  border-radius: 5px;
+  color: var(--text-color);
+  font-size: 14px;
+  margin-bottom: 15px;
+}
+
+.music-list {
+  margin-top: 20px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.music-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background-color: var(--bg-color);
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.music-info {
+  flex: 1;
+}
+
+.music-title {
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 4px;
+}
+
+.music-artist {
+  font-size: 14px;
+  color: var(--secondary);
+}
+
+.music-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.music-actions button {
+  width: 35px;
+  height: 35px;
+  border-radius: 6px;
+  background-color: var(--border-color);
+  color: var(--text-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s;
+}
+
+.music-actions button:hover:not(:disabled) {
+  background-color: var(--primary);
+  color: white;
+}
+
+.music-actions button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.music-actions .delete-button:hover {
+  background-color: #dc3545;
+  color: white;
+}
+
+.logout-button {
+  width: 100%;
+  padding: 12px;
+  background-color: #dc3545;
+  color: white;
+  border-radius: 8px;
+  font-weight: 600;
+  margin-top: 20px;
+  transition: background-color 0.3s;
+}
+
+.logout-button:hover {
+  background-color: #c82333;
+}
+
+/* 链接管理样式 */
+.link-add-form {
+  margin-bottom: 20px;
+}
+
+.link-add-form button[type="submit"] {
+  width: 100%;
+  padding: 12px;
+  background-color: var(--primary);
+  color: white;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: background-color 0.3s;
+}
+
+.link-add-form button[type="submit"]:hover {
+  background-color: #0056b3;
+}
+
+.link-list {
+  margin-top: 20px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.link-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background-color: var(--bg-color);
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.link-info {
+  flex: 1;
+}
+
+.link-title {
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 4px;
+}
+
+.link-url {
+  font-size: 13px;
+  color: var(--primary);
+  word-break: break-all;
+}
+
+.link-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.link-actions button {
+  width: 35px;
+  height: 35px;
+  border-radius: 6px;
+  background-color: var(--border-color);
+  color: var(--text-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s;
+  font-size: 16px;
+}
+
+.link-actions button:hover:not(:disabled) {
+  background-color: var(--primary);
+  color: white;
+}
+
+.link-actions button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.link-actions .edit-button:hover {
+  background-color: #28a745;
+}
+
+.link-actions .delete-button:hover {
+  background-color: #dc3545;
+  color: white;
+}
+
+.link-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.link-edit-form input {
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-size: 14px;
+}
+
+.link-edit-form input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.link-edit-form .link-actions {
+  justify-content: flex-end;
+}
+
+.link-edit-form .link-actions button {
+  width: auto;
+  padding: 8px 16px;
+}
+
+.empty-list {
+  text-align: center;
+  padding: 40px;
+  color: var(--secondary);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

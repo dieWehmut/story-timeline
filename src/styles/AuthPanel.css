@@ -1,0 +1,127 @@
+.auth-panel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--overlay-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: fadeIn 0.3s;
+}
+
+.auth-panel {
+  background-color: var(--panel-bg);
+  padding: 40px;
+  border-radius: 15px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  position: relative;
+  animation: slideUp 0.3s;
+}
+
+.auth-panel .close-button {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s;
+}
+
+.auth-panel .close-button:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.auth-panel .close-button svg {
+  stroke: var(--text-color);
+}
+
+.auth-panel h2 {
+  margin-bottom: 30px;
+  color: var(--text-color);
+  text-align: center;
+}
+
+.auth-panel .form-group {
+  margin-bottom: 20px;
+}
+
+.auth-panel .form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-color);
+  font-weight: 500;
+}
+
+.auth-panel .form-group input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-size: 16px;
+  transition: border-color 0.3s;
+}
+
+.auth-panel .form-group input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.auth-panel .error-message {
+  color: #dc3545;
+  margin-bottom: 15px;
+  padding: 10px;
+  border-radius: 5px;
+  background-color: rgba(220, 53, 69, 0.1);
+  text-align: center;
+}
+
+.auth-panel .submit-button {
+  width: 100%;
+  padding: 12px;
+  background-color: var(--primary);
+  color: white;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  transition: background-color 0.3s;
+}
+
+.auth-panel .submit-button:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.auth-panel .submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
