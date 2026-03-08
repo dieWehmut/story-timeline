@@ -21,7 +21,7 @@ export function AuthButton({ loading, onLogin, onLogout, user }: AuthButtonProps
         disabled
         variant="secondary"
       >
-        <UserRound size={30} />
+        <UserRound size={34} />
       </Button>
     );
   }
@@ -34,7 +34,7 @@ export function AuthButton({ loading, onLogin, onLogout, user }: AuthButtonProps
         onClick={onLogin}
         variant="secondary"
       >
-        <UserRound size={30} />
+        <UserRound size={34} />
       </Button>
     );
   }
@@ -46,7 +46,7 @@ export function AuthButton({ loading, onLogin, onLogout, user }: AuthButtonProps
       onClick={() => void onLogout()}
       variant="secondary"
     >
-      <LogOut size={30} />
+      <LogOut size={34} />
     </Button>
   );
 }

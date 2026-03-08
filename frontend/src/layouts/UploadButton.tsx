@@ -67,7 +67,7 @@ export function UploadButton({ busy, onSubmit }: UploadButtonProps) {
         onClick={() => setOpen(true)}
         variant="secondary"
       >
-        <ImagePlus className="transition-transform duration-300 hover:rotate-6" size={30} />
+        <ImagePlus className="transition-transform duration-300 hover:rotate-6" size={34} />
       </Button>
 
       {open ? (

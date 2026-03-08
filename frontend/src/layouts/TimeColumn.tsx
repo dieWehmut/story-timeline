@@ -10,7 +10,7 @@ interface TimeColumnProps {
 export function TimeColumn({ activeMonth, months, onJump, open }: TimeColumnProps) {
   return (
     <aside
-      className={`fixed right-0 top-0 z-40 h-screen w-[4.5rem] overflow-y-auto overflow-x-hidden bg-[#0f1218] py-8 pl-4 pr-2 shadow-[-16px_0_48px_rgba(0,0,0,0.45)] transition-transform duration-300 ease-in-out md:w-20 ${
+      className={`fixed right-0 top-0 z-40 h-screen w-[5.5rem] overflow-y-auto overflow-x-hidden bg-[#0f1218] py-8 pl-4 pr-2 shadow-[-16px_0_48px_rgba(0,0,0,0.45)] transition-transform duration-300 ease-in-out md:w-24 ${
         open ? 'translate-x-0' : 'pointer-events-none translate-x-full'
       }`}
       style={{ scrollbarWidth: 'none' }}

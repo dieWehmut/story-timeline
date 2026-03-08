@@ -14,7 +14,7 @@ export function ThemeButton({ theme, onToggle }: ThemeButtonProps) {
       onClick={onToggle}
       variant="ghost"
     >
-      {theme === 'dark' ? <SunMedium size={30} /> : <MoonStar size={30} />}
+      {theme === 'dark' ? <SunMedium size={34} /> : <MoonStar size={34} />}
     </Button>
   );
 }
