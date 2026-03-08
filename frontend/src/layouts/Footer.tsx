@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
 import { Activity, Eye, TimerReset } from 'lucide-react';
 import type { HealthStats } from '../types/image';
+
+const UPTIME_START_AT = Date.parse('2025-10-10T09:00:00.000Z');
 
 interface FooterProps {
   stats: HealthStats;
@@ -15,22 +18,39 @@ const formatUptime = (uptimeSeconds: number) => {
 };
 
 export function Footer({ stats }: FooterProps) {
+  const [uptimeSeconds, setUptimeSeconds] = useState(() => Math.max(0, Math.floor((Date.now() - UPTIME_START_AT) / 1000)));
+
+  useEffect(() => {
+    const sync = () => {
+      setUptimeSeconds(Math.max(0, Math.floor((Date.now() - UPTIME_START_AT) / 1000)));
+    };
+
+    sync();
+    const timer = window.setInterval(() => {
+      sync();
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
+
   return (
-    <footer className="glass-panel fixed bottom-0 left-0 right-0 z-30 rounded-t-[2rem] px-5 py-4 md:px-8">
-      <div className="mx-auto flex max-w-6xl flex-col gap-3 text-sm text-soft md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-wrap items-center gap-4 text-[var(--text-main)]">
+    <footer className="fixed bottom-0 left-0 right-0 z-30 border-t border-white/10 bg-[color:var(--panel-bg)] px-5 py-4 shadow-[0_-12px_36px_rgba(2,6,23,0.22)] backdrop-blur-xl md:px-8">
+      <div className="mx-auto flex max-w-6xl flex-col items-center justify-center gap-2 text-center text-sm text-soft">
+        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[var(--text-main)]">
           <span className="inline-flex items-center gap-2">
             <Activity className="text-cyan-300" size={16} />
-            {stats.visitorCount}
+            <span>{stats.visitorCount}</span>
           </span>
           <span className="inline-flex items-center gap-2">
             <Eye className="text-cyan-300" size={16} />
-            {stats.activeViewers}
+            <span>{stats.activeViewers}</span>
           </span>
-        </div>
-        <div className="inline-flex items-center gap-2">
-          <TimerReset className="text-cyan-300" size={16} />
-          <span>Uptime: {formatUptime(stats.uptimeSeconds)}</span>
+          <span className="inline-flex items-center gap-2">
+            <TimerReset className="text-cyan-300" size={16} />
+            <span>{formatUptime(uptimeSeconds)}</span>
+          </span>
         </div>
         <p>Copyright © 2025-2026 {stats.githubOwner}</p>
       </div>

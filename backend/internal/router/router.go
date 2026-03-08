@@ -5,9 +5,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"story-backend/internal/controller"
-	"story-backend/internal/middleware"
-	"story-backend/internal/service"
+	"github.com/dieWehmut/inner/backend/internal/controller"
+	"github.com/dieWehmut/inner/backend/internal/middleware"
+	"github.com/dieWehmut/inner/backend/internal/service"
 )
 
 type Dependencies struct {

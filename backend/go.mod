@@ -1,4 +1,4 @@
-module github.com/dieWehmut/dieWehmut.github.io/backend
+module github.com/dieWehmut/inner/backend
 
 go 1.25.0
 

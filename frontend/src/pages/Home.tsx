@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef } from 'react';
 import { LoaderCircle } from 'lucide-react';
 import { AuthButton } from '../layouts/AuthButton';
 import { Footer } from '../layouts/Footer';
+import { Header } from '../layouts/Header';
 import { ImageCard } from '../layouts/ImageCard';
 import { ThemeButton } from '../layouts/ThemeButton';
-import { TimeButton } from '../layouts/TimeButton';
 import { TimeColumn } from '../layouts/TimeColumn';
 import { UploadButton } from '../layouts/UploadButton';
 import { useAuth } from '../hooks/useAuth';
@@ -120,36 +120,19 @@ export default function Home({
     <div className="relative min-h-screen overflow-x-hidden">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.18),transparent_30%),radial-gradient(circle_at_20%_20%,rgba(244,114,182,0.09),transparent_22%)]" />
 
-      <div className="fixed left-4 top-4 z-40 rounded-[1.8rem] border border-white/10 bg-slate-950/40 px-4 py-3 backdrop-blur-xl md:left-8 md:top-8">
-        <p className="text-xs uppercase tracking-[0.32em] text-soft">Current</p>
-        <p className="mt-1 font-serif text-3xl font-semibold text-accent">
-          {activeMonth ? `${activeMonth.year}-${String(activeMonth.month).padStart(2, '0')}` : '---- --'}
-        </p>
-      </div>
-
-      <div className="fixed right-4 top-4 z-40 md:right-8 md:top-8">
-        <TimeButton onToggle={onTimelineToggle} open={timelineOpen} />
-      </div>
+      <Header activeMonth={activeMonth} onTimelineToggle={onTimelineToggle} timelineOpen={timelineOpen} />
 
       <TimeColumn activeMonth={activeMonth} months={images.timeline} onJump={jumpToMonth} open={timelineOpen} />
 
-      <div className="fixed bottom-32 left-4 z-40 flex w-[min(18rem,calc(100vw-2rem))] flex-col gap-3 md:bottom-36 md:left-8 md:w-72">
+      <div className="fixed bottom-32 left-4 z-50 flex flex-col gap-3 md:bottom-36 md:left-8">
         <ThemeButton onToggle={onThemeToggle} theme={theme} />
         {auth.user ? <UploadButton busy={images.submitting} onSubmit={images.createImage} /> : null}
         <AuthButton loading={auth.loading} onLogin={auth.login} onLogout={auth.logout} user={auth.user} />
       </div>
 
-      <main className="relative mx-auto flex w-full max-w-6xl flex-col px-4 pb-44 pt-28 md:px-8 md:pt-36">
+      <main className="relative mx-auto flex w-full max-w-6xl flex-col px-4 pb-36 pt-28 md:px-8 md:pt-36">
         <section className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_24rem] lg:items-end">
-          <div className="glass-panel rounded-[2.5rem] p-6 md:p-8">
-            <p className="text-sm uppercase tracking-[0.34em] text-cyan-300/75">Beijing Timeline</p>
-            <h1 className="mt-3 max-w-3xl font-serif text-4xl font-semibold leading-tight md:text-6xl">
-              用时间整理故事，用图片保存现场。
-            </h1>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-soft md:text-lg">
-              页面顶部显示当前滚动到的年月，右侧时间列可直接跳转到指定月份，所有时间统一按北京时间展示。登录后可上传、替换图片、修改说明与时间，也可以直接删除卡片。
-            </p>
-          </div>
+
 
           <div className="glass-panel rounded-[2.5rem] p-6 md:p-8">
             <p className="text-sm uppercase tracking-[0.34em] text-soft">Latest Moment</p>

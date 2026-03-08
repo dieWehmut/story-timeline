@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"story-backend/internal/dto"
-	"story-backend/internal/utils"
+	"github.com/dieWehmut/inner/backend/internal/dto"
+	"github.com/dieWehmut/inner/backend/internal/utils"
 )
 
 type HealthController struct {
@@ -18,8 +18,10 @@ type HealthController struct {
 }
 
 func NewHealthController(githubOwner string) *HealthController {
+	startedAt := time.Date(2025, 10, 10, 17, 0, 0, 0, utils.BeijingLocation())
+
 	return &HealthController{
-		startedAt:   utils.NowBeijing(),
+		startedAt:   startedAt,
 		githubOwner: githubOwner,
 		visitors:    map[string]time.Time{},
 		active:      map[string]time.Time{},

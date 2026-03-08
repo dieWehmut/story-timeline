@@ -7,10 +7,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"story-backend/internal/dto"
-	"story-backend/internal/middleware"
-	"story-backend/internal/service"
-	"story-backend/internal/utils"
+	"github.com/dieWehmut/inner/backend/internal/dto"
+	"github.com/dieWehmut/inner/backend/internal/middleware"
+	"github.com/dieWehmut/inner/backend/internal/service"
+	"github.com/dieWehmut/inner/backend/internal/utils"
 )
 
 type ImageController struct {

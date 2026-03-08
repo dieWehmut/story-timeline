@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	"story-backend/internal/dto"
-	"story-backend/internal/model"
-	"story-backend/internal/service"
+	"github.com/dieWehmut/inner/backend/internal/dto"
+	"github.com/dieWehmut/inner/backend/internal/model"
+	"github.com/dieWehmut/inner/backend/internal/service"
 )
 
 type contextKey string

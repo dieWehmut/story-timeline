@@ -1,6 +1,6 @@
 package dto
 
-import "story-backend/internal/model"
+import "github.com/dieWehmut/inner/backend/internal/model"
 
 type ImageResponse struct {
 	ID           string `json:"id"`
