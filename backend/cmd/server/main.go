@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dieWehmut/inner/backend/config"
-	"github.com/dieWehmut/inner/backend/internal/controller"
-	"github.com/dieWehmut/inner/backend/internal/github"
-	"github.com/dieWehmut/inner/backend/internal/router"
-	"github.com/dieWehmut/inner/backend/internal/service"
-	"github.com/dieWehmut/inner/backend/internal/storage"
+	"github.com/dieWehmut/story-timeline/backend/config"
+	"github.com/dieWehmut/story-timeline/backend/internal/controller"
+	"github.com/dieWehmut/story-timeline/backend/internal/github"
+	"github.com/dieWehmut/story-timeline/backend/internal/router"
+	"github.com/dieWehmut/story-timeline/backend/internal/service"
+	"github.com/dieWehmut/story-timeline/backend/internal/storage"
 )
 
 func main() {
@@ -39,7 +39,7 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	log.Printf("github.com/dieWehmut/inner/backend listening on %s", server.Addr)
+	log.Printf("github.com/dieWehmut/story-timeline/backend listening on %s", server.Addr)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server failed: %v", err)
 	}

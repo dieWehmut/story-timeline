@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dieWehmut/inner/backend/internal/model"
-	"github.com/dieWehmut/inner/backend/internal/storage"
-	"github.com/dieWehmut/inner/backend/internal/utils"
+	"github.com/dieWehmut/story-timeline/backend/internal/model"
+	"github.com/dieWehmut/story-timeline/backend/internal/storage"
+	"github.com/dieWehmut/story-timeline/backend/internal/utils"
 )
 
 type ImageService struct {

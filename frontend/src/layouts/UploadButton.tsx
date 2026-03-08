@@ -63,11 +63,11 @@ export function UploadButton({ busy, onSubmit }: UploadButtonProps) {
     <>
       <Button
         aria-label="上传图片"
-        className="h-14 w-14 rounded-[1.35rem] border border-white/12 bg-[var(--button-bg)] p-0 shadow-[0_14px_30px_rgba(15,23,42,0.3)] transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-[var(--button-hover)] hover:shadow-[0_18px_38px_rgba(34,211,238,0.22)] active:scale-95"
+        className="floating-btn h-12 w-12 rounded-xl p-0 transition-all duration-300 hover:-translate-y-0.5 hover:scale-105 active:scale-95"
         onClick={() => setOpen(true)}
         variant="secondary"
       >
-        <ImagePlus className="transition-transform duration-300 hover:rotate-6" size={20} />
+        <ImagePlus className="transition-transform duration-300 hover:rotate-6" size={30} />
       </Button>
 
       {open ? (

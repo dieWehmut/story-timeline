@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { LoaderCircle } from 'lucide-react';
-import { AuthButton } from '../layouts/AuthButton';
+import { FloatingActions } from '../layouts/FloatingActions';
 import { Footer } from '../layouts/Footer';
 import { Header } from '../layouts/Header';
 import { ImageCard } from '../layouts/ImageCard';
-import { ThemeButton } from '../layouts/ThemeButton';
 import { TimeColumn } from '../layouts/TimeColumn';
-import { UploadButton } from '../layouts/UploadButton';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
 import type { TimelineMonth } from '../types/image';
@@ -122,13 +120,22 @@ export default function Home({
 
       <Header activeMonth={activeMonth} onTimelineToggle={onTimelineToggle} timelineOpen={timelineOpen} />
 
+      {timelineOpen && (
+        <div className="fixed inset-0 z-30" onClick={onTimelineClose} />
+      )}
+
       <TimeColumn activeMonth={activeMonth} months={images.timeline} onJump={jumpToMonth} open={timelineOpen} />
 
-      <div className="fixed bottom-32 left-4 z-50 flex flex-col gap-3 md:bottom-36 md:left-8">
-        <ThemeButton onToggle={onThemeToggle} theme={theme} />
-        {auth.user ? <UploadButton busy={images.submitting} onSubmit={images.createImage} /> : null}
-        <AuthButton loading={auth.loading} onLogin={auth.login} onLogout={auth.logout} user={auth.user} />
-      </div>
+      <FloatingActions
+        authLoading={auth.loading}
+        authUser={auth.user}
+        onLogin={auth.login}
+        onLogout={auth.logout}
+        onThemeToggle={onThemeToggle}
+        onUpload={images.createImage}
+        theme={theme}
+        uploadBusy={images.submitting}
+      />
 
       <main className="relative mx-auto flex w-full max-w-6xl flex-col px-4 pb-36 pt-28 md:px-8 md:pt-36">
         <section className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_24rem] lg:items-end">

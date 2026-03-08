@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dieWehmut/inner/backend/internal/dto"
-	"github.com/dieWehmut/inner/backend/internal/utils"
+	"github.com/dieWehmut/story-timeline/backend/internal/dto"
+	"github.com/dieWehmut/story-timeline/backend/internal/utils"
 )
 
 type HealthController struct {

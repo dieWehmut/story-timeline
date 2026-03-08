@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	githuboauth "github.com/dieWehmut/inner/backend/internal/github"
-	"github.com/dieWehmut/inner/backend/internal/model"
-	"github.com/dieWehmut/inner/backend/internal/utils"
+	githuboauth "github.com/dieWehmut/story-timeline/backend/internal/github"
+	"github.com/dieWehmut/story-timeline/backend/internal/model"
+	"github.com/dieWehmut/story-timeline/backend/internal/utils"
 )
 
 const (

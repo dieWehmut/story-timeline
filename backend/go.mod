@@ -1,4 +1,4 @@
-module github.com/dieWehmut/inner/backend
+module github.com/dieWehmut/story-timeline/backend
 
 go 1.25.0
 

@@ -1,9 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&display=swap');
 @import 'tailwindcss';
 
+@font-face {
+  font-family: 'LXGW WenKai';
+  src: url('./assets/fonts/LXGWWenKai-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
-  --font-sans: 'IBM Plex Sans', 'Segoe UI', sans-serif;
-  --font-serif: 'Noto Serif SC', 'Songti SC', serif;
+  --font-sans: 'LXGW WenKai', 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-serif: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', serif;
 }
 
 @layer base {
@@ -68,6 +76,32 @@
     box-shadow: var(--panel-shadow);
     -webkit-backdrop-filter: blur(18px);
     backdrop-filter: blur(18px);
+  }
+
+  .floating-btn {
+    background: rgba(255, 255, 255, 0.62) !important;
+    -webkit-backdrop-filter: blur(22px);
+    backdrop-filter: blur(22px);
+    border: 1px solid rgba(255, 255, 255, 0.58) !important;
+    box-shadow: 0 4px 18px rgba(90, 100, 200, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+    color: #5465e0 !important;
+  }
+
+  .floating-btn:hover {
+    background: rgba(255, 255, 255, 0.80) !important;
+    box-shadow: 0 6px 22px rgba(90, 100, 200, 0.16), 0 2px 6px rgba(0, 0, 0, 0.07) !important;
+  }
+
+  :root:not([data-theme='light']) .floating-btn {
+    background: rgba(20, 28, 48, 0.70) !important;
+    border: 1px solid rgba(255, 255, 255, 0.10) !important;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.40) !important;
+    color: #818cf8 !important;
+  }
+
+  :root:not([data-theme='light']) .floating-btn:hover {
+    background: rgba(30, 42, 68, 0.82) !important;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.48) !important;
   }
 
   .text-soft {

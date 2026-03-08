@@ -9,7 +9,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
 
-	"github.com/dieWehmut/inner/backend/internal/model"
+	"github.com/dieWehmut/story-timeline/backend/internal/model"
 )
 
 type OAuthClient struct {

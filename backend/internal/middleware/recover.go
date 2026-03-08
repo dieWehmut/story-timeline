@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/dieWehmut/inner/backend/internal/dto"
+	"github.com/dieWehmut/story-timeline/backend/internal/dto"
 )
 
 func Recover(next http.Handler) http.Handler {

@@ -10,32 +10,35 @@ interface TimeColumnProps {
 export function TimeColumn({ activeMonth, months, onJump, open }: TimeColumnProps) {
   return (
     <aside
-      className={`glass-panel fixed right-4 top-20 z-40 max-h-[75vh] w-32 overflow-y-auto rounded-[2rem] px-4 py-5 transition duration-300 md:right-8 ${
-        open ? 'translate-x-0 opacity-100' : 'pointer-events-none translate-x-8 opacity-0'
+      className={`fixed right-0 top-0 z-40 h-screen w-[4.5rem] overflow-y-auto overflow-x-hidden bg-[#0f1218] py-8 pl-4 pr-2 shadow-[-16px_0_48px_rgba(0,0,0,0.45)] transition-transform duration-300 ease-in-out md:w-20 ${
+        open ? 'translate-x-0' : 'pointer-events-none translate-x-full'
       }`}
+      style={{ scrollbarWidth: 'none' }}
     >
-      <div className="space-y-5">
+      <div className="space-y-4 pt-4">
         {months.map((month, index) => {
           const previous = months[index - 1];
           const showYear = !previous || previous.year !== month.year;
           const active = activeMonth?.key === month.key;
 
           return (
-            <div className="space-y-2" key={month.key}>
+            <div key={month.key}>
               {showYear ? (
-                <p className={`text-xl font-semibold ${active ? 'text-cyan-400' : 'text-[var(--text-main)]'}`}>
-                  {month.year}年
+                <p className={`mb-2 text-[0.65rem] font-bold uppercase tracking-widest ${
+                  active ? 'text-cyan-400' : 'text-slate-400'
+                }`}>
+                  {month.year}
                 </p>
               ) : null}
               <button
-                className={`block text-left text-5xl font-light tracking-tight transition hover:text-cyan-300 ${
-                  active ? 'text-cyan-400' : 'text-[var(--text-main)]'
+                className={`block w-full text-left font-light leading-none transition-all duration-200 hover:text-cyan-300 ${
+                  active ? 'text-cyan-400' : 'text-slate-200'
                 }`}
                 onClick={() => onJump(month)}
                 type="button"
               >
-                <span>{month.month}</span>
-                <span className="ml-1 text-2xl">月</span>
+                <span className="text-4xl tracking-tight">{month.month}</span>
+                <span className="ml-0.5 text-base text-slate-400">月</span>
               </button>
             </div>
           );
