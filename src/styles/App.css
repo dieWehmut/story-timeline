@@ -1,6 +1,0 @@
-.app {
-  min-height: 100vh;
-  position: relative;
-  background-color: var(--bg-color);
-  transition: background-color 0.3s;
-}

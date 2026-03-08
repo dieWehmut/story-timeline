@@ -1,0 +1,6 @@
+.git
+.gitignore
+bin
+tmp
+data/cache.json
+.env

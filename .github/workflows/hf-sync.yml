@@ -1,0 +1,36 @@
+name: Sync to HuggingFace Space
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/hf-sync.yml'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Push to HuggingFace
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "github-actions"
+
+          git clone https://dieWehmut:$HF_TOKEN@huggingface.co/spaces/dieWehmut/inner-backend hf-space
+
+          rsync -av --delete \
+            --exclude ".git" \
+            backend/ hf-space/
+
+          cd hf-space
+
+          git add .
+          git commit -m "sync from github" || echo "No changes"
+          git push

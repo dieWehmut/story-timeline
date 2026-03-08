@@ -1,0 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-serif: 'Noto Serif SC', 'Songti SC', serif;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --page-bg: #0d1117;
+    --page-bg-soft: #151b24;
+    --panel-bg: rgba(12, 18, 26, 0.78);
+    --panel-border: rgba(148, 163, 184, 0.16);
+    --panel-shadow: 0 24px 60px rgba(1, 4, 9, 0.35);
+    --text-main: #edf2f7;
+    --text-soft: #9fb0c3;
+    --text-accent: #7dd3fc;
+    --button-bg: rgba(20, 28, 39, 0.94);
+    --button-hover: rgba(30, 41, 59, 0.98);
+    --hero-glow: radial-gradient(circle at top, rgba(56, 189, 248, 0.2), transparent 38%);
+  }
+
+  :root[data-theme='light'] {
+    color-scheme: light;
+    --page-bg: #f4efe7;
+    --page-bg-soft: #f9f6f0;
+    --panel-bg: rgba(255, 252, 246, 0.84);
+    --panel-border: rgba(148, 163, 184, 0.28);
+    --panel-shadow: 0 20px 50px rgba(128, 102, 78, 0.14);
+    --text-main: #1f2937;
+    --text-soft: #6b7280;
+    --text-accent: #0f766e;
+    --button-bg: rgba(255, 251, 244, 0.95);
+    --button-hover: rgba(255, 247, 237, 1);
+    --hero-glow: radial-gradient(circle at top, rgba(15, 118, 110, 0.16), transparent 40%);
+  }
+
+  * {
+    @apply box-border;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply m-0 min-h-screen bg-[var(--page-bg)] font-sans text-[var(--text-main)] antialiased;
+    background-image: linear-gradient(180deg, rgba(15, 23, 42, 0.12), transparent 24%), var(--hero-glow);
+  }
+
+  #root {
+    @apply min-h-screen;
+  }
+
+  button,
+  input,
+  textarea {
+    @apply font-sans;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    box-shadow: var(--panel-shadow);
+    -webkit-backdrop-filter: blur(18px);
+    backdrop-filter: blur(18px);
+  }
+
+  .text-soft {
+    color: var(--text-soft);
+  }
+
+  .text-accent {
+    color: var(--text-accent);
+  }
+}
