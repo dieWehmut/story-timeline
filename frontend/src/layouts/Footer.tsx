@@ -36,7 +36,7 @@ export function Footer({ stats }: FooterProps) {
   }, []);
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 z-30 border-t border-white/10 bg-[color:var(--panel-bg)] px-5 py-4 shadow-[0_-12px_36px_rgba(2,6,23,0.22)] backdrop-blur-xl md:px-8">
+    <footer className="fixed bottom-0 left-0 right-0 z-30 bg-[color:var(--panel-bg)] px-5 py-2 backdrop-blur-xl md:px-8">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-center gap-2 text-center text-sm text-soft">
         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[var(--text-main)]">
           <span className="inline-flex items-center gap-2">

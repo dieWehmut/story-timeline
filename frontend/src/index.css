@@ -27,7 +27,6 @@
     --text-accent: #7dd3fc;
     --button-bg: rgba(20, 28, 39, 0.94);
     --button-hover: rgba(30, 41, 59, 0.98);
-    --hero-glow: radial-gradient(circle at top, rgba(56, 189, 248, 0.2), transparent 38%);
   }
 
   :root[data-theme='light'] {
@@ -42,7 +41,6 @@
     --text-accent: #0f766e;
     --button-bg: rgba(255, 251, 244, 0.95);
     --button-hover: rgba(255, 247, 237, 1);
-    --hero-glow: radial-gradient(circle at top, rgba(15, 118, 110, 0.16), transparent 40%);
   }
 
   * {
@@ -55,7 +53,7 @@
 
   body {
     @apply m-0 min-h-screen bg-[var(--page-bg)] font-sans text-[var(--text-main)] antialiased;
-    background-image: linear-gradient(180deg, rgba(15, 23, 42, 0.12), transparent 24%), var(--hero-glow);
+
   }
 
   #root {
@@ -83,25 +81,25 @@
     -webkit-backdrop-filter: blur(22px);
     backdrop-filter: blur(22px);
     border: 1px solid rgba(255, 255, 255, 0.58) !important;
-    box-shadow: 0 4px 18px rgba(90, 100, 200, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+    box-shadow: none !important;
     color: #5465e0 !important;
   }
 
   .floating-btn:hover {
     background: rgba(255, 255, 255, 0.80) !important;
-    box-shadow: 0 6px 22px rgba(90, 100, 200, 0.16), 0 2px 6px rgba(0, 0, 0, 0.07) !important;
+    box-shadow: none !important;
   }
 
   :root:not([data-theme='light']) .floating-btn {
     background: rgba(20, 28, 48, 0.70) !important;
     border: 1px solid rgba(255, 255, 255, 0.10) !important;
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.40) !important;
+    box-shadow: none !important;
     color: #818cf8 !important;
   }
 
   :root:not([data-theme='light']) .floating-btn:hover {
     background: rgba(30, 42, 68, 0.82) !important;
-    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.48) !important;
+    box-shadow: none !important;
   }
 
   .text-soft {

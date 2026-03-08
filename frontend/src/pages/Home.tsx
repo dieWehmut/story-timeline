@@ -116,7 +116,7 @@ export default function Home({
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.18),transparent_30%),radial-gradient(circle_at_20%_20%,rgba(244,114,182,0.09),transparent_22%)]" />
+
 
       <Header activeMonth={activeMonth} onTimelineToggle={onTimelineToggle} timelineOpen={timelineOpen} />
 
