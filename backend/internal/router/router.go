@@ -3,7 +3,7 @@ package router
 import (
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/gin-gonic/gin"
 
 	"github.com/dieWehmut/story-timeline/backend/internal/controller"
 	"github.com/dieWehmut/story-timeline/backend/internal/middleware"
@@ -17,46 +17,58 @@ type Dependencies struct {
 	AuthService      *service.AuthService
 }
 
-func New(deps Dependencies, allowedOrigins []string) http.Handler {
-	r := chi.NewRouter()
-	r.Use(middleware.Recover)
-	r.Use(middleware.Logger)
+func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.New()
+	r.Use(middleware.Recover())
+	r.Use(middleware.Logger())
 	r.Use(middleware.CORS(allowedOrigins))
 
-	r.Route("/api", func(api chi.Router) {
-		api.Route("/auth", func(auth chi.Router) {
-			auth.Get("/github/login", deps.AuthController.Login)
-			auth.Get("/github/callback", deps.AuthController.Callback)
-			auth.Get("/session", deps.AuthController.Session)
-			auth.Post("/logout", deps.AuthController.Logout)
-		})
+	api := r.Group("/api")
+	{
+		auth := api.Group("/auth")
+		{
+			auth.GET("/github/login", deps.AuthController.Login)
+			auth.GET("/github/callback", deps.AuthController.Callback)
+			auth.GET("/session", deps.AuthController.Session)
+			auth.POST("/logout", deps.AuthController.Logout)
+		}
 
 		// Feed endpoints (public read, aggregated from multiple users)
-		api.Get("/feed", deps.ImageController.Feed)
-		api.Get("/feed/users", deps.ImageController.FeedUsers)
+		api.GET("/feed", deps.ImageController.Feed)
+		api.GET("/feed/users", deps.ImageController.FeedUsers)
 
-		api.Route("/images", func(images chi.Router) {
+		images := api.Group("/images")
+		{
 			// Asset serving: /api/images/{ownerLogin}/{imageID}/asset/{assetIndex}
-			images.Get("/{ownerLogin}/{imageID}/asset/{assetIndex}", deps.ImageController.Asset)
+			images.GET("/:ownerLogin/:imageID/asset/:assetIndex", deps.ImageController.Asset)
 
 			// Interactions (public read, auth write)
-			images.Get("/{ownerLogin}/{postID}/comments", deps.ImageController.GetComments)
-			images.With(middleware.RequireAuth(deps.AuthService)).Post("/{ownerLogin}/{postID}/like", deps.ImageController.ToggleLike)
-			images.With(middleware.RequireAuth(deps.AuthService)).Post("/{ownerLogin}/{postID}/comments", deps.ImageController.AddComment)
+			images.GET("/:ownerLogin/:postID/comments", deps.ImageController.GetComments)
+			images.POST("/:ownerLogin/:postID/like", middleware.RequireAuth(deps.AuthService), deps.ImageController.ToggleLike)
+			images.POST("/:ownerLogin/:postID/comments", middleware.RequireAuth(deps.AuthService), deps.ImageController.AddComment)
 
 			// Write operations require authentication (any logged-in user)
-			images.With(middleware.RequireAuth(deps.AuthService)).Post("/", deps.ImageController.Create)
-			images.With(middleware.RequireAuth(deps.AuthService)).Patch("/{imageID}", deps.ImageController.Update)
-			images.With(middleware.RequireAuth(deps.AuthService)).Delete("/{imageID}", deps.ImageController.Delete)
-		})
+			images.POST("/", middleware.RequireAuth(deps.AuthService), deps.ImageController.Create)
+			images.PATCH("/:imageID", middleware.RequireAuth(deps.AuthService), deps.ImageController.Update)
+			images.DELETE("/:imageID", middleware.RequireAuth(deps.AuthService), deps.ImageController.Delete)
+		}
 
-		api.Get("/health/stats", deps.HealthController.Stats)
-		api.Post("/health/ping", deps.HealthController.Ping)
+		comments := api.Group("/comments")
+		{
+			comments.GET("/:commenterLogin/:postOwner/:postID/:commentID/asset", deps.ImageController.CommentAsset)
+		}
+
+		api.GET("/health/stats", deps.HealthController.Stats)
+		api.POST("/health/ping", deps.HealthController.Ping)
+	}
+
+	r.GET("/ping", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
+	r.GET("/healthz", func(c *gin.Context) {
+		c.String(http.StatusOK, "ok")
 	})
 
 	return r

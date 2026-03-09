@@ -4,18 +4,19 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/dieWehmut/story-timeline/backend/internal/dto"
+	"github.com/gin-gonic/gin"
 )
 
-func Recover(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func Recover() gin.HandlerFunc {
+	return func(c *gin.Context) {
 		defer func() {
 			if recovered := recover(); recovered != nil {
 				log.Printf("panic recovered: %v", recovered)
-				dto.WriteError(w, http.StatusInternalServerError, "internal server error")
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+				c.Abort()
 			}
 		}()
 
-		next.ServeHTTP(w, r)
-	})
+		c.Next()
+	}
 }

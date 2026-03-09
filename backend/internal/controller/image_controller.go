@@ -1,14 +1,13 @@
 package controller
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/gin-gonic/gin"
 
 	"github.com/dieWehmut/story-timeline/backend/internal/dto"
 	"github.com/dieWehmut/story-timeline/backend/internal/middleware"
@@ -48,14 +47,14 @@ func assetURLs(ownerLogin string, id string, count int) []string {
 }
 
 // Feed returns the aggregated feed for the current user.
-func (controller *ImageController) Feed(w http.ResponseWriter, r *http.Request) {
+func (controller *ImageController) Feed(c *gin.Context) {
 	var feedLogins []string
 	var viewerLogin string
 
-	session, _ := controller.authService.ReadSession(r)
+	session, _ := controller.authService.ReadSession(c.Request)
 	if session != nil {
 		viewerLogin = session.User.Login
-		feedUsers, err := controller.userService.GetFeedUsers(r.Context(), session.AccessToken, session.User.Login)
+		feedUsers, err := controller.userService.GetFeedUsers(c.Request.Context(), session.AccessToken, session.User.Login)
 		if err == nil {
 			for _, u := range feedUsers {
 				feedLogins = append(feedLogins, u.Login)
@@ -79,7 +78,7 @@ func (controller *ImageController) Feed(w http.ResponseWriter, r *http.Request) 
 		allLogins = append(allLogins, adminLogin)
 	}
 
-	items := controller.imageService.GetFeed(r.Context(), tokenFromSession(session), feedLogins)
+	items := controller.imageService.GetFeed(c.Request.Context(), tokenFromSession(session), feedLogins)
 	response := make([]dto.ImageResponse, 0, len(items))
 	for _, item := range items {
 		ownerLogin := item.AuthorLogin
@@ -89,32 +88,32 @@ func (controller *ImageController) Feed(w http.ResponseWriter, r *http.Request) 
 		resp := dto.NewImageResponse(item, assetURLs(ownerLogin, item.ID, len(item.AllImagePaths())))
 
 		likeCount, commentCount := controller.interactionService.GetPostInteractionCounts(
-			r.Context(), tokenFromSession(session), ownerLogin, item.ID, allLogins,
+			c.Request.Context(), tokenFromSession(session), ownerLogin, item.ID, allLogins,
 		)
 		resp.LikeCount = likeCount
 		resp.CommentCount = commentCount
 		if viewerLogin != "" {
 			resp.Liked = controller.interactionService.IsLikedBy(
-				r.Context(), tokenFromSession(session), ownerLogin, item.ID, viewerLogin,
+				c.Request.Context(), tokenFromSession(session), ownerLogin, item.ID, viewerLogin,
 			)
 		}
 
 		response = append(response, resp)
 	}
 
-	dto.WriteJSON(w, http.StatusOK, response)
+	c.JSON(http.StatusOK, response)
 }
 
 // FeedUsers returns the list of users visible in the feed.
-func (controller *ImageController) FeedUsers(w http.ResponseWriter, r *http.Request) {
+func (controller *ImageController) FeedUsers(c *gin.Context) {
 	adminLogin := controller.userService.AdminLogin()
 
 	// Always include admin
 	var users []model.GitHubUser
 
-	session, _ := controller.authService.ReadSession(r)
+	session, _ := controller.authService.ReadSession(c.Request)
 	if session != nil {
-		feedUsers, err := controller.userService.GetFeedUsers(r.Context(), session.AccessToken, session.User.Login)
+		feedUsers, err := controller.userService.GetFeedUsers(c.Request.Context(), session.AccessToken, session.User.Login)
 		if err == nil {
 			users = append(users, feedUsers...)
 		}
@@ -160,120 +159,118 @@ func (controller *ImageController) FeedUsers(w http.ResponseWriter, r *http.Requ
 		result = append(result, userResponse{Login: u.Login, AvatarURL: avatar})
 	}
 
-	dto.WriteJSON(w, http.StatusOK, result)
+	c.JSON(http.StatusOK, result)
 }
 
-func (controller *ImageController) Create(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(maxTotalSize + (1 << 20)); err != nil {
-		dto.WriteError(w, http.StatusBadRequest, err.Error())
+func (controller *ImageController) Create(c *gin.Context) {
+	if err := c.Request.ParseMultipartForm(maxTotalSize + (1 << 20)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	files, err := readMultipartFiles(r)
+	files, err := readMultipartFiles(c.Request)
 	if err != nil {
-		dto.WriteError(w, http.StatusBadRequest, err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	capturedAt, err := utils.ParseBeijing(r.FormValue("capturedAt"))
+	capturedAt, err := utils.ParseBeijing(c.Request.FormValue("capturedAt"))
 	if err != nil {
-		dto.WriteError(w, http.StatusBadRequest, "invalid capturedAt")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid capturedAt"})
 		return
 	}
 
-	session, ok := middleware.SessionFromContext(r.Context())
+	session, ok := middleware.SessionFromContext(c)
 	if !ok {
-		dto.WriteError(w, http.StatusUnauthorized, "missing session")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing session"})
 		return
 	}
 
 	// Ensure user has a story-timeline-data repository
-	if err := controller.userService.EnsureRepo(r.Context(), session.AccessToken, session.User.Login); err != nil {
-		dto.WriteError(w, http.StatusBadGateway, fmt.Sprintf("无法创建数据仓库: %s", err.Error()))
+	if err := controller.userService.EnsureRepo(c.Request.Context(), session.AccessToken, session.User.Login); err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("无法创建数据仓库: %s", err.Error())})
 		return
 	}
 
-	image, err := controller.imageService.Create(r.Context(), session.AccessToken, session.User, r.FormValue("description"), capturedAt, files)
+	image, err := controller.imageService.Create(c.Request.Context(), session.AccessToken, session.User, c.Request.FormValue("description"), capturedAt, files)
 	if err != nil {
-		dto.WriteError(w, http.StatusBadGateway, err.Error())
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
 
-	dto.WriteJSON(w, http.StatusCreated, dto.NewImageResponse(image, assetURLs(session.User.Login, image.ID, len(image.AllImagePaths()))))
+	c.JSON(http.StatusCreated, dto.NewImageResponse(image, assetURLs(session.User.Login, image.ID, len(image.AllImagePaths()))))
 }
 
-func (controller *ImageController) Update(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(maxTotalSize + (1 << 20)); err != nil {
-		dto.WriteError(w, http.StatusBadRequest, err.Error())
+func (controller *ImageController) Update(c *gin.Context) {
+	if err := c.Request.ParseMultipartForm(maxTotalSize + (1 << 20)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	imageID := chi.URLParam(r, "imageID")
-	capturedAt, err := utils.ParseBeijing(r.FormValue("capturedAt"))
+	imageID := c.Param("imageID")
+	capturedAt, err := utils.ParseBeijing(c.Request.FormValue("capturedAt"))
 	if err != nil {
-		dto.WriteError(w, http.StatusBadRequest, "invalid capturedAt")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid capturedAt"})
 		return
 	}
 
-	files, err := readMultipartFiles(r)
+	files, err := readMultipartFiles(c.Request)
 	if err != nil {
-		dto.WriteError(w, http.StatusBadRequest, err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	session, ok := middleware.SessionFromContext(r.Context())
+	session, ok := middleware.SessionFromContext(c)
 	if !ok {
-		dto.WriteError(w, http.StatusUnauthorized, "missing session")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing session"})
 		return
 	}
 
 	// Users can only edit their own posts
 	ownerLogin := session.User.Login
-	image, err := controller.imageService.Update(r.Context(), session.AccessToken, ownerLogin, imageID, r.FormValue("description"), capturedAt, files)
+	image, err := controller.imageService.Update(c.Request.Context(), session.AccessToken, ownerLogin, imageID, c.Request.FormValue("description"), capturedAt, files)
 	if err != nil {
-		dto.WriteError(w, http.StatusBadGateway, err.Error())
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
 
-	dto.WriteJSON(w, http.StatusOK, dto.NewImageResponse(image, assetURLs(ownerLogin, image.ID, len(image.AllImagePaths()))))
+	c.JSON(http.StatusOK, dto.NewImageResponse(image, assetURLs(ownerLogin, image.ID, len(image.AllImagePaths()))))
 }
 
-func (controller *ImageController) Delete(w http.ResponseWriter, r *http.Request) {
-	imageID := chi.URLParam(r, "imageID")
-	session, ok := middleware.SessionFromContext(r.Context())
+func (controller *ImageController) Delete(c *gin.Context) {
+	imageID := c.Param("imageID")
+	session, ok := middleware.SessionFromContext(c)
 	if !ok {
-		dto.WriteError(w, http.StatusUnauthorized, "missing session")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing session"})
 		return
 	}
 
 	// Users can only delete their own posts
 	ownerLogin := session.User.Login
-	if err := controller.imageService.Delete(r.Context(), session.AccessToken, ownerLogin, imageID); err != nil {
-		dto.WriteError(w, http.StatusBadGateway, err.Error())
+	if err := controller.imageService.Delete(c.Request.Context(), session.AccessToken, ownerLogin, imageID); err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
 
-	dto.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
-func (controller *ImageController) Asset(w http.ResponseWriter, r *http.Request) {
-	ownerLogin := chi.URLParam(r, "ownerLogin")
-	imageID := chi.URLParam(r, "imageID")
-	assetIndex, err := strconv.Atoi(chi.URLParam(r, "assetIndex"))
+func (controller *ImageController) Asset(c *gin.Context) {
+	ownerLogin := c.Param("ownerLogin")
+	imageID := c.Param("imageID")
+	assetIndex, err := strconv.Atoi(c.Param("assetIndex"))
 	if err != nil || assetIndex < 0 {
-		dto.WriteError(w, http.StatusBadRequest, "invalid asset index")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid asset index"})
 		return
 	}
 
-	content, contentType, err := controller.imageService.ReadAsset(r.Context(), "", ownerLogin, imageID, assetIndex)
+	content, contentType, err := controller.imageService.ReadAsset(c.Request.Context(), "", ownerLogin, imageID, assetIndex)
 	if err != nil {
-		dto.WriteError(w, http.StatusNotFound, err.Error())
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
-	w.Header().Set("Content-Type", contentType)
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(content)
+	c.Data(http.StatusOK, contentType, content)
 }
 
 func tokenFromSession(session *model.Session) string {
@@ -284,19 +281,19 @@ func tokenFromSession(session *model.Session) string {
 }
 
 // ToggleLike toggles a like on a post.
-func (controller *ImageController) ToggleLike(w http.ResponseWriter, r *http.Request) {
-	ownerLogin := chi.URLParam(r, "ownerLogin")
-	postID := chi.URLParam(r, "postID")
+func (controller *ImageController) ToggleLike(c *gin.Context) {
+	ownerLogin := c.Param("ownerLogin")
+	postID := c.Param("postID")
 
-	session, ok := middleware.SessionFromContext(r.Context())
+	session, ok := middleware.SessionFromContext(c)
 	if !ok {
-		dto.WriteError(w, http.StatusUnauthorized, "missing session")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing session"})
 		return
 	}
 
-	lf, err := controller.interactionService.ToggleLike(r.Context(), session.AccessToken, ownerLogin, postID, session.User)
+	lf, err := controller.interactionService.ToggleLike(c.Request.Context(), session.AccessToken, ownerLogin, postID, session.User)
 	if err != nil {
-		dto.WriteError(w, http.StatusBadGateway, err.Error())
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -308,21 +305,21 @@ func (controller *ImageController) ToggleLike(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	dto.WriteJSON(w, http.StatusOK, map[string]any{
+	c.JSON(http.StatusOK, gin.H{
 		"likeCount": len(lf.Likes),
 		"liked":     liked,
 	})
 }
 
 // GetComments returns comments for a post.
-func (controller *ImageController) GetComments(w http.ResponseWriter, r *http.Request) {
-	ownerLogin := chi.URLParam(r, "ownerLogin")
-	postID := chi.URLParam(r, "postID")
+func (controller *ImageController) GetComments(c *gin.Context) {
+	ownerLogin := c.Param("ownerLogin")
+	postID := c.Param("postID")
 
 	var feedLogins []string
-	session, _ := controller.authService.ReadSession(r)
+	session, _ := controller.authService.ReadSession(c.Request)
 	if session != nil {
-		feedUsers, err := controller.userService.GetFeedUsers(r.Context(), session.AccessToken, session.User.Login)
+		feedUsers, err := controller.userService.GetFeedUsers(c.Request.Context(), session.AccessToken, session.User.Login)
 		if err == nil {
 			for _, u := range feedUsers {
 				feedLogins = append(feedLogins, u.Login)
@@ -343,61 +340,110 @@ func (controller *ImageController) GetComments(w http.ResponseWriter, r *http.Re
 		feedLogins = append(feedLogins, adminLogin)
 	}
 
-	comments := controller.interactionService.GetAllComments(r.Context(), tokenFromSession(session), ownerLogin, postID, feedLogins)
+	comments := controller.interactionService.GetAllComments(c.Request.Context(), tokenFromSession(session), ownerLogin, postID, feedLogins)
 	result := make([]dto.CommentResponse, 0, len(comments))
-	for _, c := range comments {
+	for _, cm := range comments {
+		var imageUrl string
+		if cm.ImagePath != "" {
+			imageUrl = fmt.Sprintf("/api/comments/%s/%s/%s/%s/asset", cm.AuthorLogin, cm.PostOwner, cm.PostID, cm.ID)
+		}
 		result = append(result, dto.CommentResponse{
-			ID:          c.ID,
-			AuthorLogin: c.AuthorLogin,
-			PostOwner:   c.PostOwner,
-			PostID:      c.PostID,
-			Text:        c.Text,
-			CreatedAt:   c.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
+			ID:          cm.ID,
+			AuthorLogin: cm.AuthorLogin,
+			PostOwner:   cm.PostOwner,
+			PostID:      cm.PostID,
+			Text:        cm.Text,
+			ImageUrl:    imageUrl,
+			CreatedAt:   cm.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
 		})
 	}
 
-	dto.WriteJSON(w, http.StatusOK, result)
+	c.JSON(http.StatusOK, result)
 }
 
 // AddComment adds a comment on a post. The comment is stored in the commenter's repo.
-func (controller *ImageController) AddComment(w http.ResponseWriter, r *http.Request) {
-	ownerLogin := chi.URLParam(r, "ownerLogin")
-	postID := chi.URLParam(r, "postID")
+func (controller *ImageController) AddComment(c *gin.Context) {
+	ownerLogin := c.Param("ownerLogin")
+	postID := c.Param("postID")
 
-	session, ok := middleware.SessionFromContext(r.Context())
+	session, ok := middleware.SessionFromContext(c)
 	if !ok {
-		dto.WriteError(w, http.StatusUnauthorized, "missing session")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing session"})
 		return
 	}
 
 	// Ensure commenter has a repo
-	if err := controller.userService.EnsureRepo(r.Context(), session.AccessToken, session.User.Login); err != nil {
-		dto.WriteError(w, http.StatusBadGateway, fmt.Sprintf("无法创建数据仓库: %s", err.Error()))
+	if err := controller.userService.EnsureRepo(c.Request.Context(), session.AccessToken, session.User.Login); err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("无法创建数据仓库: %s", err.Error())})
 		return
 	}
 
-	var body struct {
-		Text string `json:"text"`
+	var text string
+	var imageData []byte
+
+	contentType := c.GetHeader("Content-Type")
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		text = strings.TrimSpace(c.PostForm("text"))
+		fh, err := c.FormFile("file")
+		if err == nil && fh.Size <= maxFileSize {
+			f, ferr := fh.Open()
+			if ferr == nil {
+				imageData, _ = io.ReadAll(f)
+				f.Close()
+			}
+		}
+	} else {
+		var body struct {
+			Text string `json:"text"`
+		}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "请输入评论内容"})
+			return
+		}
+		text = strings.TrimSpace(body.Text)
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Text) == "" {
-		dto.WriteError(w, http.StatusBadRequest, "请输入评论内容")
+
+	if text == "" && len(imageData) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请输入评论内容或选择图片"})
 		return
 	}
 
-	comment, err := controller.interactionService.AddComment(r.Context(), session.AccessToken, session.User, ownerLogin, postID, strings.TrimSpace(body.Text))
+	comment, err := controller.interactionService.AddComment(c.Request.Context(), session.AccessToken, session.User, ownerLogin, postID, text, imageData)
 	if err != nil {
-		dto.WriteError(w, http.StatusBadGateway, err.Error())
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
 
-	dto.WriteJSON(w, http.StatusCreated, dto.CommentResponse{
+	var imageUrl string
+	if comment.ImagePath != "" {
+		imageUrl = fmt.Sprintf("/api/comments/%s/%s/%s/%s/asset", session.User.Login, ownerLogin, postID, comment.ID)
+	}
+
+	c.JSON(http.StatusCreated, dto.CommentResponse{
 		ID:          comment.ID,
 		AuthorLogin: session.User.Login,
 		PostOwner:   comment.PostOwner,
 		PostID:      comment.PostID,
 		Text:        comment.Text,
+		ImageUrl:    imageUrl,
 		CreatedAt:   comment.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
 	})
+}
+
+// CommentAsset serves a comment image.
+func (controller *ImageController) CommentAsset(c *gin.Context) {
+	commenterLogin := c.Param("commenterLogin")
+	postOwner := c.Param("postOwner")
+	postID := c.Param("postID")
+	commentID := c.Param("commentID")
+
+	content, contentType, err := controller.interactionService.ReadCommentImage(c.Request.Context(), commenterLogin, postOwner, postID, commentID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Data(http.StatusOK, contentType, content)
 }
 
 func readMultipartFiles(r *http.Request) ([][]byte, error) {

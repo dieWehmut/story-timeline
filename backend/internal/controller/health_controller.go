@@ -5,7 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dieWehmut/story-timeline/backend/internal/dto"
+	"github.com/gin-gonic/gin"
+
 	"github.com/dieWehmut/story-timeline/backend/internal/service"
 	"github.com/dieWehmut/story-timeline/backend/internal/utils"
 )
@@ -31,13 +32,13 @@ func NewHealthController(githubOwner string, authService *service.AuthService) *
 	}
 }
 
-func (controller *HealthController) Stats(w http.ResponseWriter, r *http.Request) {
-	controller.touchUser(r)
+func (controller *HealthController) Stats(c *gin.Context) {
+	controller.touchUser(c)
 	controller.mu.Lock()
 	defer controller.mu.Unlock()
 	controller.cleanupLocked()
 
-	dto.WriteJSON(w, http.StatusOK, map[string]any{
+	c.JSON(http.StatusOK, gin.H{
 		"userCount":     len(controller.users),
 		"onlineUsers":   len(controller.online),
 		"uptimeSeconds": int(utils.NowBeijing().Sub(controller.startedAt).Seconds()),
@@ -45,13 +46,13 @@ func (controller *HealthController) Stats(w http.ResponseWriter, r *http.Request
 	})
 }
 
-func (controller *HealthController) Ping(w http.ResponseWriter, r *http.Request) {
-	controller.touchUser(r)
-	dto.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
+func (controller *HealthController) Ping(c *gin.Context) {
+	controller.touchUser(c)
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
-func (controller *HealthController) touchUser(r *http.Request) {
-	session, err := controller.authService.ReadSession(r)
+func (controller *HealthController) touchUser(c *gin.Context) {
+	session, err := controller.authService.ReadSession(c.Request)
 	if err != nil || session == nil {
 		return
 	}

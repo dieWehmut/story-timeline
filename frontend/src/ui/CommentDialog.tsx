@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import { LoaderCircle, Send } from 'lucide-react';
+import { useEffect, useId, useRef, useState, useCallback } from 'react';
+import { ImagePlus, LoaderCircle, Send, X } from 'lucide-react';
 import type { CommentItem } from '../types/image';
 
 interface CommentDialogProps {
@@ -8,7 +8,7 @@ interface CommentDialogProps {
   comments: CommentItem[];
   loading: boolean;
   busy: boolean;
-  onSubmit: (text: string) => Promise<void>;
+  onSubmit: (text: string, file?: File) => Promise<void>;
   canComment: boolean;
 }
 
@@ -27,15 +27,20 @@ const toBeijingText = (value: string) => {
 export function CommentDialog({ open, onClose, comments, loading, busy, onSubmit, canComment }: CommentDialogProps) {
   const inputId = useId();
   const [text, setText] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [animating, setAnimating] = useState(false);
   const [visible, setVisible] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const prevOpenRef = useRef(false);
 
   useEffect(() => {
     if (open && !prevOpenRef.current) {
       setText('');
+      setFile(null);
+      setPreview(null);
       setError(null);
     }
     prevOpenRef.current = open;
@@ -61,11 +66,30 @@ export function CommentDialog({ open, onClose, comments, loading, busy, onSubmit
     }
   }, [comments.length]);
 
+  const handleFileSelect = useCallback((incoming: FileList | null) => {
+    if (!incoming || incoming.length === 0) return;
+    const selected = incoming[0];
+    if (selected.size > 5 * 1024 * 1024) {
+      setError('图片不能超过 5MB');
+      return;
+    }
+    setFile(selected);
+    setPreview(URL.createObjectURL(selected));
+    setError(null);
+  }, []);
+
+  const removeFile = useCallback(() => {
+    if (preview) URL.revokeObjectURL(preview);
+    setFile(null);
+    setPreview(null);
+  }, [preview]);
+
   const handleSubmit = async () => {
-    if (!text.trim()) return;
+    if (!text.trim() && !file) return;
     try {
-      await onSubmit(text.trim());
+      await onSubmit(text.trim(), file ?? undefined);
       setText('');
+      removeFile();
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : '评论失败');
@@ -75,35 +99,47 @@ export function CommentDialog({ open, onClose, comments, loading, busy, onSubmit
   if (!open && !animating) return null;
 
   return (
-    <div className={`fixed inset-0 z-50 flex flex-col md:items-center md:justify-center transition-colors duration-250 ${visible ? 'bg-[var(--page-bg)] md:bg-slate-950/65' : 'bg-transparent md:bg-transparent'}`}>
-      <div className={`flex h-full w-full flex-col bg-[var(--page-bg)] transition-all duration-250 md:h-auto md:max-h-[80vh] md:min-h-[320px] md:max-w-lg md:border md:border-[var(--panel-border)] md:bg-[var(--panel-bg)] md:backdrop-blur-xl ${visible ? 'translate-y-0 opacity-100 md:scale-100' : 'translate-y-full opacity-100 md:translate-y-0 md:scale-95 md:opacity-0'}`}>
+    <div
+      className={`fixed inset-x-0 bottom-0 z-50 transition-colors duration-250 ${visible ? '' : ''}`}
+      style={{ top: '75vh' }}
+    >
+      {/* Backdrop - clickable to dismiss */}
+      {visible && (
+        <div className="fixed inset-0 z-40" onClick={onClose} />
+      )}
+
+      <div
+        className={`relative z-50 flex h-full w-full flex-col border-t border-[var(--panel-border)] bg-[var(--page-bg)] shadow-lg transition-transform duration-250 ${
+          visible ? 'translate-y-0' : 'translate-y-full'
+        }`}
+      >
         {/* Header */}
-        <div className="flex shrink-0 items-center justify-between px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between px-4 py-2">
           <p className="text-sm font-medium text-[var(--text-main)]">评论</p>
           <button
             className="text-sm text-soft hover:text-[var(--text-main)] transition"
             onClick={onClose}
             type="button"
           >
-            关闭
+            取消
           </button>
         </div>
 
         {/* Comments list */}
         <div className="flex-1 overflow-y-auto px-4 pb-2" ref={listRef}>
           {loading ? (
-            <div className="flex min-h-32 items-center justify-center">
-              <LoaderCircle className="animate-spin text-cyan-300" size={22} />
+            <div className="flex min-h-16 items-center justify-center">
+              <LoaderCircle className="animate-spin text-cyan-300" size={20} />
             </div>
           ) : comments.length === 0 ? (
-            <p className="py-8 text-center text-sm text-soft">暂无评论</p>
+            <p className="py-4 text-center text-sm text-soft">暂无评论</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {comments.map((c) => (
                 <div className="flex gap-2" key={c.id}>
                   <img
                     alt={c.authorLogin}
-                    className="mt-0.5 h-6 w-6 shrink-0 rounded-full object-cover"
+                    className="mt-0.5 h-5 w-5 shrink-0 rounded-full object-cover"
                     src={`https://github.com/${c.authorLogin}.png?size=48`}
                   />
                   <div className="min-w-0 flex-1">
@@ -111,7 +147,16 @@ export function CommentDialog({ open, onClose, comments, loading, busy, onSubmit
                       <span className="font-medium text-[var(--text-main)]">{c.authorLogin}</span>
                       <span className="ml-2">{toBeijingText(c.createdAt)}</span>
                     </p>
-                    <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--text-main)]">{c.text}</p>
+                    {c.text ? (
+                      <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--text-main)]">{c.text}</p>
+                    ) : null}
+                    {c.imageUrl ? (
+                      <img
+                        alt="评论图片"
+                        className="mt-1 max-h-32 max-w-48 rounded object-cover"
+                        src={c.imageUrl}
+                      />
+                    ) : null}
                   </div>
                 </div>
               ))}
@@ -122,10 +167,40 @@ export function CommentDialog({ open, onClose, comments, loading, busy, onSubmit
 
         {/* Input bar */}
         {canComment ? (
-          <div className="shrink-0 border-t border-[var(--panel-border)] px-4 py-3">
+          <div className="shrink-0 border-t border-[var(--panel-border)] px-4 py-2">
+            {/* Image preview */}
+            {preview ? (
+              <div className="relative mb-2 inline-block">
+                <img alt="" className="h-16 w-16 rounded object-cover" src={preview} />
+                <button
+                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white/80 hover:text-white"
+                  onClick={removeFile}
+                  type="button"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ) : null}
             <div className="flex items-center gap-2">
+              <button
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center text-soft transition hover:text-[var(--text-main)]"
+                onClick={() => fileInputRef.current?.click()}
+                type="button"
+              >
+                <ImagePlus size={18} />
+              </button>
               <input
-                className="flex-1 border border-white/10 bg-transparent px-3 py-2 text-sm text-[var(--text-main)] outline-none transition placeholder:text-soft/50 focus:border-[var(--text-accent)]"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  handleFileSelect(e.target.files);
+                  e.target.value = '';
+                }}
+                ref={fileInputRef}
+                type="file"
+              />
+              <input
+                className="flex-1 border border-white/10 bg-transparent px-3 py-1.5 text-sm text-[var(--text-main)] outline-none transition placeholder:text-soft/50 focus:border-[var(--text-accent)]"
                 disabled={busy}
                 id={inputId}
                 onChange={(e) => setText(e.target.value)}
@@ -139,8 +214,8 @@ export function CommentDialog({ open, onClose, comments, loading, busy, onSubmit
                 value={text}
               />
               <button
-                className="inline-flex h-9 w-9 items-center justify-center text-cyan-300 transition hover:text-cyan-200 disabled:opacity-50"
-                disabled={busy || !text.trim()}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center text-cyan-300 transition hover:text-cyan-200 disabled:opacity-50"
+                disabled={busy || (!text.trim() && !file)}
                 onClick={() => void handleSubmit()}
                 type="button"
               >

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Heart, MessageCircle, PencilLine, Trash2 } from 'lucide-react';
 import { ImageViewer } from '../ui/ImageViewer';
 import { PostDialog } from '../ui/PostDialog';
@@ -89,6 +89,19 @@ export function ImageCard({ busy, canInteract, editable, fallbackAuthorLogin, it
   const [likeBusy, setLikeBusy] = useState(false);
   const { confirm } = useToast();
 
+  // Load comments on mount if there are any
+  useEffect(() => {
+    if (item.commentCount > 0 && comments.length === 0 && !commentsLoading) {
+      let cancelled = false;
+      setCommentsLoading(true);
+      api.getComments(item.authorLogin || fallbackAuthorLogin || '', item.id)
+        .then((data) => { if (!cancelled) setComments(data); })
+        .catch(() => { if (!cancelled) setComments([]); })
+        .finally(() => { if (!cancelled) setCommentsLoading(false); });
+      return () => { cancelled = true; };
+    }
+  }, [item.commentCount]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const iconButtonClass =
     'inline-flex h-8 w-8 items-center justify-center text-soft transition hover:text-[var(--text-main)]';
 
@@ -140,10 +153,10 @@ export function ImageCard({ busy, canInteract, editable, fallbackAuthorLogin, it
     }
   };
 
-  const handleAddComment = async (text: string) => {
+  const handleAddComment = async (text: string, file?: File) => {
     setCommentBusy(true);
     try {
-      const newComment = await api.addComment(authorLogin, item.id, text);
+      const newComment = await api.addComment(authorLogin, item.id, text, file);
       setComments((prev) => [...prev, newComment]);
       onCommentCountChange?.(item.id, 1);
     } finally {
@@ -203,7 +216,7 @@ export function ImageCard({ busy, canInteract, editable, fallbackAuthorLogin, it
           </div>
         ) : null}
         {/* Footer: time + like & comment */}
-        <div className="flex items-center justify-between gap-4 px-2 pb-3 pt-2">
+        <div className="flex items-center justify-between gap-4 px-2 pb-1 pt-2">
           <p className="text-xs text-soft">{toBeijingText(item.capturedAt)}</p>
           <div className="flex items-center gap-4">
             <button
@@ -225,6 +238,43 @@ export function ImageCard({ busy, canInteract, editable, fallbackAuthorLogin, it
             </button>
           </div>
         </div>
+
+        {/* Inline comments preview */}
+        {comments.length > 0 && !commentsLoading ? (
+          <div className="space-y-1.5 px-2 pb-3">
+            {comments.slice(-3).map((c) => (
+              <div className="flex items-start gap-1.5" key={c.id}>
+                <img
+                  alt={c.authorLogin}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded-full object-cover"
+                  src={`https://github.com/${c.authorLogin}.png?size=32`}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-[var(--text-main)]">
+                    <span className="font-medium">{c.authorLogin}</span>
+                    {c.text ? <span className="ml-1">{c.text}</span> : null}
+                  </p>
+                  {c.imageUrl ? (
+                    <img
+                      alt="评论图片"
+                      className="mt-0.5 max-h-20 max-w-32 rounded object-cover"
+                      src={c.imageUrl}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            ))}
+            {comments.length > 3 ? (
+              <button
+                className="text-xs text-soft hover:text-[var(--text-main)] transition"
+                onClick={() => void openComments()}
+                type="button"
+              >
+                查看全部 {comments.length} 条评论
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </article>
 
       {/* Image viewer lightbox */}

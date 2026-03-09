@@ -50,7 +50,7 @@ export function Header({
 						<p className="text-sm font-medium text-[var(--text-main)]">{authUser.login}</p>
 					) : null}
 				</div>
-				<div className="flex items-center gap-1.5">
+				<div className="flex items-center gap-0">
 					<AuthButton loading={authLoading} onLogin={onLogin} onLogout={onLogout} user={authUser} />
 					<ThemeButton onToggle={onThemeToggle} theme={theme} />
 					{authUser && canPost ? <UploadButton busy={uploadBusy} onSubmit={onUpload} /> : null}
@@ -80,11 +80,11 @@ export function Header({
 						onClick={() => onFilterUser(null)}
 						type="button"
 					>
-						全部
+						All
 					</button>
 					{feedUsers.map((user) => (
 						<button
-							className={`flex shrink-0 items-center gap-1.5 transition-all duration-200 ${
+							className={`flex shrink-0 items-center gap-1 transition-all duration-200 ${
 								filterUser === user.login
 									? 'scale-105 rounded-full bg-cyan-500/10 px-1.5 py-0.5 ring-1 ring-cyan-400/40'
 									: filterUser !== null
@@ -98,10 +98,10 @@ export function Header({
 						>
 							<img
 								alt={user.login}
-								className="h-6 w-6 rounded-full object-cover"
+								className="h-5 w-5 rounded-full object-cover"
 								src={user.avatarUrl}
 							/>
-							<span className="max-w-[72px] truncate text-xs text-soft">{user.login}</span>
+							
 						</button>
 					))}
 				</div>

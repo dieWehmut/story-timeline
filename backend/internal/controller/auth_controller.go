@@ -3,7 +3,8 @@ package controller
 import (
 	"net/http"
 
-	"github.com/dieWehmut/story-timeline/backend/internal/dto"
+	"github.com/gin-gonic/gin"
+
 	"github.com/dieWehmut/story-timeline/backend/internal/service"
 )
 
@@ -16,36 +17,36 @@ func NewAuthController(authService *service.AuthService, frontendBaseURL string)
 	return &AuthController{authService: authService, frontendBaseURL: frontendBaseURL}
 }
 
-func (controller *AuthController) Login(w http.ResponseWriter, r *http.Request) {
+func (controller *AuthController) Login(c *gin.Context) {
 	state := controller.authService.NewState()
-	controller.authService.SetOAuthStateCookie(w, state)
-	http.Redirect(w, r, controller.authService.LoginURL(state), http.StatusTemporaryRedirect)
+	controller.authService.SetOAuthStateCookie(c.Writer, state)
+	c.Redirect(http.StatusTemporaryRedirect, controller.authService.LoginURL(state))
 }
 
-func (controller *AuthController) Callback(w http.ResponseWriter, r *http.Request) {
-	if !controller.authService.ValidateState(r, r.URL.Query().Get("state")) {
-		dto.WriteError(w, http.StatusBadRequest, "invalid oauth state")
+func (controller *AuthController) Callback(c *gin.Context) {
+	if !controller.authService.ValidateState(c.Request, c.Query("state")) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid oauth state"})
 		return
 	}
 
-	session, err := controller.authService.CompleteLogin(r.Context(), r.URL.Query().Get("code"))
+	session, err := controller.authService.CompleteLogin(c.Request.Context(), c.Query("code"))
 	if err != nil {
-		dto.WriteError(w, http.StatusBadGateway, err.Error())
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := controller.authService.SetSessionCookie(w, session); err != nil {
-		dto.WriteError(w, http.StatusInternalServerError, err.Error())
+	if err := controller.authService.SetSessionCookie(c.Writer, session); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	http.Redirect(w, r, controller.frontendBaseURL, http.StatusTemporaryRedirect)
+	c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL)
 }
 
-func (controller *AuthController) Session(w http.ResponseWriter, r *http.Request) {
-	session, err := controller.authService.ReadSession(r)
+func (controller *AuthController) Session(c *gin.Context) {
+	session, err := controller.authService.ReadSession(c.Request)
 	if err != nil {
-		dto.WriteJSON(w, http.StatusOK, map[string]any{
+		c.JSON(http.StatusOK, gin.H{
 			"authenticated": false,
 			"loginUrl":      "/api/auth/github/login",
 			"isAdmin":       false,
@@ -62,13 +63,13 @@ func (controller *AuthController) Session(w http.ResponseWriter, r *http.Request
 		roleLabel = "管理员"
 	}
 
-	dto.WriteJSON(w, http.StatusOK, map[string]any{
+	c.JSON(http.StatusOK, gin.H{
 		"authenticated": true,
 		"loginUrl":      "/api/auth/github/login",
 		"isAdmin":       isAdmin,
 		"canPost":       true,
 		"roleLabel":     roleLabel,
-		"user": map[string]any{
+		"user": gin.H{
 			"id":        session.User.ID,
 			"login":     session.User.Login,
 			"avatarUrl": session.User.AvatarURL,
@@ -76,7 +77,7 @@ func (controller *AuthController) Session(w http.ResponseWriter, r *http.Request
 	})
 }
 
-func (controller *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
-	controller.authService.ClearSession(w)
-	dto.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
+func (controller *AuthController) Logout(c *gin.Context) {
+	controller.authService.ClearSession(c.Writer)
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }

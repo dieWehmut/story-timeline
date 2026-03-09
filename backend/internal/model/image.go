@@ -48,6 +48,7 @@ type Comment struct {
 	PostOwner string    `json:"postOwner"`
 	PostID    string    `json:"postId"`
 	Text      string    `json:"text"`
+	ImagePath string    `json:"imagePath,omitempty"`
 	CreatedAt time.Time `json:"createdAt"`
 }
 

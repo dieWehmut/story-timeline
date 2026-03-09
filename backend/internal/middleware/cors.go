@@ -1,30 +1,32 @@
 package middleware
 
-import "net/http"
+import (
+	"net/http"
 
-func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
+	"github.com/gin-gonic/gin"
+)
+
+func CORS(allowedOrigins []string) gin.HandlerFunc {
 	allowed := map[string]struct{}{}
 	for _, origin := range allowedOrigins {
 		allowed[origin] = struct{}{}
 	}
 
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			origin := r.Header.Get("Origin")
-			if _, ok := allowed[origin]; ok {
-				w.Header().Set("Access-Control-Allow-Origin", origin)
-				w.Header().Set("Vary", "Origin")
-				w.Header().Set("Access-Control-Allow-Credentials", "true")
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
-			}
+	return func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+		if _, ok := allowed[origin]; ok {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Vary", "Origin")
+			c.Header("Access-Control-Allow-Credentials", "true")
+			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+		}
 
-			if r.Method == http.MethodOptions {
-				w.WriteHeader(http.StatusNoContent)
-				return
-			}
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
 
-			next.ServeHTTP(w, r)
-		})
+		c.Next()
 	}
 }

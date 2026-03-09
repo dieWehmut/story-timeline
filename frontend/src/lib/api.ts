@@ -135,14 +135,29 @@ export const api = {
   deleteImage: (id: string) => request<{ ok: boolean }>(`${API_BASE}/api/images/${id}`, { method: 'DELETE' }),
   toggleLike: (ownerLogin: string, postID: string) =>
     request<LikeToggleResult>(`${API_BASE}/api/images/${ownerLogin}/${postID}/like`, { method: 'POST' }),
-  getComments: (ownerLogin: string, postID: string) =>
-    request<CommentItem[]>(`${API_BASE}/api/images/${ownerLogin}/${postID}/comments`),
-  addComment: (ownerLogin: string, postID: string, text: string) =>
-    request<CommentItem>(`${API_BASE}/api/images/${ownerLogin}/${postID}/comments`, {
+  getComments: async (ownerLogin: string, postID: string) => {
+    const items = await request<CommentItem[]>(`${API_BASE}/api/images/${ownerLogin}/${postID}/comments`);
+    return items.map((item) => ({ ...item, imageUrl: item.imageUrl ? withApiBase(item.imageUrl) : undefined }));
+  },
+  addComment: async (ownerLogin: string, postID: string, text: string, file?: File) => {
+    if (file) {
+      const formData = new FormData();
+      formData.set('text', text);
+      const webpBlob = await fileToWebp(file);
+      formData.append('file', webpBlob, 'comment.webp');
+      const item = await request<CommentItem>(`${API_BASE}/api/images/${ownerLogin}/${postID}/comments`, {
+        method: 'POST',
+        body: formData,
+      });
+      return { ...item, imageUrl: item.imageUrl ? withApiBase(item.imageUrl) : undefined };
+    }
+    const item = await request<CommentItem>(`${API_BASE}/api/images/${ownerLogin}/${postID}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
-    }),
+    });
+    return { ...item, imageUrl: item.imageUrl ? withApiBase(item.imageUrl) : undefined };
+  },
   getStats: () => request<HealthStats>(`${API_BASE}/api/health/stats`),
   pingStats: () => request<{ ok: boolean }>(`${API_BASE}/api/health/ping`, { method: 'POST' }),
 };

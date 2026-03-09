@@ -1,53 +1,55 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 
-	"github.com/dieWehmut/story-timeline/backend/internal/dto"
+	"github.com/gin-gonic/gin"
+
 	"github.com/dieWehmut/story-timeline/backend/internal/model"
 	"github.com/dieWehmut/story-timeline/backend/internal/service"
 )
 
-type contextKey string
+const sessionKey = "session"
 
-const sessionContextKey contextKey = "session"
+func RequireAuth(authService *service.AuthService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		session, err := authService.ReadSession(c.Request)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+			c.Abort()
+			return
+		}
 
-func RequireAuth(authService *service.AuthService) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			session, err := authService.ReadSession(r)
-			if err != nil {
-				dto.WriteError(w, http.StatusUnauthorized, "authentication required")
-				return
-			}
-
-			ctx := context.WithValue(r.Context(), sessionContextKey, session)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
+		c.Set(sessionKey, session)
+		c.Next()
 	}
 }
 
-func RequireAdmin(authService *service.AuthService) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return RequireAuth(authService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			session, ok := SessionFromContext(r.Context())
-			if !ok {
-				dto.WriteError(w, http.StatusUnauthorized, "authentication required")
-				return
-			}
+func RequireAdmin(authService *service.AuthService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		session, err := authService.ReadSession(c.Request)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+			c.Abort()
+			return
+		}
 
-			if !authService.IsAdmin(session.User.Login) {
-				dto.WriteError(w, http.StatusForbidden, "admin required")
-				return
-			}
+		if !authService.IsAdmin(session.User.Login) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "admin required"})
+			c.Abort()
+			return
+		}
 
-			next.ServeHTTP(w, r)
-		}))
+		c.Set(sessionKey, session)
+		c.Next()
 	}
 }
 
-func SessionFromContext(ctx context.Context) (*model.Session, bool) {
-	session, ok := ctx.Value(sessionContextKey).(*model.Session)
+func SessionFromContext(c *gin.Context) (*model.Session, bool) {
+	val, exists := c.Get(sessionKey)
+	if !exists {
+		return nil, false
+	}
+	session, ok := val.(*model.Session)
 	return session, ok
 }
