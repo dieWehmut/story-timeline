@@ -1,6 +1,7 @@
 import type {
   AuthSession,
   CreateImagePayload,
+  FeedUser,
   HealthStats,
   ImageItem,
   UpdateImagePayload,
@@ -119,7 +120,8 @@ const buildImageFormData = async (payload: CreateImagePayload | UpdateImagePaylo
 export const api = {
   getSession: async () => normalizeSession(await request<AuthSession>(`${API_BASE}/api/auth/session`)),
   logout: () => request<{ ok: boolean }>(`${API_BASE}/api/auth/logout`, { method: 'POST' }),
-  getImages: async () => (await request<ImageItem[]>(`${API_BASE}/api/images`)).map(normalizeImageItem),
+  getFeed: async () => (await request<ImageItem[]>(`${API_BASE}/api/feed`)).map(normalizeImageItem),
+  getFeedUsers: () => request<FeedUser[]>(`${API_BASE}/api/feed/users`),
   createImage: async (payload: CreateImagePayload) => {
     const body = await buildImageFormData(payload);
     return normalizeImageItem(await request<ImageItem>(`${API_BASE}/api/images`, { method: 'POST', body }));

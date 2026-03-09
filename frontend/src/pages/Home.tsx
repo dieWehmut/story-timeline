@@ -108,7 +108,10 @@ export default function Home({
         activeMonth={activeMonth}
         authLoading={auth.loading}
         authUser={auth.user}
-        isAdmin={auth.isAdmin}
+        canPost={auth.canPost}
+        feedUsers={images.feedUsers}
+        filterUser={images.filterUser}
+        onFilterUser={images.setFilterUser}
         onLogin={auth.login}
         onLogout={auth.logout}
         onThemeToggle={onThemeToggle}
@@ -152,13 +155,14 @@ export default function Home({
                   {items.map((item) => (
                     <ImageCard
                       busy={images.submitting}
-                      editable={auth.isAdmin}
+                      editable={auth.user?.login === item.authorLogin}
                       fallbackAuthorLogin={images.stats.githubOwner || auth.user?.login || undefined}
                       item={item}
                       key={item.id}
+                      onAvatarClick={(login) => images.setFilterUser(images.filterUser === login ? null : login)}
                       onDelete={images.deleteImage}
                       onSave={images.updateImage}
-                      roleLabel={auth.roleLabel}
+                      roleLabel={item.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
                     />
                   ))}
                 </div>

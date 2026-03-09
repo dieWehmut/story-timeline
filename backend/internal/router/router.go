@@ -31,12 +31,18 @@ func New(deps Dependencies, allowedOrigins []string) http.Handler {
 			auth.Post("/logout", deps.AuthController.Logout)
 		})
 
+		// Feed endpoints (public read, aggregated from multiple users)
+		api.Get("/feed", deps.ImageController.Feed)
+		api.Get("/feed/users", deps.ImageController.FeedUsers)
+
 		api.Route("/images", func(images chi.Router) {
-			images.Get("/", deps.ImageController.List)
-			images.Get("/{imageID}/asset/{assetIndex}", deps.ImageController.Asset)
-				images.With(middleware.RequireAdmin(deps.AuthService)).Post("/", deps.ImageController.Create)
-				images.With(middleware.RequireAdmin(deps.AuthService)).Patch("/{imageID}", deps.ImageController.Update)
-				images.With(middleware.RequireAdmin(deps.AuthService)).Delete("/{imageID}", deps.ImageController.Delete)
+			// Asset serving: /api/images/{ownerLogin}/{imageID}/asset/{assetIndex}
+			images.Get("/{ownerLogin}/{imageID}/asset/{assetIndex}", deps.ImageController.Asset)
+
+			// Write operations require authentication (any logged-in user)
+			images.With(middleware.RequireAuth(deps.AuthService)).Post("/", deps.ImageController.Create)
+			images.With(middleware.RequireAuth(deps.AuthService)).Patch("/{imageID}", deps.ImageController.Update)
+			images.With(middleware.RequireAuth(deps.AuthService)).Delete("/{imageID}", deps.ImageController.Delete)
 		})
 
 		api.Get("/health/stats", deps.HealthController.Stats)

@@ -11,6 +11,7 @@ interface ImageCardProps {
   roleLabel?: string;
   editable: boolean;
   busy: boolean;
+  onAvatarClick?: (login: string) => void;
   onDelete: (id: string) => Promise<void>;
   onSave: (payload: UpdateImagePayload) => Promise<void>;
 }
@@ -73,7 +74,7 @@ function ImageGrid({ urls, alt, onImageClick }: { urls: string[]; alt: string; o
   );
 }
 
-export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onDelete, onSave, roleLabel }: ImageCardProps) {
+export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onAvatarClick, onDelete, onSave, roleLabel }: ImageCardProps) {
   const [editing, setEditing] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const { confirm } = useToast();
@@ -109,11 +110,23 @@ export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onDelete,
         {/* Author row */}
         <div className="flex items-center gap-2 px-2 pb-0 pt-3">
           {authorAvatar ? (
-            <img alt={authorLabel} className="h-8 w-8 rounded-full object-cover ring-1 ring-white/10" src={authorAvatar} />
+            <button
+              className="shrink-0 transition-transform hover:scale-110"
+              onClick={() => onAvatarClick?.(authorLogin)}
+              title={authorLabel}
+              type="button"
+            >
+              <img alt={authorLabel} className="h-8 w-8 rounded-full object-cover ring-1 ring-white/10" src={authorAvatar} />
+            </button>
           ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/8 text-xs font-semibold text-soft ring-1 ring-white/10">
+            <button
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/8 text-xs font-semibold text-soft ring-1 ring-white/10 transition-transform hover:scale-110"
+              onClick={() => onAvatarClick?.(authorLogin)}
+              title={authorLabel}
+              type="button"
+            >
               {authorLabel.slice(0, 1).toUpperCase()}
-            </div>
+            </button>
           )}
           <p className="flex items-center gap-2 text-sm font-medium text-[var(--text-main)]">
             {authorLabel}

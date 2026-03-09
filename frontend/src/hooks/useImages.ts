@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import type {
   CreateImagePayload,
+  FeedUser,
   HealthStats,
   ImageItem,
   TimelineMonth,
@@ -28,14 +29,16 @@ const getMonthKey = (capturedAt: string) => {
 };
 
 const defaultStats: HealthStats = {
-  visitorCount: 0,
-  activeViewers: 0,
+  userCount: 0,
+  onlineUsers: 0,
   uptimeSeconds: 0,
   githubOwner: 'GitHub',
 };
 
 export const useImages = () => {
   const [items, setItems] = useState<ImageItem[]>([]);
+  const [feedUsers, setFeedUsers] = useState<FeedUser[]>([]);
+  const [filterUser, setFilterUser] = useState<string | null>(null);
   const [stats, setStats] = useState<HealthStats>(defaultStats);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -46,7 +49,11 @@ export const useImages = () => {
 
     const bootstrap = async () => {
       try {
-        const [nextItems, nextStats] = await Promise.all([api.getImages(), api.getStats()]);
+        const [nextItems, nextStats, nextUsers] = await Promise.all([
+          api.getFeed(),
+          api.getStats(),
+          api.getFeedUsers(),
+        ]);
 
         if (cancelled) {
           return;
@@ -58,6 +65,7 @@ export const useImages = () => {
           )
         );
         setStats(nextStats);
+        setFeedUsers(nextUsers);
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : '加载失败');
@@ -82,10 +90,18 @@ export const useImages = () => {
     };
   }, []);
 
+  // Filter items by selected user
+  const filteredItems = useMemo(() => {
+    if (!filterUser) return items;
+    return items.filter(
+      (item) => item.authorLogin.toLowerCase() === filterUser.toLowerCase()
+    );
+  }, [items, filterUser]);
+
   const timeline = useMemo<TimelineMonth[]>(() => {
     const monthMap = new Map<string, TimelineMonth>();
 
-    items.forEach((item) => {
+    filteredItems.forEach((item) => {
       const month = getMonthKey(item.capturedAt);
       const existing = monthMap.get(month.key);
 
@@ -102,7 +118,7 @@ export const useImages = () => {
     });
 
     return [...monthMap.values()].sort((left, right) => right.key.localeCompare(left.key));
-  }, [items]);
+  }, [filteredItems]);
 
   const createImage = async (payload: CreateImagePayload) => {
     setSubmitting(true);
@@ -115,6 +131,8 @@ export const useImages = () => {
           (left, right) => new Date(right.capturedAt).getTime() - new Date(left.capturedAt).getTime()
         )
       );
+      // Refresh feed users in case this is a new user
+      api.getFeedUsers().then(setFeedUsers).catch(() => undefined);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : '上传失败');
       throw submitError;
@@ -158,7 +176,11 @@ export const useImages = () => {
   };
 
   return {
-    items,
+    items: filteredItems,
+    allItems: items,
+    feedUsers,
+    filterUser,
+    setFilterUser,
     timeline,
     stats,
     loading,

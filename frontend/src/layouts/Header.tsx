@@ -2,13 +2,16 @@ import { CalendarRange } from 'lucide-react';
 import { ThemeButton } from './ThemeButton';
 import { AuthButton } from './AuthButton';
 import { UploadButton } from './UploadButton';
-import type { AuthUser, CreateImagePayload, TimelineMonth } from '../types/image';
+import type { AuthUser, CreateImagePayload, FeedUser, TimelineMonth } from '../types/image';
 
 interface HeaderProps {
 	activeMonth: TimelineMonth | null;
 	authLoading: boolean;
 	authUser: AuthUser | null;
-	isAdmin: boolean;
+	canPost: boolean;
+	feedUsers: FeedUser[];
+	filterUser: string | null;
+	onFilterUser: (login: string | null) => void;
 	onLogin: () => void;
 	onLogout: () => Promise<void>;
 	onThemeToggle: () => void;
@@ -23,7 +26,10 @@ export function Header({
 	activeMonth,
 	authLoading,
 	authUser,
-	isAdmin,
+	canPost,
+	feedUsers,
+	filterUser,
+	onFilterUser,
 	onLogin,
 	onLogout,
 	onThemeToggle,
@@ -47,7 +53,7 @@ export function Header({
 				<div className="flex items-center gap-1.5">
 					<AuthButton loading={authLoading} onLogin={onLogin} onLogout={onLogout} user={authUser} />
 					<ThemeButton onToggle={onThemeToggle} theme={theme} />
-					{authUser && isAdmin ? <UploadButton busy={uploadBusy} onSubmit={onUpload} /> : null}
+					{authUser && canPost ? <UploadButton busy={uploadBusy} onSubmit={onUpload} /> : null}
 					<div className={`transition-all duration-300 ${timelineOpen ? 'pointer-events-none scale-75 opacity-0' : 'opacity-100'}`}>
 						<button
 							aria-expanded={timelineOpen}
@@ -61,6 +67,44 @@ export function Header({
 					</div>
 				</div>
 			</div>
+
+			{/* Feed user avatars row */}
+			{feedUsers.length > 1 ? (
+				<div className="mx-auto mt-2 flex w-full max-w-6xl items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+					<button
+						className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition ${
+							filterUser === null
+								? 'bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-400/40'
+								: 'text-soft hover:text-[var(--text-main)]'
+						}`}
+						onClick={() => onFilterUser(null)}
+						type="button"
+					>
+						全部
+					</button>
+					{feedUsers.map((user) => (
+						<button
+							className={`shrink-0 transition-all duration-200 ${
+								filterUser === user.login
+									? 'scale-110 ring-2 ring-cyan-400 rounded-full'
+									: filterUser !== null
+										? 'opacity-50 hover:opacity-80'
+										: 'hover:scale-105'
+							}`}
+							key={user.login}
+							onClick={() => onFilterUser(filterUser === user.login ? null : user.login)}
+							title={user.login}
+							type="button"
+						>
+							<img
+								alt={user.login}
+								className="h-7 w-7 rounded-full object-cover"
+								src={user.avatarUrl}
+							/>
+						</button>
+					))}
+				</div>
+			) : null}
 		</header>
 	);
 }

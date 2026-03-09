@@ -6,6 +6,7 @@ const defaultSession: AuthSession = {
   authenticated: false,
   loginUrl: `${API_BASE}/api/auth/github/login`,
   isAdmin: false,
+  canPost: false,
   roleLabel: '游客',
   user: null,
 };

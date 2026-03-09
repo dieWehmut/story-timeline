@@ -49,6 +49,7 @@ func (controller *AuthController) Session(w http.ResponseWriter, r *http.Request
 			"authenticated": false,
 			"loginUrl":      "/api/auth/github/login",
 			"isAdmin":       false,
+			"canPost":       false,
 			"roleLabel":     "游客",
 			"user":          nil,
 		})
@@ -56,7 +57,7 @@ func (controller *AuthController) Session(w http.ResponseWriter, r *http.Request
 	}
 
 	isAdmin := controller.authService.IsAdmin(session.User.Login)
-	roleLabel := "游客"
+	roleLabel := "用户"
 	if isAdmin {
 		roleLabel = "管理员"
 	}
@@ -65,6 +66,7 @@ func (controller *AuthController) Session(w http.ResponseWriter, r *http.Request
 		"authenticated": true,
 		"loginUrl":      "/api/auth/github/login",
 		"isAdmin":       isAdmin,
+		"canPost":       true,
 		"roleLabel":     roleLabel,
 		"user": map[string]any{
 			"id":        session.User.ID,

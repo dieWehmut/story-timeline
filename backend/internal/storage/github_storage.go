@@ -14,8 +14,6 @@ import (
 )
 
 type GitHubStorage struct {
-	owner        string
-	repo         string
 	branch       string
 	defaultToken string
 	httpClient   *http.Client
@@ -30,26 +28,20 @@ type contentResponse struct {
 	Message      string `json:"message"`
 }
 
-func NewGitHubStorage(owner string, repo string, branch string, defaultToken string) *GitHubStorage {
+func NewGitHubStorage(branch string, defaultToken string) *GitHubStorage {
 	return &GitHubStorage{
-		owner:        owner,
-		repo:         repo,
 		branch:       branch,
 		defaultToken: defaultToken,
 		httpClient:   &http.Client{},
 	}
 }
 
-func (storage *GitHubStorage) Configured() bool {
-	return storage.owner != "" && storage.repo != ""
-}
-
-func (storage *GitHubStorage) GetFile(ctx context.Context, token string, filePath string) ([]byte, string, string, error) {
-	if !storage.Configured() {
+func (storage *GitHubStorage) GetFile(ctx context.Context, token string, owner string, repo string, filePath string) ([]byte, string, string, error) {
+	if owner == "" || repo == "" {
 		return nil, "", "", osErrNotFound(filePath)
 	}
 
-	endpoint := storage.contentsURL(filePath)
+	endpoint := contentsURL(owner, repo, filePath)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, "", "", err
@@ -91,13 +83,13 @@ func (storage *GitHubStorage) GetFile(ctx context.Context, token string, filePat
 	return decoded, payload.SHA, nilIfEmpty(contentType), nil
 }
 
-func (storage *GitHubStorage) PutFile(ctx context.Context, token string, filePath string, content []byte, message string) error {
-	if !storage.Configured() {
+func (storage *GitHubStorage) PutFile(ctx context.Context, token string, owner string, repo string, filePath string, content []byte, message string) error {
+	if owner == "" || repo == "" {
 		return fmt.Errorf("github storage is not configured")
 	}
 
-	sha, err := storage.lookupSHA(ctx, token, filePath)
-	if err != nil && !isNotFound(err) {
+	sha, err := storage.lookupSHA(ctx, token, owner, repo, filePath)
+	if err != nil && !IsNotFound(err) {
 		return err
 	}
 
@@ -110,17 +102,17 @@ func (storage *GitHubStorage) PutFile(ctx context.Context, token string, filePat
 		payload["sha"] = sha
 	}
 
-	return storage.sendJSON(ctx, token, http.MethodPut, storage.contentsURL(filePath), payload)
+	return storage.sendJSON(ctx, token, http.MethodPut, contentsURL(owner, repo, filePath), payload)
 }
 
-func (storage *GitHubStorage) DeleteFile(ctx context.Context, token string, filePath string, message string) error {
-	if !storage.Configured() {
+func (storage *GitHubStorage) DeleteFile(ctx context.Context, token string, owner string, repo string, filePath string, message string) error {
+	if owner == "" || repo == "" {
 		return nil
 	}
 
-	sha, err := storage.lookupSHA(ctx, token, filePath)
+	sha, err := storage.lookupSHA(ctx, token, owner, repo, filePath)
 	if err != nil {
-		if isNotFound(err) {
+		if IsNotFound(err) {
 			return nil
 		}
 		return err
@@ -132,16 +124,16 @@ func (storage *GitHubStorage) DeleteFile(ctx context.Context, token string, file
 		"branch":  storage.branch,
 	}
 
-	return storage.sendJSON(ctx, token, http.MethodDelete, storage.contentsURL(filePath), payload)
+	return storage.sendJSON(ctx, token, http.MethodDelete, contentsURL(owner, repo, filePath), payload)
 }
 
-func (storage *GitHubStorage) contentsURL(filePath string) string {
+func contentsURL(owner string, repo string, filePath string) string {
 	trimmed := strings.TrimPrefix(filePath, "/")
-	return fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s", storage.owner, storage.repo, trimmed)
+	return fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s", owner, repo, trimmed)
 }
 
-func (storage *GitHubStorage) lookupSHA(ctx context.Context, token string, filePath string) (string, error) {
-	_, sha, _, err := storage.GetFile(ctx, token, filePath)
+func (storage *GitHubStorage) lookupSHA(ctx context.Context, token string, owner string, repo string, filePath string) (string, error) {
+	_, sha, _, err := storage.GetFile(ctx, token, owner, repo, filePath)
 	if err != nil {
 		return "", err
 	}
@@ -205,7 +197,7 @@ func (err notFoundError) Error() string {
 	return fmt.Sprintf("%s not found", err.path)
 }
 
-func isNotFound(err error) bool {
+func IsNotFound(err error) bool {
 	_, ok := err.(notFoundError)
 	return ok
 }

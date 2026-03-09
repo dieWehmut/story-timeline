@@ -17,20 +17,25 @@ import (
 func main() {
 	env := config.LoadEnv()
 	ctx := context.Background()
+
 	githubOAuthClient := github.NewOAuthClient(env.GitHubClientID, env.GitHubClientSecret, env.GitHubCallbackURL)
-	authService := service.NewAuthService(githubOAuthClient, env.SessionSecret, env.SecureCookies, env.GitHubRepoOwner)
-	gitHubStorage := storage.NewGitHubStorage(env.GitHubRepoOwner, env.GitHubRepoName, env.GitHubRepoBranch, env.GitHubStorageToken)
-	imageService, err := service.NewImageService(ctx, gitHubStorage, env.CacheFile)
+	graphqlClient := github.NewGraphQLClient()
+
+	authService := service.NewAuthService(githubOAuthClient, graphqlClient, env.SessionSecret, env.SecureCookies, env.GitHubRepoOwner)
+	userService := service.NewUserService(graphqlClient, env.GitHubRepoName, env.GitHubRepoBranch, env.GitHubRepoOwner)
+	gitHubStorage := storage.NewGitHubStorage(env.GitHubRepoBranch, env.GitHubStorageToken)
+
+	imageService, err := service.NewImageService(ctx, gitHubStorage, env.GitHubRepoName, env.GitHubRepoOwner, env.GitHubStorageToken, env.CacheFile)
 	if err != nil {
 		log.Fatalf("failed to initialize image service: %v", err)
 	}
 
 	server := &http.Server{
-		Addr:              ":" + env.Port,
-		Handler:           router.New(router.Dependencies{
+		Addr: ":" + env.Port,
+		Handler: router.New(router.Dependencies{
 			AuthController:   controller.NewAuthController(authService, env.FrontendBaseURL),
-			ImageController:  controller.NewImageController(imageService),
-			HealthController: controller.NewHealthController(env.GitHubRepoOwner, env.SecureCookies),
+			ImageController:  controller.NewImageController(imageService, userService, authService),
+			HealthController: controller.NewHealthController(env.GitHubRepoOwner, authService),
 			AuthService:      authService,
 		}, config.AllowedOrigins(env)),
 		ReadHeaderTimeout: 5 * time.Second,

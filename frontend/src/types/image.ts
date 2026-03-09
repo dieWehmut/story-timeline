@@ -32,9 +32,14 @@ export interface UpdateImagePayload {
   files?: File[];
 }
 
+export interface FeedUser {
+  login: string;
+  avatarUrl: string;
+}
+
 export interface HealthStats {
-  visitorCount: number;
-  activeViewers: number;
+  userCount: number;
+  onlineUsers: number;
   uptimeSeconds: number;
   githubOwner: string;
 }
@@ -49,6 +54,7 @@ export interface AuthSession {
   authenticated: boolean;
   loginUrl: string;
   isAdmin: boolean;
+  canPost: boolean;
   roleLabel: string;
   user: AuthUser | null;
 }

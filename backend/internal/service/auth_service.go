@@ -25,14 +25,16 @@ const (
 
 type AuthService struct {
 	oauth         *githuboauth.OAuthClient
+	graphql       *githuboauth.GraphQLClient
 	signingSecret []byte
 	secureCookies bool
 	adminLogin    string
 }
 
-func NewAuthService(oauth *githuboauth.OAuthClient, secret string, secureCookies bool, adminLogin string) *AuthService {
+func NewAuthService(oauth *githuboauth.OAuthClient, graphql *githuboauth.GraphQLClient, secret string, secureCookies bool, adminLogin string) *AuthService {
 	return &AuthService{
 		oauth:         oauth,
+		graphql:       graphql,
 		signingSecret: []byte(secret),
 		secureCookies: secureCookies,
 		adminLogin:    strings.ToLower(strings.TrimSpace(adminLogin)),
@@ -74,7 +76,7 @@ func (service *AuthService) CompleteLogin(ctx context.Context, code string) (mod
 		return model.Session{}, err
 	}
 
-	user, err := service.oauth.FetchUser(ctx, token.AccessToken)
+	user, err := service.graphql.FetchUser(ctx, token.AccessToken)
 	if err != nil {
 		return model.Session{}, err
 	}
