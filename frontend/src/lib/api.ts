@@ -26,6 +26,22 @@ const normalizeImageItem = (item: ImageItem): ImageItem => ({
   imageUrl: withApiBase(item.imageUrl),
 });
 
+const extractErrorMessage = async (response: Response) => {
+  const contentType = response.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    const payload = (await response.json()) as { error?: string; message?: string };
+    return payload.error || payload.message || 'Request failed';
+  }
+
+  const text = await response.text();
+  if (text.includes('<!DOCTYPE html') || text.includes('<html')) {
+    return '后端返回了 HTML 页面，请检查 VITE_API_BASE 或 Hugging Face Space 是否正常运行';
+  }
+
+  return text || 'Request failed';
+};
+
 const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => {
   const response = await fetch(input, {
     credentials: 'include',
@@ -33,8 +49,12 @@ const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || 'Request failed');
+    throw new Error(await extractErrorMessage(response));
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(await extractErrorMessage(response));
   }
 
   return (await response.json()) as T;

@@ -25,13 +25,13 @@ const getMonthKey = (capturedAt: string) => {
   const parts = new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai',
     year: 'numeric',
-    month: '2-digit',
+    month: 'numeric',
   }).formatToParts(new Date(capturedAt));
 
-  const year = parts.find((part) => part.type === 'year')?.value ?? '0000';
-  const month = parts.find((part) => part.type === 'month')?.value ?? '00';
+  const year = Number(parts.find((part) => part.type === 'year')?.value ?? '0');
+  const month = Number(parts.find((part) => part.type === 'month')?.value ?? '0');
 
-  return `${year}-${month}`;
+  return `${year}-${String(month).padStart(2, '0')}`;
 };
 
 export default function Home({
