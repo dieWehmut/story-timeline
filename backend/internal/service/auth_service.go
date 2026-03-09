@@ -52,7 +52,7 @@ func (service *AuthService) SetOAuthStateCookie(w http.ResponseWriter, state str
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   service.secureCookies,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: service.sameSiteMode(),
 		MaxAge:   600,
 	})
 }
@@ -99,7 +99,7 @@ func (service *AuthService) SetSessionCookie(w http.ResponseWriter, session mode
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   service.secureCookies,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: service.sameSiteMode(),
 		MaxAge:   int((7 * 24 * time.Hour).Seconds()),
 	})
 
@@ -145,7 +145,7 @@ func (service *AuthService) ClearSession(w http.ResponseWriter) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   service.secureCookies,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: service.sameSiteMode(),
 		MaxAge:   -1,
 	})
 
@@ -155,9 +155,17 @@ func (service *AuthService) ClearSession(w http.ResponseWriter) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   service.secureCookies,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: service.sameSiteMode(),
 		MaxAge:   -1,
 	})
+}
+
+func (service *AuthService) sameSiteMode() http.SameSite {
+	if service.secureCookies {
+		return http.SameSiteNoneMode
+	}
+
+	return http.SameSiteLaxMode
 }
 
 func (service *AuthService) sign(payload string) string {
