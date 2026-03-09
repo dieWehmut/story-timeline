@@ -33,6 +33,15 @@ const normalizeImageItem = (item: ImageItem): ImageItem => ({
   imageUrls: (item.imageUrls ?? []).map(withApiBase),
 });
 
+const normalizeCommentItem = (item: CommentItem): CommentItem => {
+  const imageUrls = (item.imageUrls ?? (item.imageUrl ? [item.imageUrl] : [])).map(withApiBase);
+  return {
+    ...item,
+    imageUrl: imageUrls[0],
+    imageUrls,
+  };
+};
+
 const extractErrorMessage = async (response: Response) => {
   const contentType = response.headers.get('content-type') || '';
 
@@ -146,26 +155,28 @@ export const api = {
     request<LikeToggleResult>(`${API_BASE}/api/images/${ownerLogin}/${postID}/like`, { method: 'POST' }),
   getComments: async (ownerLogin: string, postID: string) => {
     const items = await request<CommentItem[]>(`${API_BASE}/api/images/${ownerLogin}/${postID}/comments`);
-    return items.map((item) => ({ ...item, imageUrl: item.imageUrl ? withApiBase(item.imageUrl) : undefined }));
+    return items.map(normalizeCommentItem);
   },
-  addComment: async (ownerLogin: string, postID: string, text: string, file?: File) => {
-    if (file) {
+  addComment: async (ownerLogin: string, postID: string, text: string, files?: File[]) => {
+    if (files && files.length > 0) {
       const formData = new FormData();
       formData.set('text', text);
-      const webpBlob = await fileToWebp(file);
-      formData.append('file', webpBlob, 'comment.webp');
+      for (const [index, file] of files.entries()) {
+        const webpBlob = await fileToWebp(file);
+        formData.append('files', webpBlob, `comment-${index + 1}.webp`);
+      }
       const item = await request<CommentItem>(`${API_BASE}/api/images/${ownerLogin}/${postID}/comments`, {
         method: 'POST',
         body: formData,
       });
-      return { ...item, imageUrl: item.imageUrl ? withApiBase(item.imageUrl) : undefined };
+      return normalizeCommentItem(item);
     }
     const item = await request<CommentItem>(`${API_BASE}/api/images/${ownerLogin}/${postID}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
     });
-    return { ...item, imageUrl: item.imageUrl ? withApiBase(item.imageUrl) : undefined };
+    return normalizeCommentItem(item);
   },
   getStats: () => request<HealthStats>(`${API_BASE}/api/health/stats`),
   pingStats: () => request<{ ok: boolean }>(`${API_BASE}/api/health/ping`, { method: 'POST' }),

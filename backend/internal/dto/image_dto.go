@@ -52,5 +52,6 @@ type CommentResponse struct {
 	PostID      string `json:"postId"`
 	Text        string `json:"text"`
 	ImageUrl    string `json:"imageUrl,omitempty"`
+	ImageURLs   []string `json:"imageUrls,omitempty"`
 	CreatedAt   string `json:"createdAt"`
 }

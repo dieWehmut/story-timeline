@@ -121,7 +121,7 @@ export function ImageCard({
   const [likeBusy, setLikeBusy] = useState(false);
   const [commentBusy, setCommentBusy] = useState(false);
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
-  const [commentImageUrl, setCommentImageUrl] = useState<string | null>(null);
+  const [commentImageViewer, setCommentImageViewer] = useState<{ urls: string[]; initialIndex: number } | null>(null);
   const { confirm } = useToast();
 
   // Auto-load comments on mount if there are any (for inline preview)
@@ -193,10 +193,10 @@ export function ImageCard({
     setCommentDialogOpen(true);
   };
 
-  const handleAddComment = async (text: string, file?: File) => {
+  const handleAddComment = async (text: string, files?: File[]) => {
     setCommentBusy(true);
     try {
-      const newComment = await api.addComment(authorLogin, item.id, text, file);
+      const newComment = await api.addComment(authorLogin, item.id, text, files);
       setComments((prev) => [...prev, newComment]);
       onCommentCountChange?.(item.id, 1);
     } finally {
@@ -305,13 +305,21 @@ export function ImageCard({
                     <span className="font-medium text-[var(--text-main)]">{c.authorLogin}</span>
                     <span className="text-[var(--text-main)]">：</span>
                     {c.text ? <span className="text-[var(--text-main)]">{c.text}</span> : null}
-                    {c.imageUrl ? (
-                      <img
-                        alt="评论图片"
-                        className="mt-0.5 block max-h-16 max-w-28 cursor-pointer rounded object-cover"
-                        onClick={(e) => { e.stopPropagation(); setCommentImageUrl(c.imageUrl!); }}
-                        src={c.imageUrl}
-                      />
+                    {c.imageUrls && c.imageUrls.length > 0 ? (
+                      <div className="mt-1 grid max-w-40 grid-cols-3 gap-1">
+                        {c.imageUrls.map((url, index) => (
+                          <img
+                            alt="评论图片"
+                            className="block h-12 w-12 cursor-pointer rounded object-cover"
+                            key={`${c.id}-${url}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCommentImageViewer({ urls: c.imageUrls!, initialIndex: index });
+                            }}
+                            src={url}
+                          />
+                        ))}
+                      </div>
                     ) : null}
                   </div>
                 ))}
@@ -375,8 +383,12 @@ export function ImageCard({
       />
 
       {/* Comment image viewer */}
-      {commentImageUrl ? (
-        <ImageViewer onClose={() => setCommentImageUrl(null)} urls={[commentImageUrl]} />
+      {commentImageViewer ? (
+        <ImageViewer
+          initialIndex={commentImageViewer.initialIndex}
+          onClose={() => setCommentImageViewer(null)}
+          urls={commentImageViewer.urls}
+        />
       ) : null}
     </>
   );

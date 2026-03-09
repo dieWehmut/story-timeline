@@ -19,6 +19,7 @@ import (
 
 const (
 	maxFiles     = 9
+	maxCommentFiles = 3
 	maxFileSize  = 5 << 20  // 5 MB
 	maxTotalSize = 25 << 20 // 25 MB
 )
@@ -43,6 +44,14 @@ func assetURLs(ownerLogin string, id string, count int) []string {
 	urls := make([]string, count)
 	for i := range count {
 		urls[i] = fmt.Sprintf("/api/images/%s/%s/asset/%d", ownerLogin, id, i)
+	}
+	return urls
+}
+
+func commentAssetURLs(commenterLogin string, comment model.Comment, count int) []string {
+	urls := make([]string, count)
+	for i := range count {
+		urls[i] = fmt.Sprintf("/api/comments/%s/%s/%s/%s/asset/%d", commenterLogin, comment.PostOwner, comment.PostID, comment.ID, i)
 	}
 	return urls
 }
@@ -376,8 +385,9 @@ func (controller *ImageController) GetComments(c *gin.Context) {
 	result := make([]dto.CommentResponse, 0, len(comments))
 	for _, cm := range comments {
 		var imageUrl string
-		if cm.ImagePath != "" {
-			imageUrl = fmt.Sprintf("/api/comments/%s/%s/%s/%s/asset", cm.AuthorLogin, cm.PostOwner, cm.PostID, cm.ID)
+		imageURLs := commentAssetURLs(cm.AuthorLogin, cm.Comment, len(cm.AllImagePaths()))
+		if len(imageURLs) > 0 {
+			imageUrl = imageURLs[0]
 		}
 		result = append(result, dto.CommentResponse{
 			ID:          cm.ID,
@@ -386,6 +396,7 @@ func (controller *ImageController) GetComments(c *gin.Context) {
 			PostID:      cm.PostID,
 			Text:        cm.Text,
 			ImageUrl:    imageUrl,
+			ImageURLs:   imageURLs,
 			CreatedAt:   cm.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
 		})
 	}
@@ -411,19 +422,21 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 	}
 
 	var text string
-	var imageData []byte
+	var imageData [][]byte
 
 	contentType := c.GetHeader("Content-Type")
 	if strings.HasPrefix(contentType, "multipart/form-data") {
-		text = strings.TrimSpace(c.PostForm("text"))
-		fh, err := c.FormFile("file")
-		if err == nil && fh.Size <= maxFileSize {
-			f, ferr := fh.Open()
-			if ferr == nil {
-				imageData, _ = io.ReadAll(f)
-				f.Close()
-			}
+		if err := c.Request.ParseMultipartForm(maxTotalSize + (1 << 20)); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
 		}
+		text = strings.TrimSpace(c.PostForm("text"))
+		files, err := readMultipartFilesWithLimit(c.Request, maxCommentFiles)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		imageData = files
 	} else {
 		var body struct {
 			Text string `json:"text"`
@@ -447,8 +460,9 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 	}
 
 	var imageUrl string
-	if comment.ImagePath != "" {
-		imageUrl = fmt.Sprintf("/api/comments/%s/%s/%s/%s/asset", session.User.Login, ownerLogin, postID, comment.ID)
+	imageURLs := commentAssetURLs(session.User.Login, comment, len(comment.AllImagePaths()))
+	if len(imageURLs) > 0 {
+		imageUrl = imageURLs[0]
 	}
 
 	c.JSON(http.StatusCreated, dto.CommentResponse{
@@ -458,6 +472,7 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 		PostID:      comment.PostID,
 		Text:        comment.Text,
 		ImageUrl:    imageUrl,
+		ImageURLs:   imageURLs,
 		CreatedAt:   comment.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
 	})
 }
@@ -468,8 +483,17 @@ func (controller *ImageController) CommentAsset(c *gin.Context) {
 	postOwner := c.Param("postOwner")
 	postID := c.Param("postID")
 	commentID := c.Param("commentID")
+	assetIndex := 0
+	if rawAssetIndex := c.Param("assetIndex"); rawAssetIndex != "" {
+		parsedIndex, err := strconv.Atoi(rawAssetIndex)
+		if err != nil || parsedIndex < 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid asset index"})
+			return
+		}
+		assetIndex = parsedIndex
+	}
 
-	content, contentType, err := controller.interactionService.ReadCommentImage(c.Request.Context(), commenterLogin, postOwner, postID, commentID)
+	content, contentType, err := controller.interactionService.ReadCommentImage(c.Request.Context(), commenterLogin, postOwner, postID, commentID, assetIndex)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -479,12 +503,16 @@ func (controller *ImageController) CommentAsset(c *gin.Context) {
 }
 
 func readMultipartFiles(r *http.Request) ([][]byte, error) {
+	return readMultipartFilesWithLimit(r, maxFiles)
+}
+
+func readMultipartFilesWithLimit(r *http.Request, maxCount int) ([][]byte, error) {
 	fileHeaders := r.MultipartForm.File["files"]
 	if len(fileHeaders) == 0 {
 		fileHeaders = r.MultipartForm.File["file"]
 	}
-	if len(fileHeaders) > maxFiles {
-		return nil, fmt.Errorf("最多上传 %d 张图片", maxFiles)
+	if len(fileHeaders) > maxCount {
+		return nil, fmt.Errorf("最多上传 %d 张图片", maxCount)
 	}
 
 	var totalSize int64

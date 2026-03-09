@@ -157,6 +157,78 @@ func (c *GraphQLClient) FetchFollowing(ctx context.Context, token string) ([]mod
 	return all, nil
 }
 
+// SearchRepoOwners returns owners of repositories whose name matches repoName.
+func (c *GraphQLClient) SearchRepoOwners(ctx context.Context, token string, repoName string) ([]model.GitHubUser, error) {
+	query := `query($query: String!, $cursor: String) {
+		search(query: $query, type: REPOSITORY, first: 100, after: $cursor) {
+			pageInfo { hasNextPage endCursor }
+			nodes {
+				... on Repository {
+					name
+					owner {
+						login
+						avatarUrl
+					}
+				}
+			}
+		}
+	}`
+
+	searchQuery := fmt.Sprintf("%s in:name", repoName)
+	var all []model.GitHubUser
+	seen := map[string]struct{}{}
+	var cursor *string
+
+	for {
+		vars := map[string]any{"query": searchQuery}
+		if cursor != nil {
+			vars["cursor"] = *cursor
+		}
+
+		var data struct {
+			Search struct {
+				PageInfo struct {
+					HasNextPage bool   `json:"hasNextPage"`
+					EndCursor   string `json:"endCursor"`
+				} `json:"pageInfo"`
+				Nodes []struct {
+					Name  string `json:"name"`
+					Owner struct {
+						Login     string `json:"login"`
+						AvatarURL string `json:"avatarUrl"`
+					} `json:"owner"`
+				} `json:"nodes"`
+			} `json:"search"`
+		}
+
+		if err := c.execute(ctx, token, query, vars, &data); err != nil {
+			return nil, err
+		}
+
+		for _, node := range data.Search.Nodes {
+			if !strings.EqualFold(node.Name, repoName) || node.Owner.Login == "" {
+				continue
+			}
+			loginKey := strings.ToLower(node.Owner.Login)
+			if _, ok := seen[loginKey]; ok {
+				continue
+			}
+			seen[loginKey] = struct{}{}
+			all = append(all, model.GitHubUser{
+				Login:     node.Owner.Login,
+				AvatarURL: node.Owner.AvatarURL,
+			})
+		}
+
+		if !data.Search.PageInfo.HasNextPage {
+			break
+		}
+		cursor = &data.Search.PageInfo.EndCursor
+	}
+
+	return all, nil
+}
+
 // CheckRepo returns true if the specified user has the given repository.
 func (c *GraphQLClient) CheckRepo(ctx context.Context, token string, owner string, repoName string) (bool, error) {
 	query := `query($owner: String!, $name: String!) {

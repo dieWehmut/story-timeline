@@ -167,7 +167,10 @@ export const useImages = () => {
         return next;
       });
       // Refresh feed users in case this is a new user
-      api.getFeedUsers().then(setFeedUsers).catch(() => undefined);
+      api.getFeedUsers().then((users) => {
+        setFeedUsers(users);
+        saveCacheUsers(users);
+      }).catch(() => undefined);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : '上传失败');
       throw submitError;

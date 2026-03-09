@@ -18,6 +18,7 @@ const MAX_FILES = 9;
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_TOTAL_SIZE = 25 * 1024 * 1024;
 const DRAFT_KEY = 'draft:post';
+const postDraftFileCache = new Map<string, File[]>();
 
 const getDefaultDateTime = () => {
   const formatter = new Intl.DateTimeFormat('sv-SE', {
@@ -37,6 +38,17 @@ interface PreviewItem {
   file?: File;
   url: string;
 }
+
+const buildFilePreviewItems = (files: File[]): PreviewItem[] =>
+  files.map((file) => ({ type: 'file' as const, file, url: URL.createObjectURL(file) }));
+
+const revokeFilePreviews = (items: PreviewItem[]) => {
+  items.forEach((item) => {
+    if (item.type === 'file') {
+      URL.revokeObjectURL(item.url);
+    }
+  });
+};
 
 export function PostDialog({
   open,
@@ -69,6 +81,11 @@ export function PostDialog({
   const prevOpenRef = useRef(false);
   const [animating, setAnimating] = useState(false);
   const [visible, setVisible] = useState(false);
+  const previewsRef = useRef<PreviewItem[]>(previews);
+
+  useEffect(() => {
+    previewsRef.current = previews;
+  }, [previews]);
 
   // Stable key for initialImageUrls to avoid re-triggering effect
   const initialUrlsKey = initialImageUrls.join(',');
@@ -76,6 +93,7 @@ export function PostDialog({
   // Reset state only when dialog freshly opens (false → true)
   useEffect(() => {
     if (open && !prevOpenRef.current) {
+      const draftFiles = mode === 'create' ? (postDraftFileCache.get(DRAFT_KEY) ?? []) : [];
       if (mode === 'create') {
         try {
           const saved = localStorage.getItem(DRAFT_KEY);
@@ -103,14 +121,28 @@ export function PostDialog({
         setStartAt(initialStartAt ?? getDefaultDateTime());
         setEndAt(initialEndAt ?? initialStartAt ?? getDefaultDateTime());
       }
-      setPreviews(initialImageUrls.map((url) => ({ type: 'url' as const, url })));
+      setPreviews((current) => {
+        revokeFilePreviews(current);
+        return [...initialImageUrls.map((url) => ({ type: 'url' as const, url })), ...buildFilePreviewItems(draftFiles)];
+      });
       setError(null);
       setDraggingIndex(null);
       setOverDelete(false);
+    } else if (!open && prevOpenRef.current && mode === 'create') {
+      const draftFiles = previewsRef.current.filter((item) => item.type === 'file').map((item) => item.file!);
+      if (draftFiles.length > 0) {
+        postDraftFileCache.set(DRAFT_KEY, draftFiles);
+      } else {
+        postDraftFileCache.delete(DRAFT_KEY);
+      }
     }
     prevOpenRef.current = open;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialDescription, initialEndAt, initialStartAt, initialTimeMode, initialUrlsKey, mode]);
+
+  useEffect(() => () => {
+    revokeFilePreviews(previewsRef.current);
+  }, []);
 
   // Persist create-mode draft to localStorage whenever fields change
   useEffect(() => {
@@ -204,7 +236,10 @@ export function PostDialog({
         files,
         removedUrls: removedUrls.length > 0 ? removedUrls : undefined,
       });
-      if (mode === 'create') localStorage.removeItem(DRAFT_KEY);
+      if (mode === 'create') {
+        localStorage.removeItem(DRAFT_KEY);
+        postDraftFileCache.delete(DRAFT_KEY);
+      }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : '提交失败');
     }

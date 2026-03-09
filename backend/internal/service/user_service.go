@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,7 @@ type UserService struct {
 	mu          sync.RWMutex
 	followCache map[string]*followEntry
 	repoCache   map[string]*repoEntry
+	allUsers    *followEntry
 }
 
 type followEntry struct {
@@ -42,6 +44,27 @@ func NewUserService(graphql *githubclient.GraphQLClient, repoName string, branch
 		followCache: map[string]*followEntry{},
 		repoCache:   map[string]*repoEntry{},
 	}
+}
+
+func (s *UserService) GetAllFeedUsers(ctx context.Context, token string) ([]model.GitHubUser, error) {
+	s.mu.RLock()
+	entry := s.allUsers
+	s.mu.RUnlock()
+
+	if entry != nil && time.Since(entry.loadedAt) < followCacheTTL {
+		return entry.users, nil
+	}
+
+	users, err := s.graphql.SearchRepoOwners(ctx, token, s.repoName)
+	if err != nil {
+		return nil, err
+	}
+
+	s.mu.Lock()
+	s.allUsers = &followEntry{users: users, loadedAt: time.Now()}
+	s.mu.Unlock()
+
+	return users, nil
 }
 
 // GetFollowing returns the list of users the viewer follows (cached).
@@ -109,6 +132,7 @@ func (s *UserService) EnsureRepo(ctx context.Context, token string, login string
 
 	s.mu.Lock()
 	s.repoCache[login] = &repoEntry{exists: true, checkedAt: time.Now()}
+	s.allUsers = nil
 	s.mu.Unlock()
 
 	return nil
@@ -121,6 +145,10 @@ func (s *UserService) GetFeedUsers(ctx context.Context, token string, viewerLogi
 
 	if token == "" || viewerLogin == "" {
 		return result, nil
+	}
+
+	if s.adminLogin != "" && strings.EqualFold(viewerLogin, s.adminLogin) {
+		return s.GetAllFeedUsers(ctx, token)
 	}
 
 	following, err := s.GetFollowing(ctx, token, viewerLogin)

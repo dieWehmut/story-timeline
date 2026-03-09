@@ -78,6 +78,7 @@ export interface CommentItem {
   postId: string;
   text: string;
   imageUrl?: string;
+  imageUrls?: string[];
   createdAt: string;
 }
 

@@ -93,7 +93,18 @@ type Comment struct {
 	PostID    string    `json:"postId"`
 	Text      string    `json:"text"`
 	ImagePath string    `json:"imagePath,omitempty"`
+	ImagePaths []string `json:"imagePaths,omitempty"`
 	CreatedAt time.Time `json:"createdAt"`
+}
+
+func (comment Comment) AllImagePaths() []string {
+	if len(comment.ImagePaths) > 0 {
+		return comment.ImagePaths
+	}
+	if comment.ImagePath != "" {
+		return []string{comment.ImagePath}
+	}
+	return nil
 }
 
 // CommentFile is persisted as comments/{postOwnerLogin}/{postID}.json in the commenter's repo.

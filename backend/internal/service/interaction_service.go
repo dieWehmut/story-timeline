@@ -151,6 +151,14 @@ func commentPath(postOwner, postID string) string {
 	return fmt.Sprintf("comments/%s/%s.json", postOwner, postID)
 }
 
+func commentImagePath(postOwner, postID, commentID string, assetIndex int) string {
+	return fmt.Sprintf("comment-images/%s/%s/%s/%d.webp", postOwner, postID, commentID, assetIndex)
+}
+
+func legacyCommentImagePath(postOwner, postID, commentID string) string {
+	return fmt.Sprintf("comment-images/%s/%s/%s.webp", postOwner, postID, commentID)
+}
+
 func cmtKey(commenterLogin, postOwner, postID string) string {
 	return commenterLogin + "/" + postOwner + "/" + postID
 }
@@ -200,7 +208,7 @@ func (s *InteractionService) persistComments(ctx context.Context, token, comment
 }
 
 // AddComment adds a comment stored in the commenter's repo.
-func (s *InteractionService) AddComment(ctx context.Context, token string, commenter model.GitHubUser, postOwner, postID, text string, imageData []byte) (model.Comment, error) {
+func (s *InteractionService) AddComment(ctx context.Context, token string, commenter model.GitHubUser, postOwner, postID, text string, imageData [][]byte) (model.Comment, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -213,12 +221,13 @@ func (s *InteractionService) AddComment(ctx context.Context, token string, comme
 	}
 
 	commentID := utils.NewID()
-	var imagePath string
-	if len(imageData) > 0 {
-		imagePath = fmt.Sprintf("comment-images/%s/%s/%s.webp", postOwner, postID, commentID)
-		if err := s.storage.PutFile(ctx, token, commenter.Login, s.repoName, imagePath, imageData, "Add comment image"); err != nil {
+	imagePaths := make([]string, 0, len(imageData))
+	for assetIndex, data := range imageData {
+		imagePath := commentImagePath(postOwner, postID, commentID, assetIndex)
+		if err := s.storage.PutFile(ctx, token, commenter.Login, s.repoName, imagePath, data, fmt.Sprintf("Add comment image %d", assetIndex+1)); err != nil {
 			return model.Comment{}, err
 		}
+		imagePaths = append(imagePaths, imagePath)
 	}
 
 	comment := model.Comment{
@@ -226,8 +235,12 @@ func (s *InteractionService) AddComment(ctx context.Context, token string, comme
 		PostOwner: postOwner,
 		PostID:    postID,
 		Text:      text,
-		ImagePath: imagePath,
+		ImagePath: "",
+		ImagePaths: imagePaths,
 		CreatedAt: utils.NowBeijing(),
+	}
+	if len(imagePaths) == 1 {
+		comment.ImagePath = imagePaths[0]
 	}
 
 	cf.Comments = append(cf.Comments, comment)
@@ -297,10 +310,19 @@ func (s *InteractionService) IsLikedBy(ctx context.Context, token, ownerLogin, p
 }
 
 // ReadCommentImage reads a comment image from the commenter's repo.
-func (s *InteractionService) ReadCommentImage(ctx context.Context, commenterLogin, postOwner, postID, commentID string) ([]byte, string, error) {
-	imagePath := fmt.Sprintf("comment-images/%s/%s/%s.webp", postOwner, postID, commentID)
+func (s *InteractionService) ReadCommentImage(ctx context.Context, commenterLogin, postOwner, postID, commentID string, assetIndex int) ([]byte, string, error) {
+	imagePath := commentImagePath(postOwner, postID, commentID, assetIndex)
 	content, _, contentType, err := s.storage.GetFile(ctx, s.defaultToken, commenterLogin, s.repoName, imagePath)
-	if err != nil {
+	if err == nil {
+		return content, contentType, nil
+	}
+	if assetIndex != 0 {
+		return nil, "", err
+	}
+
+	legacyPath := legacyCommentImagePath(postOwner, postID, commentID)
+	content, _, contentType, legacyErr := s.storage.GetFile(ctx, s.defaultToken, commenterLogin, s.repoName, legacyPath)
+	if legacyErr != nil {
 		return nil, "", err
 	}
 	return content, contentType, nil

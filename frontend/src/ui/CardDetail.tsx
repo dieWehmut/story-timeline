@@ -7,7 +7,15 @@ import { api } from '../lib/api';
 import type { CommentItem, ImageItem, UpdateImagePayload } from '../types/image';
 
 // Module-level cache: persists draft comment files while detail view is closed
-const detailFileCache = new Map<string, File>();
+const detailFileCache = new Map<string, File[]>();
+const MAX_COMMENT_FILES = 3;
+const MAX_COMMENT_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_COMMENT_TOTAL_SIZE = 25 * 1024 * 1024;
+
+const createPreviewUrls = (files: File[]) => files.map((currentFile) => URL.createObjectURL(currentFile));
+const revokePreviewUrls = (urls: string[]) => {
+  urls.forEach((url) => URL.revokeObjectURL(url));
+};
 
 const toDateTimeInputValue = (value: string) => {
   const formatter = new Intl.DateTimeFormat('sv-SE', {
@@ -129,38 +137,46 @@ export function CardDetail({
   const [commentBusy, setCommentBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
-  const [viewingCommentImage, setViewingCommentImage] = useState<string | null>(null);
+  const [viewingCommentImage, setViewingCommentImage] = useState<{ urls: string[]; initialIndex: number } | null>(null);
   const [likeBusy, setLikeBusy] = useState(false);
 
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
   const { confirm } = useToast();
-  const fileRef = useRef<File | null>(null);
+  const fileRef = useRef<File[]>([]);
+  const previewRef = useRef<string[]>([]);
 
-  // Keep fileRef current for unmount cleanup
-  useEffect(() => { fileRef.current = file; }, [file]);
+  const replaceCommentFiles = useCallback((nextFiles: File[]) => {
+    revokePreviewUrls(previewRef.current);
+    const nextPreviews = createPreviewUrls(nextFiles);
+    setFiles(nextFiles);
+    setPreviews(nextPreviews);
+  }, []);
+
+  useEffect(() => { fileRef.current = files; }, [files]);
+  useEffect(() => { previewRef.current = previews; }, [previews]);
 
   // Restore draft file on mount; save draft file on unmount
   useEffect(() => {
     const cached = detailFileCache.get(item.id);
-    if (cached) {
-      setFile(cached);
-      setPreview(URL.createObjectURL(cached));
+    if (cached && cached.length > 0) {
+      replaceCommentFiles(cached);
       detailFileCache.delete(item.id);
     }
     return () => {
-      if (fileRef.current) {
+      if (fileRef.current.length > 0) {
         detailFileCache.set(item.id, fileRef.current);
       } else {
         detailFileCache.delete(item.id);
       }
+      revokePreviewUrls(previewRef.current);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [item.id, replaceCommentFiles]);
 
   const authorLogin = item.authorLogin || fallbackAuthorLogin || 'GitHub';
   const authorAvatar =
@@ -237,31 +253,44 @@ export function CardDetail({
 
   const handleFileSelect = useCallback((incoming: FileList | null) => {
     if (!incoming || incoming.length === 0) return;
-    const selected = incoming[0];
-    if (selected.size > 5 * 1024 * 1024) {
-      setError('图片不能超过 5MB');
+    const selectedFiles = Array.from(incoming);
+    const nextFiles = [...fileRef.current, ...selectedFiles];
+
+    if (nextFiles.length > MAX_COMMENT_FILES) {
+      setError(`评论最多上传 ${MAX_COMMENT_FILES} 张图片`);
       return;
     }
-    setFile(selected);
-    setPreview(URL.createObjectURL(selected));
-    setError(null);
-  }, []);
 
-  const removeFile = useCallback(() => {
-    if (preview) URL.revokeObjectURL(preview);
-    setFile(null);
-    setPreview(null);
-  }, [preview]);
+    let totalSize = 0;
+    for (const selected of nextFiles) {
+      if (selected.size > MAX_COMMENT_FILE_SIZE) {
+        setError(`单张图片不能超过 5MB: ${selected.name}`);
+        return;
+      }
+      totalSize += selected.size;
+    }
+    if (totalSize > MAX_COMMENT_TOTAL_SIZE) {
+      setError('评论图片总大小不能超过 25MB');
+      return;
+    }
+
+    replaceCommentFiles(nextFiles);
+    setError(null);
+  }, [replaceCommentFiles]);
+
+  const removeFile = useCallback((index: number) => {
+    replaceCommentFiles(fileRef.current.filter((_, currentIndex) => currentIndex !== index));
+  }, [replaceCommentFiles]);
 
   const handleAddComment = async () => {
-    if (!text.trim() && !file) return;
+    if (!text.trim() && files.length === 0) return;
     setCommentBusy(true);
     try {
-      const newComment = await api.addComment(authorLogin, item.id, text.trim(), file ?? undefined);
+      const newComment = await api.addComment(authorLogin, item.id, text.trim(), files.length > 0 ? files : undefined);
       setComments((prev) => [...prev, newComment]);
       onCommentCountChange?.(item.id, 1);
       setText('');
-      removeFile();
+      replaceCommentFiles([]);
       detailFileCache.delete(item.id);
       setError(null);
     } catch (e) {
@@ -392,13 +421,18 @@ export function CardDetail({
                         {c.text ? (
                           <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--text-main)]">{c.text}</p>
                         ) : null}
-                        {c.imageUrl ? (
-                          <img
-                            alt="评论图片"
-                            className="mt-1 max-h-40 max-w-56 cursor-pointer rounded object-cover"
-                            onClick={() => setViewingCommentImage(c.imageUrl!)}
-                            src={c.imageUrl}
-                          />
+                        {c.imageUrls && c.imageUrls.length > 0 ? (
+                          <div className="mt-2 grid max-w-56 grid-cols-3 gap-1">
+                            {c.imageUrls.map((url, index) => (
+                              <img
+                                alt="评论图片"
+                                className="h-20 w-full cursor-pointer rounded object-cover"
+                                key={`${c.id}-${url}`}
+                                onClick={() => setViewingCommentImage({ urls: c.imageUrls!, initialIndex: index })}
+                                src={url}
+                              />
+                            ))}
+                          </div>
                         ) : null}
                       </div>
                     </div>
@@ -412,16 +446,20 @@ export function CardDetail({
         {/* Comment input bar (sticky at bottom) */}
         {canInteract ? (
           <div className="shrink-0 border-t border-[var(--panel-border)] bg-[var(--page-bg)] px-4 py-2">
-            {preview ? (
-              <div className="relative mb-2 inline-block">
-                <img alt="" className="h-16 w-16 rounded object-cover" src={preview} />
-                <button
-                  className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white/80 hover:text-white"
-                  onClick={removeFile}
-                  type="button"
-                >
-                  <X size={12} />
-                </button>
+            {previews.length > 0 ? (
+              <div className="mb-2 grid grid-cols-3 gap-2">
+                {previews.map((preview, index) => (
+                  <div className="relative inline-block" key={`${preview}-${index}`}>
+                    <img alt="" className="h-16 w-full rounded object-cover" src={preview} />
+                    <button
+                      className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white/80 hover:text-white"
+                      onClick={() => removeFile(index)}
+                      type="button"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
               </div>
             ) : null}
             {error ? <p className="mb-1 text-xs text-rose-300">{error}</p> : null}
@@ -436,6 +474,7 @@ export function CardDetail({
               <input
                 accept="image/*"
                 className="hidden"
+                multiple
                 onChange={(e) => {
                   handleFileSelect(e.target.files);
                   e.target.value = '';
@@ -460,7 +499,7 @@ export function CardDetail({
               />
               <button
                 className="inline-flex h-9 w-9 shrink-0 items-center justify-center text-cyan-300 transition hover:text-cyan-200 disabled:opacity-50"
-                disabled={commentBusy || (!text.trim() && !file)}
+                disabled={commentBusy || (!text.trim() && files.length === 0)}
                 onClick={() => void handleAddComment()}
                 type="button"
               >
@@ -494,7 +533,11 @@ export function CardDetail({
 
       {/* Comment image viewer */}
       {viewingCommentImage ? (
-        <ImageViewer onClose={() => setViewingCommentImage(null)} urls={[viewingCommentImage]} />
+        <ImageViewer
+          initialIndex={viewingCommentImage.initialIndex}
+          onClose={() => setViewingCommentImage(null)}
+          urls={viewingCommentImage.urls}
+        />
       ) : null}
     </>
   );

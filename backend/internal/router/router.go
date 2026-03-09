@@ -56,6 +56,7 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 
 		comments := api.Group("/comments")
 		{
+			comments.GET("/:commenterLogin/:postOwner/:postID/:commentID/asset/:assetIndex", deps.ImageController.CommentAsset)
 			comments.GET("/:commenterLogin/:postOwner/:postID/:commentID/asset", deps.ImageController.CommentAsset)
 		}
 
