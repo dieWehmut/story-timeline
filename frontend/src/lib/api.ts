@@ -8,6 +8,24 @@ import type {
 
 export const API_BASE = import.meta.env.VITE_API_BASE || '';
 
+const withApiBase = (value: string) => {
+  if (!value || value.startsWith('http://') || value.startsWith('https://')) {
+    return value;
+  }
+
+  return `${API_BASE}${value}`;
+};
+
+const normalizeSession = (session: AuthSession): AuthSession => ({
+  ...session,
+  loginUrl: withApiBase(session.loginUrl),
+});
+
+const normalizeImageItem = (item: ImageItem): ImageItem => ({
+  ...item,
+  imageUrl: withApiBase(item.imageUrl),
+});
+
 const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => {
   const response = await fetch(input, {
     credentials: 'include',
@@ -78,16 +96,16 @@ const buildImageFormData = async (payload: CreateImagePayload | UpdateImagePaylo
 };
 
 export const api = {
-  getSession: () => request<AuthSession>(`${API_BASE}/api/auth/session`),
+  getSession: async () => normalizeSession(await request<AuthSession>(`${API_BASE}/api/auth/session`)),
   logout: () => request<{ ok: boolean }>(`${API_BASE}/api/auth/logout`, { method: 'POST' }),
-  getImages: () => request<ImageItem[]>(`${API_BASE}/api/images`),
+  getImages: async () => (await request<ImageItem[]>(`${API_BASE}/api/images`)).map(normalizeImageItem),
   createImage: async (payload: CreateImagePayload) => {
     const body = await buildImageFormData(payload);
-    return request<ImageItem>(`${API_BASE}/api/images`, { method: 'POST', body });
+    return normalizeImageItem(await request<ImageItem>(`${API_BASE}/api/images`, { method: 'POST', body }));
   },
   updateImage: async (payload: UpdateImagePayload) => {
     const body = await buildImageFormData(payload);
-    return request<ImageItem>(`${API_BASE}/api/images/${payload.id}`, { method: 'PATCH', body });
+    return normalizeImageItem(await request<ImageItem>(`${API_BASE}/api/images/${payload.id}`, { method: 'PATCH', body }));
   },
   deleteImage: (id: string) => request<{ ok: boolean }>(`${API_BASE}/api/images/${id}`, { method: 'DELETE' }),
   getStats: () => request<HealthStats>(`${API_BASE}/api/health/stats`),

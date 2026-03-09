@@ -1,6 +1,5 @@
-import { useId, useMemo, useState } from 'react';
-import { Clock3, PencilLine, Save, Trash2, X } from 'lucide-react';
-import { Button } from '../ui/Button';
+import { useId, useState } from 'react';
+import { PencilLine, Save, Trash2, X } from 'lucide-react';
 import type { ImageItem, UpdateImagePayload } from '../types/image';
 
 interface ImageCardProps {
@@ -55,8 +54,6 @@ export function ImageCard({ busy, editable, item, onDelete, onSave }: ImageCardP
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const monthKey = useMemo(() => capturedAt.slice(0, 7), [capturedAt]);
-
   const handleSave = async () => {
     try {
       await onSave({
@@ -81,38 +78,11 @@ export function ImageCard({ busy, editable, item, onDelete, onSave }: ImageCardP
     setEditing(false);
   };
 
-  return (
-    <article className="glass-panel group rounded-[2.2rem] p-5 md:p-6" data-month-key={monthKey} id={`story-${item.id}`}>
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.32em] text-cyan-300/75">Story Card</p>
-          <p className="mt-2 text-sm text-soft">北京时间 · {monthKey.replace('-', ' / ')}</p>
-        </div>
-        {editable ? (
-          <div className="flex items-center gap-2 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
-            {editing ? (
-              <>
-                <Button className="h-10 w-10 rounded-2xl p-0" onClick={() => void handleSave()} variant="primary">
-                  <Save size={16} />
-                </Button>
-                <Button className="h-10 w-10 rounded-2xl p-0" onClick={reset} variant="ghost">
-                  <X size={16} />
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button className="h-10 w-10 rounded-2xl p-0" onClick={() => setEditing(true)} variant="ghost">
-                  <PencilLine size={16} />
-                </Button>
-                <Button className="h-10 w-10 rounded-2xl p-0 text-rose-200 hover:bg-rose-500/10" onClick={() => void onDelete(item.id)} variant="ghost">
-                  <Trash2 size={16} />
-                </Button>
-              </>
-            )}
-          </div>
-        ) : null}
-      </div>
+  const iconButtonClass =
+    'inline-flex h-8 w-8 items-center justify-center text-soft transition hover:text-[var(--text-main)]';
 
+  return (
+    <article className="glass-panel group rounded-[2.2rem] p-5 md:p-6" id={`story-${item.id}`}>
       {editing ? (
         <div className="space-y-4">
           <label className="block space-y-2" htmlFor={descriptionId}>
@@ -150,12 +120,32 @@ export function ImageCard({ busy, editable, item, onDelete, onSave }: ImageCardP
           <div className="overflow-hidden rounded-[1.8rem] bg-slate-950/20">
             <img alt={item.description} className="aspect-[4/5] w-full object-cover transition duration-500 group-hover:scale-[1.015]" src={item.imageUrl} />
           </div>
-          <div className="mt-5 flex items-center gap-2 text-sm text-soft">
-            <Clock3 size={16} />
-            <span>{toBeijingText(item.capturedAt)}</span>
+          <div className="mt-5 flex items-center justify-between gap-4">
+            <p className="text-sm text-soft">{toBeijingText(item.capturedAt)}</p>
+            {editable ? (
+              <div className="flex items-center gap-3 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
+                <button aria-label="修改卡片" className={iconButtonClass} onClick={() => setEditing(true)} type="button">
+                  <PencilLine size={19} />
+                </button>
+                <button aria-label="删除卡片" className={`${iconButtonClass} text-rose-300 hover:text-rose-200`} onClick={() => void onDelete(item.id)} type="button">
+                  <Trash2 size={19} />
+                </button>
+              </div>
+            ) : null}
           </div>
         </>
       )}
+
+      {editable && editing ? (
+        <div className="mt-5 flex items-center justify-end gap-3">
+          <button aria-label="保存修改" className={iconButtonClass} onClick={() => void handleSave()} type="button">
+            <Save size={19} />
+          </button>
+          <button aria-label="取消修改" className={iconButtonClass} onClick={reset} type="button">
+            <X size={19} />
+          </button>
+        </div>
+      ) : null}
 
       {busy && editing ? <p className="mt-3 text-xs text-soft">正在提交修改…</p> : null}
     </article>

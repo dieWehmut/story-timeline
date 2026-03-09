@@ -41,8 +41,8 @@ export function UploadButton({ busy, onSubmit }: UploadButtonProps) {
   };
 
   const handleSubmit = async () => {
-    if (!description.trim() || !file || !capturedAt) {
-      setError('请填写说明、时间并选择图片');
+    if (!file || !capturedAt) {
+	  setError('请选择图片并填写时间');
       return;
     }
 
@@ -85,12 +85,12 @@ export function UploadButton({ busy, onSubmit }: UploadButtonProps) {
 
             <div className="space-y-4">
               <label className="block space-y-2" htmlFor={descriptionId}>
-                <span className="text-sm text-soft">说明</span>
+                <span className="text-sm text-soft">说明（可选）</span>
                 <textarea
                   className="min-h-28 w-full rounded-3xl border border-white/10 bg-slate-950/30 px-4 py-3 outline-none transition focus:border-cyan-400/70"
                   id={descriptionId}
                   onChange={(event) => setDescription(event.target.value)}
-                  placeholder="写下这张图片对应的瞬间。"
+                  placeholder="可以留空，或者写下这张图片对应的瞬间。"
                   value={description}
                 />
               </label>

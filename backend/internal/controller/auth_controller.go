@@ -48,14 +48,24 @@ func (controller *AuthController) Session(w http.ResponseWriter, r *http.Request
 		dto.WriteJSON(w, http.StatusOK, map[string]any{
 			"authenticated": false,
 			"loginUrl":      "/api/auth/github/login",
+			"isAdmin":       false,
+			"roleLabel":     "游客",
 			"user":          nil,
 		})
 		return
 	}
 
+	isAdmin := controller.authService.IsAdmin(session.User.Login)
+	roleLabel := "游客"
+	if isAdmin {
+		roleLabel = "管理员"
+	}
+
 	dto.WriteJSON(w, http.StatusOK, map[string]any{
 		"authenticated": true,
 		"loginUrl":      "/api/auth/github/login",
+		"isAdmin":       isAdmin,
+		"roleLabel":     roleLabel,
 		"user": map[string]any{
 			"id":        session.User.ID,
 			"login":     session.User.Login,

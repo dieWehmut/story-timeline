@@ -27,13 +27,15 @@ type AuthService struct {
 	oauth         *githuboauth.OAuthClient
 	signingSecret []byte
 	secureCookies bool
+	adminLogin    string
 }
 
-func NewAuthService(oauth *githuboauth.OAuthClient, secret string, secureCookies bool) *AuthService {
+func NewAuthService(oauth *githuboauth.OAuthClient, secret string, secureCookies bool, adminLogin string) *AuthService {
 	return &AuthService{
 		oauth:         oauth,
 		signingSecret: []byte(secret),
 		secureCookies: secureCookies,
+		adminLogin:    strings.ToLower(strings.TrimSpace(adminLogin)),
 	}
 }
 
@@ -158,6 +160,14 @@ func (service *AuthService) ClearSession(w http.ResponseWriter) {
 		SameSite: service.sameSiteMode(),
 		MaxAge:   -1,
 	})
+}
+
+func (service *AuthService) IsAdmin(login string) bool {
+	if service.adminLogin == "" {
+		return false
+	}
+
+	return strings.EqualFold(strings.TrimSpace(login), service.adminLogin)
 }
 
 func (service *AuthService) sameSiteMode() http.SameSite {

@@ -34,9 +34,9 @@ func New(deps Dependencies, allowedOrigins []string) http.Handler {
 		api.Route("/images", func(images chi.Router) {
 			images.Get("/", deps.ImageController.List)
 			images.Get("/{imageID}/asset", deps.ImageController.Asset)
-			images.With(middleware.RequireAuth(deps.AuthService)).Post("/", deps.ImageController.Create)
-			images.With(middleware.RequireAuth(deps.AuthService)).Patch("/{imageID}", deps.ImageController.Update)
-			images.With(middleware.RequireAuth(deps.AuthService)).Delete("/{imageID}", deps.ImageController.Delete)
+				images.With(middleware.RequireAdmin(deps.AuthService)).Post("/", deps.ImageController.Create)
+				images.With(middleware.RequireAdmin(deps.AuthService)).Patch("/{imageID}", deps.ImageController.Update)
+				images.With(middleware.RequireAdmin(deps.AuthService)).Delete("/{imageID}", deps.ImageController.Delete)
 		})
 
 		api.Get("/health/stats", deps.HealthController.Stats)

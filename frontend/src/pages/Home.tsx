@@ -47,68 +47,55 @@ export default function Home({
 }: HomeProps) {
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const heroTimestamp = useMemo(() => {
-    if (!images.items[0]) {
-      return '北京时间 2026-3-8 00:00';
-    }
-
-    const parts = new Intl.DateTimeFormat('zh-CN', {
-      timeZone: 'Asia/Shanghai',
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).formatToParts(new Date(images.items[0].capturedAt));
-
-    const year = parts.find((part) => part.type === 'year')?.value ?? '';
-    const month = parts.find((part) => part.type === 'month')?.value ?? '';
-    const day = parts.find((part) => part.type === 'day')?.value ?? '';
-    const hour = parts.find((part) => part.type === 'hour')?.value ?? '';
-    const minute = parts.find((part) => part.type === 'minute')?.value ?? '';
-
-    return `${year}-${month}-${day} ${hour}:${minute}`;
-  }, [images.items]);
+  const monthGroups = useMemo(
+    () =>
+      images.timeline.map((month) => ({
+        month,
+        items: images.items.filter((item) => getMonthKey(item.capturedAt) === month.key),
+      })),
+    [images.items, images.timeline]
+  );
 
   useEffect(() => {
-    const nodes = Object.values(sectionRefs.current).filter(Boolean) as HTMLDivElement[];
+    const nodes = images.timeline
+      .map((month) => sectionRefs.current[month.key])
+      .filter(Boolean) as HTMLDivElement[];
+
     if (!nodes.length) {
       return;
     }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
+    const syncActiveMonth = () => {
+      const activationOffset = 140;
+      const current =
+        [...nodes]
+          .reverse()
+          .find((node) => node.getBoundingClientRect().top <= activationOffset) ??
+        nodes[0];
 
-        if (!visible) {
-          return;
-        }
+      const monthKey = current?.getAttribute('data-month-key');
+      const month = images.timeline.find((item) => item.key === monthKey);
 
-        const monthKey = visible.target.getAttribute('data-month-key');
-        const month = images.timeline.find((item) => item.key === monthKey);
-
-        if (month) {
-          onActiveMonthChange(month);
-        }
-      },
-      {
-        rootMargin: '-20% 0px -55% 0px',
-        threshold: [0.25, 0.5, 0.75],
+      if (month && month.key !== activeMonth?.key) {
+        onActiveMonthChange(month);
       }
-    );
+    };
 
-    nodes.forEach((node) => observer.observe(node));
+    syncActiveMonth();
+
+    const handleScroll = () => {
+      window.requestAnimationFrame(syncActiveMonth);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
 
     return () => {
-      observer.disconnect();
+      window.removeEventListener('scroll', handleScroll);
     };
-  }, [images.timeline, onActiveMonthChange]);
+  }, [activeMonth?.key, images.timeline, monthGroups, onActiveMonthChange]);
 
   const jumpToMonth = (month: TimelineMonth) => {
-    const target = Object.values(sectionRefs.current).find((node) => node?.getAttribute('data-month-key') === month.key);
+    const target = sectionRefs.current[month.key];
     target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     onActiveMonthChange(month);
     onTimelineClose();
@@ -118,7 +105,7 @@ export default function Home({
     <div className="relative min-h-screen overflow-x-hidden">
 
 
-      <Header activeMonth={activeMonth} onTimelineToggle={onTimelineToggle} timelineOpen={timelineOpen} />
+      <Header activeMonth={activeMonth} authUser={auth.user} roleLabel={auth.roleLabel} onTimelineToggle={onTimelineToggle} timelineOpen={timelineOpen} />
 
       {timelineOpen && (
         <div className="fixed inset-0 z-30" onClick={onTimelineClose} />
@@ -128,6 +115,7 @@ export default function Home({
 
       <FloatingActions
         authLoading={auth.loading}
+        isAdmin={auth.isAdmin}
         authUser={auth.user}
         onLogin={auth.login}
         onLogout={auth.logout}
@@ -138,26 +126,6 @@ export default function Home({
       />
 
       <main className="relative mx-auto flex w-full max-w-6xl flex-col px-4 pb-36 pt-28 md:px-8 md:pt-36">
-        <section className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_24rem] lg:items-end">
-
-
-          <div className="glass-panel rounded-[2.5rem] p-6 md:p-8">
-            <p className="text-sm uppercase tracking-[0.34em] text-soft">Latest Moment</p>
-            {images.items[0] ? (
-              <>
-                <div className="mt-4 overflow-hidden rounded-[1.8rem]">
-                  <img alt={images.items[0].description} className="aspect-[4/5] w-full object-cover" src={images.items[0].imageUrl} />
-                </div>
-                <p className="mt-4 text-sm leading-7 text-soft">{images.items[0].description}</p>
-              </>
-            ) : (
-              <div className="mt-4 rounded-[1.8rem] border border-dashed border-white/15 px-5 py-12 text-center text-soft">
-                暂无图片
-              </div>
-            )}
-            <p className="mt-4 text-xl font-semibold text-accent">{heroTimestamp}</p>
-          </div>
-        </section>
 
         {images.error ? (
           <div className="mb-6 rounded-[1.8rem] border border-rose-400/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
@@ -170,25 +138,31 @@ export default function Home({
             <LoaderCircle className="animate-spin text-cyan-300" size={28} />
           </div>
         ) : (
-          <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {images.items.map((item) => (
-              <div
-                data-month-key={getMonthKey(item.capturedAt)}
-                key={item.id}
+          <div className="space-y-6">
+            {monthGroups.map(({ month, items }) => (
+              <section
+                className="scroll-mt-28 md:scroll-mt-36"
+                data-month-key={month.key}
+                key={month.key}
                 ref={(node) => {
-                  sectionRefs.current[item.id] = node;
+                  sectionRefs.current[month.key] = node;
                 }}
               >
-                <ImageCard
-                  busy={images.submitting}
-                  editable={Boolean(auth.user)}
-                  item={item}
-                  onDelete={images.deleteImage}
-                  onSave={images.updateImage}
-                />
-              </div>
+                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                  {items.map((item) => (
+                    <ImageCard
+                      busy={images.submitting}
+                      editable={auth.isAdmin}
+                      item={item}
+                      key={item.id}
+                      onDelete={images.deleteImage}
+                      onSave={images.updateImage}
+                    />
+                  ))}
+                </div>
+              </section>
             ))}
-          </section>
+          </div>
         )}
       </main>
 

@@ -46,5 +46,7 @@ export interface AuthUser {
 export interface AuthSession {
   authenticated: boolean;
   loginUrl: string;
+  isAdmin: boolean;
+  roleLabel: string;
   user: AuthUser | null;
 }

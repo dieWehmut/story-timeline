@@ -8,6 +8,7 @@ interface FloatingActionsProps {
   onThemeToggle: () => void;
   authLoading: boolean;
   authUser: AuthUser | null;
+  isAdmin: boolean;
   onLogin: () => void;
   onLogout: () => Promise<void>;
   uploadBusy: boolean;
@@ -19,6 +20,7 @@ export function FloatingActions({
   onThemeToggle,
   authLoading,
   authUser,
+  isAdmin,
   onLogin,
   onLogout,
   uploadBusy,
@@ -27,7 +29,7 @@ export function FloatingActions({
   return (
     <div className="fixed bottom-2 left-2 z-50 flex flex-col gap-2 md:bottom-6 md:left-5">
       <ThemeButton onToggle={onThemeToggle} theme={theme} />
-      {authUser ? <UploadButton busy={uploadBusy} onSubmit={onUpload} /> : null}
+      {authUser && isAdmin ? <UploadButton busy={uploadBusy} onSubmit={onUpload} /> : null}
       <AuthButton loading={authLoading} onLogin={onLogin} onLogout={onLogout} user={authUser} />
     </div>
   );

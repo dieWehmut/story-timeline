@@ -5,6 +5,8 @@ import type { AuthSession } from '../types/image';
 const defaultSession: AuthSession = {
   authenticated: false,
   loginUrl: `${API_BASE}/api/auth/github/login`,
+  isAdmin: false,
+  roleLabel: '游客',
   user: null,
 };
 

@@ -18,7 +18,7 @@ func main() {
 	env := config.LoadEnv()
 	ctx := context.Background()
 	githubOAuthClient := github.NewOAuthClient(env.GitHubClientID, env.GitHubClientSecret, env.GitHubCallbackURL)
-	authService := service.NewAuthService(githubOAuthClient, env.SessionSecret, env.SecureCookies)
+	authService := service.NewAuthService(githubOAuthClient, env.SessionSecret, env.SecureCookies, env.GitHubRepoOwner)
 	gitHubStorage := storage.NewGitHubStorage(env.GitHubRepoOwner, env.GitHubRepoName, env.GitHubRepoBranch, env.GitHubStorageToken)
 	imageService, err := service.NewImageService(ctx, gitHubStorage, env.CacheFile)
 	if err != nil {

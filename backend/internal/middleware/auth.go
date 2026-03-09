@@ -28,6 +28,25 @@ func RequireAuth(authService *service.AuthService) func(http.Handler) http.Handl
 	}
 }
 
+func RequireAdmin(authService *service.AuthService) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return RequireAuth(authService)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			session, ok := SessionFromContext(r.Context())
+			if !ok {
+				dto.WriteError(w, http.StatusUnauthorized, "authentication required")
+				return
+			}
+
+			if !authService.IsAdmin(session.User.Login) {
+				dto.WriteError(w, http.StatusForbidden, "admin required")
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		}))
+	}
+}
+
 func SessionFromContext(ctx context.Context) (*model.Session, bool) {
 	session, ok := ctx.Value(sessionContextKey).(*model.Session)
 	return session, ok
