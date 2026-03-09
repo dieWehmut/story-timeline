@@ -1,5 +1,8 @@
-import { useId, useState } from 'react';
-import { PencilLine, Save, Trash2, X } from 'lucide-react';
+import { useState } from 'react';
+import { PencilLine, Trash2 } from 'lucide-react';
+import { ImageViewer } from '../ui/ImageViewer';
+import { PostDialog } from '../ui/PostDialog';
+import { useToast } from '../ui/useToast';
 import type { ImageItem, UpdateImagePayload } from '../types/image';
 
 interface ImageCardProps {
@@ -47,23 +50,22 @@ const toBeijingText = (value: string) => {
   return `${year}-${month}-${day} ${hour}:${minute}`;
 };
 
-function ImageGrid({ urls, alt }: { urls: string[]; alt: string }) {
+function ImageGrid({ urls, alt, onImageClick }: { urls: string[]; alt: string; onImageClick: (index: number) => void }) {
   if (urls.length === 0) return null;
 
   if (urls.length === 1) {
     return (
-      <div className="overflow-hidden bg-slate-950/20 pr-12">
+      <div className="cursor-pointer overflow-hidden bg-slate-950/20" onClick={() => onImageClick(0)}>
         <img alt={alt} className="w-full object-contain" src={urls[0]} />
       </div>
     );
   }
 
-  // 2-9 images: square grid, 3 columns max
   const cols = urls.length <= 2 ? 2 : 3;
   return (
     <div className={`grid gap-0.5 ${cols === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
       {urls.map((url, i) => (
-        <div className="relative aspect-square overflow-hidden bg-slate-950/20" key={i}>
+        <div className="relative aspect-square cursor-pointer overflow-hidden bg-slate-950/20" key={i} onClick={() => onImageClick(i)}>
           <img alt={`${alt} ${i + 1}`} className="absolute inset-0 h-full w-full object-cover" src={url} />
         </div>
       ))}
@@ -72,37 +74,9 @@ function ImageGrid({ urls, alt }: { urls: string[]; alt: string }) {
 }
 
 export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onDelete, onSave, roleLabel }: ImageCardProps) {
-  const descriptionId = useId();
-  const timeId = useId();
   const [editing, setEditing] = useState(false);
-  const [description, setDescription] = useState(item.description);
-  const [capturedAt, setCapturedAt] = useState(toDateTimeInputValue(item.capturedAt));
-  const [files, setFiles] = useState<File[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSave = async () => {
-    try {
-      await onSave({
-        id: item.id,
-        description: description.trim(),
-        capturedAt: `${capturedAt}:00+08:00`,
-        files: files.length > 0 ? files : undefined,
-      });
-      setEditing(false);
-      setFiles([]);
-      setError(null);
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : '保存失败');
-    }
-  };
-
-  const reset = () => {
-    setDescription(item.description);
-    setCapturedAt(toDateTimeInputValue(item.capturedAt));
-    setFiles([]);
-    setError(null);
-    setEditing(false);
-  };
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const { confirm } = useToast();
 
   const iconButtonClass =
     'inline-flex h-8 w-8 items-center justify-center text-soft transition hover:text-[var(--text-main)]';
@@ -113,92 +87,83 @@ export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onDelete,
 
   const imageUrls = item.imageUrls ?? [];
 
+  const handleEditSubmit = async (data: { description: string; capturedAt: string; files: File[] }) => {
+    await onSave({
+      id: item.id,
+      description: data.description,
+      capturedAt: data.capturedAt,
+      files: data.files.length > 0 ? data.files : undefined,
+    });
+    setEditing(false);
+  };
+
+  const handleDelete = () => {
+    confirm('确定要删除这张卡片吗？', () => {
+      void onDelete(item.id);
+    });
+  };
+
   return (
-    <article className="glass-panel group overflow-hidden rounded-[2.2rem]" id={`story-${item.id}`}>
-      {editing ? (
-        <div className="space-y-4 p-5 md:p-6">
-          <label className="block space-y-2" htmlFor={descriptionId}>
-            <span className="text-sm text-soft">说明</span>
-            <textarea
-              className="min-h-24 w-full rounded-[1.6rem] border border-white/10 bg-slate-950/20 px-4 py-3 outline-none transition focus:border-cyan-400/70"
-              id={descriptionId}
-              onChange={(event) => setDescription(event.target.value)}
-              value={description}
-            />
-          </label>
-
-          <label className="block space-y-2" htmlFor={timeId}>
-            <span className="text-sm text-soft">北京时间</span>
-            <input
-              className="w-full rounded-full border border-white/10 bg-slate-950/20 px-4 py-3 outline-none transition focus:border-cyan-400/70"
-              id={timeId}
-              onChange={(event) => setCapturedAt(event.target.value)}
-              type="datetime-local"
-              value={capturedAt}
-            />
-          </label>
-
-          <label className="block space-y-2">
-            <span className="text-sm text-soft">替换图片（多选）</span>
-            <input accept="image/*" multiple onChange={(event) => setFiles(Array.from(event.target.files ?? []))} type="file" />
-          </label>
-          {error ? <p className="text-sm text-rose-300">{error}</p> : null}
-        </div>
-      ) : (
-        <>
-          <div className="flex items-center gap-3 p-5 pb-0 md:px-6 md:pt-6">
-            {authorAvatar ? (
-              <img alt={authorLabel} className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10" src={authorAvatar} />
-            ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/8 text-sm font-semibold text-soft ring-1 ring-white/10">
-                {authorLabel.slice(0, 1).toUpperCase()}
-              </div>
-            )}
-            <div>
-              <p className="flex items-center gap-2 text-sm font-medium text-[var(--text-main)]">
-                {authorLabel}
-                {roleLabel ? <span className="rounded-full bg-white/8 px-2 py-0.5 text-xs text-soft">{roleLabel}</span> : null}
-              </p>
+    <>
+      <article className="group overflow-hidden" id={`story-${item.id}`}>
+        {/* Author row */}
+        <div className="flex items-center gap-2 px-2 pb-0 pt-3">
+          {authorAvatar ? (
+            <img alt={authorLabel} className="h-8 w-8 rounded-full object-cover ring-1 ring-white/10" src={authorAvatar} />
+          ) : (
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/8 text-xs font-semibold text-soft ring-1 ring-white/10">
+              {authorLabel.slice(0, 1).toUpperCase()}
             </div>
+          )}
+          <p className="flex items-center gap-2 text-sm font-medium text-[var(--text-main)]">
+            {authorLabel}
+            {roleLabel ? <span className="rounded-full bg-white/8 px-2 py-0.5 text-xs text-soft">{roleLabel}</span> : null}
+          </p>
+        </div>
+        {/* Description */}
+        {item.description.trim() ? (
+          <p className="whitespace-pre-wrap px-2 pt-2 font-serif text-xl leading-relaxed text-[var(--text-main)] md:text-2xl">
+            {item.description}
+          </p>
+        ) : null}
+        {/* Images */}
+        {imageUrls.length > 0 ? (
+          <div className="mt-2 px-2">
+            <ImageGrid alt={item.description} onImageClick={setViewerIndex} urls={imageUrls} />
           </div>
-          {item.description.trim() ? (
-            <p className="whitespace-pre-wrap px-5 pt-4 font-serif text-2xl leading-relaxed text-[var(--text-main)] md:px-6 md:text-[2rem]">
-              {item.description}
-            </p>
-          ) : null}
-          {imageUrls.length > 0 ? (
-            <div className="mt-4">
-              <ImageGrid alt={item.description} urls={imageUrls} />
+        ) : null}
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-4 px-2 pb-3 pt-2">
+          <p className="text-xs text-soft">{toBeijingText(item.capturedAt)}</p>
+          {editable ? (
+            <div className="flex items-center gap-3 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
+              <button aria-label="修改卡片" className={iconButtonClass} onClick={() => setEditing(true)} type="button">
+                <PencilLine size={17} />
+              </button>
+              <button aria-label="删除卡片" className={`${iconButtonClass} text-rose-300 hover:text-rose-200`} onClick={handleDelete} type="button">
+                <Trash2 size={17} />
+              </button>
             </div>
           ) : null}
-          <div className="flex items-center justify-between gap-4 p-5 pt-4 md:px-6 md:pb-6">
-            <p className="text-sm text-soft">{toBeijingText(item.capturedAt)}</p>
-            {editable ? (
-              <div className="flex items-center gap-3 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
-                <button aria-label="修改卡片" className={iconButtonClass} onClick={() => setEditing(true)} type="button">
-                  <PencilLine size={19} />
-                </button>
-                <button aria-label="删除卡片" className={`${iconButtonClass} text-rose-300 hover:text-rose-200`} onClick={() => void onDelete(item.id)} type="button">
-                  <Trash2 size={19} />
-                </button>
-              </div>
-            ) : null}
-          </div>
-        </>
-      )}
-
-      {editable && editing ? (
-        <div className="flex items-center justify-end gap-3 p-5 pt-0 md:px-6 md:pb-6">
-          <button aria-label="保存修改" className={iconButtonClass} onClick={() => void handleSave()} type="button">
-            <Save size={19} />
-          </button>
-          <button aria-label="取消修改" className={iconButtonClass} onClick={reset} type="button">
-            <X size={19} />
-          </button>
         </div>
+      </article>
+
+      {/* Image viewer lightbox */}
+      {viewerIndex !== null ? (
+        <ImageViewer initialIndex={viewerIndex} onClose={() => setViewerIndex(null)} urls={imageUrls} />
       ) : null}
 
-      {busy && editing ? <p className="px-5 pb-5 text-xs text-soft md:px-6 md:pb-6">正在提交修改…</p> : null}
-    </article>
+      {/* Edit dialog */}
+      <PostDialog
+        busy={busy}
+        initialCapturedAt={toDateTimeInputValue(item.capturedAt)}
+        initialDescription={item.description}
+        initialImageUrls={imageUrls}
+        mode="edit"
+        onClose={() => setEditing(false)}
+        onSubmit={handleEditSubmit}
+        open={editing}
+      />
+    </>
   );
 }

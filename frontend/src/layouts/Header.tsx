@@ -44,7 +44,7 @@ export function Header({
 						<p className="text-sm font-medium text-[var(--text-main)]">{authUser.login}</p>
 					) : null}
 				</div>
-				<div className="flex items-center gap-3">
+				<div className="flex items-center gap-1.5">
 					<AuthButton loading={authLoading} onLogin={onLogin} onLogout={onLogout} user={authUser} />
 					<ThemeButton onToggle={onThemeToggle} theme={theme} />
 					{authUser && isAdmin ? <UploadButton busy={uploadBusy} onSubmit={onUpload} /> : null}

@@ -125,20 +125,20 @@ export default function Home({
 
       <TimeColumn activeMonth={activeMonth} months={images.timeline} onJump={jumpToMonth} open={timelineOpen} />
 
-      <main className="relative mx-auto flex w-full max-w-6xl flex-col px-4 pb-36 pt-28 md:px-8 md:pt-36">
+      <main className="relative mx-auto flex w-full max-w-xl flex-col px-0 pb-36 pt-28 md:px-0 md:pt-36">
 
         {images.error ? (
-          <div className="mb-6 rounded-[1.8rem] border border-rose-400/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
+          <div className="mb-6 border border-rose-400/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
             {images.error}
           </div>
         ) : null}
 
         {images.loading ? (
-          <div className="glass-panel flex min-h-64 items-center justify-center rounded-[2.4rem]">
+          <div className="flex min-h-64 items-center justify-center">
             <LoaderCircle className="animate-spin text-cyan-300" size={28} />
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="divide-y divide-[var(--panel-border)]">
             {monthGroups.map(({ month, items }) => (
               <section
                 className="scroll-mt-28 md:scroll-mt-36"
@@ -148,7 +148,7 @@ export default function Home({
                   sectionRefs.current[month.key] = node;
                 }}
               >
-                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                <div className="divide-y divide-[var(--panel-border)]">
                   {items.map((item) => (
                     <ImageCard
                       busy={images.submitting}

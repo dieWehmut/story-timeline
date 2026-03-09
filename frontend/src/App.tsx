@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './hooks/useAuth';
 import { useImages } from './hooks/useImages';
+import { ToastProvider } from './ui/Toast';
 import Home from './pages/Home';
 import type { TimelineMonth } from './types/image';
 
@@ -35,17 +36,19 @@ function App() {
   }, [activeMonth, images.timeline]);
 
   return (
-    <Home
-      activeMonth={activeMonth}
-      auth={auth}
-      images={images}
-      onActiveMonthChange={setActiveMonth}
-      onThemeToggle={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
-      onTimelineClose={() => setTimelineOpen(false)}
-      onTimelineToggle={() => setTimelineOpen((open) => !open)}
-      theme={theme}
-      timelineOpen={timelineOpen}
-    />
+    <ToastProvider>
+      <Home
+        activeMonth={activeMonth}
+        auth={auth}
+        images={images}
+        onActiveMonthChange={setActiveMonth}
+        onThemeToggle={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
+        onTimelineClose={() => setTimelineOpen(false)}
+        onTimelineToggle={() => setTimelineOpen((open) => !open)}
+        theme={theme}
+        timelineOpen={timelineOpen}
+      />
+    </ToastProvider>
   );
 }
 
