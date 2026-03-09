@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { LoaderCircle } from 'lucide-react';
+import { CardDetail } from '../ui/CardDetail';
 import { Footer } from '../layouts/Footer';
 import { Header } from '../layouts/Header';
 import { ImageCard } from '../layouts/ImageCard';
@@ -44,6 +45,7 @@ export default function Home({
   theme,
   timelineOpen,
 }: HomeProps) {
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const monthGroups = useMemo(
@@ -53,6 +55,11 @@ export default function Home({
         items: images.items.filter((item) => getMonthKey(item.startAt) === month.key),
       })),
     [images.items, images.timeline]
+  );
+
+  const selectedItem = useMemo(
+    () => (selectedItemId ? images.items.find((i) => i.id === selectedItemId) ?? null : null),
+    [images.items, selectedItemId]
   );
 
   useEffect(() => {
@@ -111,6 +118,8 @@ export default function Home({
         canPost={auth.canPost}
         feedUsers={images.feedUsers}
         filterUser={images.filterUser}
+        isDetailView={selectedItemId !== null}
+        onBack={() => setSelectedItemId(null)}
         onFilterUser={images.setFilterUser}
         onLogin={auth.login}
         onLogout={auth.logout}
@@ -164,6 +173,7 @@ export default function Home({
                       onCommentCountChange={images.incrementCommentCount}
                       onDelete={images.deleteImage}
                       onLikeChange={images.updateLike}
+                      onOpenDetail={() => setSelectedItemId(item.id)}
                       onSave={images.updateImage}
                       roleLabel={item.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
                     />
@@ -175,7 +185,23 @@ export default function Home({
         )}
       </main>
 
-      <Footer stats={{ ...images.stats, githubOwner: images.stats.githubOwner || auth.user?.login || 'GitHub' }} />
+      {selectedItemId === null ? (
+        <Footer stats={{ ...images.stats, githubOwner: images.stats.githubOwner || auth.user?.login || 'GitHub' }} />
+      ) : null}
+
+      {selectedItem ? (
+        <CardDetail
+          canInteract={auth.authenticated}
+          editable={auth.user?.login === selectedItem.authorLogin}
+          fallbackAuthorLogin={images.stats.githubOwner || auth.user?.login || undefined}
+          item={selectedItem}
+          onCommentCountChange={images.incrementCommentCount}
+          onDelete={images.deleteImage}
+          onLikeChange={images.updateLike}
+          onSave={images.updateImage}
+          roleLabel={selectedItem.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
+        />
+      ) : null}
     </div>
   );
 }

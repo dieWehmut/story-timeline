@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, Eye, TimerReset } from 'lucide-react';
+import { User, Eye, TimerReset } from 'lucide-react';
 import type { HealthStats } from '../types/image';
 
 const UPTIME_START_AT = Date.parse('2025-10-10T09:00:00.000Z');
@@ -40,12 +40,12 @@ export function Footer({ stats }: FooterProps) {
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-center gap-2 text-center text-sm text-soft">
         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[var(--text-main)]">
           <span className="inline-flex items-center gap-2" title="累计用户">
-            <Activity className="text-cyan-300" size={16} />
-            <span>用户 {stats.userCount}</span>
+            <User className="text-cyan-300" size={16} />
+            <span>{stats.userCount}</span>
           </span>
           <span className="inline-flex items-center gap-2" title="近 90 秒在线">
             <Eye className="text-cyan-300" size={16} />
-            <span>在线 {stats.onlineUsers}</span>
+            <span>{stats.onlineUsers}</span>
           </span>
           <span className="inline-flex items-center gap-2">
             <TimerReset className="text-cyan-300" size={16} />
