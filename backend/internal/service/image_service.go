@@ -43,7 +43,7 @@ func NewImageService(ctx context.Context, store *storage.GitHubStorage, repoName
 	return service, nil
 }
 
-// GetFeed returns aggregated posts from multiple users, sorted by capturedAt desc.
+// GetFeed returns aggregated posts from multiple users, sorted by startAt desc.
 func (service *ImageService) GetFeed(ctx context.Context, token string, feedLogins []string) []model.Image {
 	// Always include admin
 	logins := uniqueStrings(append(feedLogins, service.adminLogin))
@@ -55,7 +55,7 @@ func (service *ImageService) GetFeed(ctx context.Context, token string, feedLogi
 	}
 
 	sort.Slice(all, func(i, j int) bool {
-		return all[i].CapturedAt.After(all[j].CapturedAt)
+		return all[i].SortTime().After(all[j].SortTime())
 	})
 
 	return all
@@ -66,7 +66,7 @@ func (service *ImageService) GetUserItems(ctx context.Context, token string, log
 	return service.loadUser(ctx, token, login)
 }
 
-func (service *ImageService) Create(ctx context.Context, token string, author model.GitHubUser, description string, capturedAt time.Time, files [][]byte) (model.Image, error) {
+func (service *ImageService) Create(ctx context.Context, token string, author model.GitHubUser, description string, timeMode string, startAt time.Time, endAt time.Time, files [][]byte) (model.Image, error) {
 	ownerLogin := author.Login
 
 	// Ensure their data is loaded
@@ -77,10 +77,10 @@ func (service *ImageService) Create(ctx context.Context, token string, author mo
 
 	now := utils.NowBeijing()
 	items := service.userItems[ownerLogin]
-	metadataPath := nextMetadataPath(items, capturedAt)
+	metadataPath := nextMetadataPath(items, startAt)
 	var imagePaths []string
 	for i, file := range files {
-		imagePaths = append(imagePaths, nextImagePath(capturedAt, i))
+		imagePaths = append(imagePaths, nextImagePath(startAt, i))
 		if err := service.storage.PutFile(ctx, token, ownerLogin, service.repoName, imagePaths[i], file, fmt.Sprintf("Add image %d for post", i+1)); err != nil {
 			return model.Image{}, err
 		}
@@ -91,12 +91,16 @@ func (service *ImageService) Create(ctx context.Context, token string, author mo
 		AuthorLogin:  author.Login,
 		AuthorAvatar: author.AvatarURL,
 		Description:  description,
-		CapturedAt:   capturedAt,
+		TimeMode:     timeMode,
+		StartAt:      startAt,
+		EndAt:        endAt,
+		CapturedAt:   startAt,
 		ImagePaths:   imagePaths,
 		MetadataPath: metadataPath,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
+	image.NormalizeTimeFields()
 
 	if err := service.writeMetadata(ctx, token, ownerLogin, image); err != nil {
 		return model.Image{}, err
@@ -110,7 +114,7 @@ func (service *ImageService) Create(ctx context.Context, token string, author mo
 	return image, nil
 }
 
-func (service *ImageService) Update(ctx context.Context, token string, ownerLogin string, id string, description string, capturedAt time.Time, files [][]byte) (model.Image, error) {
+func (service *ImageService) Update(ctx context.Context, token string, ownerLogin string, id string, description string, timeMode string, startAt time.Time, endAt time.Time, files [][]byte) (model.Image, error) {
 	service.mu.Lock()
 	defer service.mu.Unlock()
 
@@ -127,15 +131,20 @@ func (service *ImageService) Update(ctx context.Context, token string, ownerLogi
 	}
 
 	current := items[index]
+	current.NormalizeTimeFields()
 	updated := current
 	updated.Description = description
-	updated.CapturedAt = capturedAt
+	updated.TimeMode = timeMode
+	updated.StartAt = startAt
+	updated.EndAt = endAt
+	updated.CapturedAt = startAt
 	updated.UpdatedAt = utils.NowBeijing()
+	updated.NormalizeTimeFields()
 
 	if len(files) > 0 {
 		var newPaths []string
 		for i, file := range files {
-			p := nextImagePath(capturedAt, i)
+			p := nextImagePath(startAt, i)
 			newPaths = append(newPaths, p)
 			if err := service.storage.PutFile(ctx, token, ownerLogin, service.repoName, p, file, fmt.Sprintf("Update image %d for %s", i+1, id)); err != nil {
 				return model.Image{}, err
@@ -147,7 +156,7 @@ func (service *ImageService) Update(ctx context.Context, token string, ownerLogi
 		updated.ImagePaths = newPaths
 		updated.ImagePath = ""
 	} else {
-		moved := !utils.SameBeijingDay(current.CapturedAt, capturedAt)
+		moved := !utils.SameBeijingDay(current.SortTime(), startAt)
 		if moved {
 			oldPaths := current.AllImagePaths()
 			var newPaths []string
@@ -156,7 +165,7 @@ func (service *ImageService) Update(ctx context.Context, token string, ownerLogi
 				if err != nil {
 					return model.Image{}, err
 				}
-				newPath := nextImagePath(capturedAt, i)
+				newPath := nextImagePath(startAt, i)
 				newPaths = append(newPaths, newPath)
 				if err := service.storage.PutFile(ctx, token, ownerLogin, service.repoName, newPath, existingImage, fmt.Sprintf("Move image %s", id)); err != nil {
 					return model.Image{}, err
@@ -170,7 +179,7 @@ func (service *ImageService) Update(ctx context.Context, token string, ownerLogi
 		}
 	}
 
-	newMetadataPath := nextMetadataPath(items, capturedAt)
+	newMetadataPath := nextMetadataPath(items, startAt)
 	if newMetadataPath != current.MetadataPath {
 		_ = service.storage.DeleteFile(ctx, token, ownerLogin, service.repoName, current.MetadataPath, fmt.Sprintf("Remove old metadata %s", id))
 	}
@@ -288,6 +297,7 @@ func (service *ImageService) loadUser(ctx context.Context, token string, login s
 		if idx.Items[i].AuthorLogin == "" {
 			idx.Items[i].AuthorLogin = login
 		}
+		idx.Items[i].NormalizeTimeFields()
 	}
 
 	service.mu.Lock()
@@ -310,6 +320,7 @@ func (service *ImageService) bootstrapAdmin(ctx context.Context) error {
 				if index.Items[i].AuthorLogin == "" {
 					index.Items[i].AuthorLogin = service.adminLogin
 				}
+				index.Items[i].NormalizeTimeFields()
 			}
 			service.userItems[service.adminLogin] = index.Items
 			return nil
@@ -332,6 +343,7 @@ func (service *ImageService) bootstrapAdmin(ctx context.Context) error {
 		if index.Items[i].AuthorLogin == "" {
 			index.Items[i].AuthorLogin = service.adminLogin
 		}
+		index.Items[i].NormalizeTimeFields()
 	}
 
 	service.userItems[service.adminLogin] = index.Items

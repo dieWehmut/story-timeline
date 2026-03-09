@@ -20,12 +20,12 @@ interface HomeProps {
   timelineOpen: boolean;
 }
 
-const getMonthKey = (capturedAt: string) => {
+const getMonthKey = (startAt: string) => {
   const parts = new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai',
     year: 'numeric',
     month: 'numeric',
-  }).formatToParts(new Date(capturedAt));
+  }).formatToParts(new Date(startAt));
 
   const year = Number(parts.find((part) => part.type === 'year')?.value ?? '0');
   const month = Number(parts.find((part) => part.type === 'month')?.value ?? '0');
@@ -50,7 +50,7 @@ export default function Home({
     () =>
       images.timeline.map((month) => ({
         month,
-        items: images.items.filter((item) => getMonthKey(item.capturedAt) === month.key),
+        items: images.items.filter((item) => getMonthKey(item.startAt) === month.key),
       })),
     [images.items, images.timeline]
   );

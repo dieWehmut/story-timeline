@@ -26,6 +26,10 @@ const normalizeSession = (session: AuthSession): AuthSession => ({
 
 const normalizeImageItem = (item: ImageItem): ImageItem => ({
   ...item,
+  timeMode: item.timeMode ?? 'point',
+  startAt: item.startAt ?? item.capturedAt ?? item.createdAt,
+  endAt: item.timeMode === 'range' ? item.endAt : undefined,
+  capturedAt: item.capturedAt ?? item.startAt ?? item.createdAt,
   imageUrls: (item.imageUrls ?? []).map(withApiBase),
 });
 
@@ -103,7 +107,12 @@ const fileToWebp = async (file: File): Promise<Blob> => {
 const buildImageFormData = async (payload: CreateImagePayload | UpdateImagePayload): Promise<FormData> => {
   const formData = new FormData();
   formData.set('description', payload.description);
-  formData.set('capturedAt', payload.capturedAt);
+  formData.set('timeMode', payload.timeMode);
+  formData.set('startAt', payload.startAt);
+  formData.set('capturedAt', payload.startAt);
+  if (payload.endAt) {
+    formData.set('endAt', payload.endAt);
+  }
 
   if ('id' in payload) {
     formData.set('id', payload.id);

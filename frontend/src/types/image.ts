@@ -1,9 +1,14 @@
+export type ImageTimeMode = 'point' | 'range';
+
 export interface ImageItem {
   id: string;
   authorLogin: string;
   authorAvatar: string;
   description: string;
-  capturedAt: string;
+  timeMode: ImageTimeMode;
+  startAt: string;
+  endAt?: string;
+  capturedAt?: string;
   imageUrls: string[];
   imagePaths: string[];
   metadataPath: string;
@@ -24,14 +29,18 @@ export interface TimelineMonth {
 
 export interface CreateImagePayload {
   description: string;
-  capturedAt: string;
+  timeMode: ImageTimeMode;
+  startAt: string;
+  endAt?: string;
   files: File[];
 }
 
 export interface UpdateImagePayload {
   id: string;
   description: string;
-  capturedAt: string;
+  timeMode: ImageTimeMode;
+  startAt: string;
+  endAt?: string;
   files?: File[];
 }
 

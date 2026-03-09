@@ -15,8 +15,8 @@ const beijingFormatter = new Intl.DateTimeFormat('zh-CN', {
   month: 'numeric',
 });
 
-const getMonthKey = (capturedAt: string) => {
-  const date = new Date(capturedAt);
+const getMonthKey = (startAt: string) => {
+  const date = new Date(startAt);
   const parts = beijingFormatter.formatToParts(date);
   const year = Number(parts.find((part) => part.type === 'year')?.value ?? '0');
   const month = Number(parts.find((part) => part.type === 'month')?.value ?? '0');
@@ -35,12 +35,48 @@ const defaultStats: HealthStats = {
   githubOwner: 'GitHub',
 };
 
+const CACHE_KEY_FEED = 'story_feed_cache';
+const CACHE_KEY_USERS = 'story_users_cache';
+
+const sortByDate = (itemsList: ImageItem[]) =>
+  [...itemsList].sort(
+    (left, right) => new Date(right.startAt).getTime() - new Date(left.startAt).getTime()
+  );
+
+const loadCachedFeed = (): ImageItem[] | null => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY_FEED);
+    return raw ? (JSON.parse(raw) as ImageItem[]) : null;
+  } catch {
+    return null;
+  }
+};
+
+const loadCachedUsers = (): FeedUser[] | null => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY_USERS);
+    return raw ? (JSON.parse(raw) as FeedUser[]) : null;
+  } catch {
+    return null;
+  }
+};
+
+const saveCacheFeed = (data: ImageItem[]) => {
+  try { localStorage.setItem(CACHE_KEY_FEED, JSON.stringify(data)); } catch { /* quota */ }
+};
+
+const saveCacheUsers = (data: FeedUser[]) => {
+  try { localStorage.setItem(CACHE_KEY_USERS, JSON.stringify(data)); } catch { /* quota */ }
+};
+
 export const useImages = () => {
-  const [items, setItems] = useState<ImageItem[]>([]);
-  const [feedUsers, setFeedUsers] = useState<FeedUser[]>([]);
+  const cachedFeed = loadCachedFeed();
+  const cachedUsers = loadCachedUsers();
+  const [items, setItems] = useState<ImageItem[]>(cachedFeed ? sortByDate(cachedFeed) : []);
+  const [feedUsers, setFeedUsers] = useState<FeedUser[]>(cachedUsers ?? []);
   const [filterUser, setFilterUser] = useState<string | null>(null);
   const [stats, setStats] = useState<HealthStats>(defaultStats);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedFeed);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,13 +95,12 @@ export const useImages = () => {
           return;
         }
 
-        setItems(
-          [...nextItems].sort(
-            (left, right) => new Date(right.capturedAt).getTime() - new Date(left.capturedAt).getTime()
-          )
-        );
+        const sorted = sortByDate(nextItems);
+        setItems(sorted);
         setStats(nextStats);
         setFeedUsers(nextUsers);
+        saveCacheFeed(sorted);
+        saveCacheUsers(nextUsers);
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : '加载失败');
@@ -102,7 +137,7 @@ export const useImages = () => {
     const monthMap = new Map<string, TimelineMonth>();
 
     filteredItems.forEach((item) => {
-      const month = getMonthKey(item.capturedAt);
+      const month = getMonthKey(item.startAt);
       const existing = monthMap.get(month.key);
 
       if (existing) {
@@ -126,11 +161,11 @@ export const useImages = () => {
 
     try {
       const created = await api.createImage(payload);
-      setItems((currentItems) =>
-        [created, ...currentItems].sort(
-          (left, right) => new Date(right.capturedAt).getTime() - new Date(left.capturedAt).getTime()
-        )
-      );
+      setItems((currentItems) => {
+        const next = sortByDate([created, ...currentItems]);
+        saveCacheFeed(next);
+        return next;
+      });
       // Refresh feed users in case this is a new user
       api.getFeedUsers().then(setFeedUsers).catch(() => undefined);
     } catch (submitError) {
@@ -147,11 +182,13 @@ export const useImages = () => {
 
     try {
       const updated = await api.updateImage(payload);
-      setItems((currentItems) =>
-        currentItems
-          .map((item) => (item.id === updated.id ? updated : item))
-          .sort((left, right) => new Date(right.capturedAt).getTime() - new Date(left.capturedAt).getTime())
-      );
+      setItems((currentItems) => {
+        const next = sortByDate(
+          currentItems.map((item) => (item.id === updated.id ? updated : item))
+        );
+        saveCacheFeed(next);
+        return next;
+      });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : '更新失败');
       throw submitError;
@@ -166,7 +203,11 @@ export const useImages = () => {
 
     try {
       await api.deleteImage(id);
-      setItems((currentItems) => currentItems.filter((item) => item.id !== id));
+      setItems((currentItems) => {
+        const next = currentItems.filter((item) => item.id !== id);
+        saveCacheFeed(next);
+        return next;
+      });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : '删除失败');
       throw submitError;

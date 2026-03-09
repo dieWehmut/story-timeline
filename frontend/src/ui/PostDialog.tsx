@@ -7,9 +7,11 @@ interface PostDialogProps {
   busy: boolean;
   mode: 'create' | 'edit';
   initialDescription?: string;
-  initialCapturedAt?: string;
+  initialTimeMode?: 'point' | 'range';
+  initialStartAt?: string;
+  initialEndAt?: string;
   initialImageUrls?: string[];
-  onSubmit: (data: { description: string; capturedAt: string; files: File[]; removedUrls?: string[] }) => Promise<void>;
+  onSubmit: (data: { description: string; timeMode: 'point' | 'range'; startAt: string; endAt?: string; files: File[]; removedUrls?: string[] }) => Promise<void>;
 }
 
 const MAX_FILES = 9;
@@ -41,16 +43,21 @@ export function PostDialog({
   busy,
   mode,
   initialDescription = '',
-  initialCapturedAt,
+  initialTimeMode = 'point',
+  initialStartAt,
+  initialEndAt,
   initialImageUrls = [],
   onSubmit,
 }: PostDialogProps) {
   const descriptionId = useId();
-  const timeId = useId();
+  const startTimeId = useId();
+  const endTimeId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [description, setDescription] = useState(initialDescription);
-  const [capturedAt, setCapturedAt] = useState(initialCapturedAt ?? getDefaultDateTime());
+  const [timeMode, setTimeMode] = useState<'point' | 'range'>(initialTimeMode);
+  const [startAt, setStartAt] = useState(initialStartAt ?? getDefaultDateTime());
+  const [endAt, setEndAt] = useState(initialEndAt ?? initialStartAt ?? getDefaultDateTime());
   const [previews, setPreviews] = useState<PreviewItem[]>(() =>
     initialImageUrls.map((url) => ({ type: 'url' as const, url }))
   );
@@ -69,7 +76,9 @@ export function PostDialog({
   useEffect(() => {
     if (open && !prevOpenRef.current) {
       setDescription(initialDescription);
-      setCapturedAt(initialCapturedAt ?? getDefaultDateTime());
+      setTimeMode(initialTimeMode);
+      setStartAt(initialStartAt ?? getDefaultDateTime());
+      setEndAt(initialEndAt ?? initialStartAt ?? getDefaultDateTime());
       setPreviews(initialImageUrls.map((url) => ({ type: 'url' as const, url })));
       setError(null);
       setDraggingIndex(null);
@@ -77,7 +86,7 @@ export function PostDialog({
     }
     prevOpenRef.current = open;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialDescription, initialCapturedAt, initialUrlsKey]);
+  }, [open, initialDescription, initialEndAt, initialStartAt, initialTimeMode, initialUrlsKey]);
 
   // Animation: mount → animate in, close → animate out → unmount
   useEffect(() => {
@@ -132,8 +141,16 @@ export function PostDialog({
   }, []);
 
   const handleSubmit = async () => {
-    if (!capturedAt) {
-      setError('请填写时间');
+    if (!startAt) {
+      setError('请填写开始时间');
+      return;
+    }
+    if (timeMode === 'range' && !endAt) {
+      setError('请填写结束时间');
+      return;
+    }
+    if (timeMode === 'range' && new Date(endAt).getTime() < new Date(startAt).getTime()) {
+      setError('结束时间不能早于开始时间');
       return;
     }
     if (!description.trim() && previews.length === 0) {
@@ -147,7 +164,9 @@ export function PostDialog({
       );
       await onSubmit({
         description: description.trim(),
-        capturedAt: `${capturedAt}:00+08:00`,
+        timeMode,
+        startAt: `${startAt}:00+08:00`,
+        endAt: timeMode === 'range' ? `${endAt}:00+08:00` : undefined,
         files,
         removedUrls: removedUrls.length > 0 ? removedUrls : undefined,
       });
@@ -286,13 +305,38 @@ export function PostDialog({
 
           {/* Time */}
           <div className="mt-4">
+            <div className="mb-3 flex gap-2 text-sm">
+              <button
+                className={`rounded px-3 py-1.5 transition ${timeMode === 'point' ? 'bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-400/40' : 'bg-white/5 text-soft hover:text-[var(--text-main)]'}`}
+                onClick={() => setTimeMode('point')}
+                type="button"
+              >
+                时间点
+              </button>
+              <button
+                className={`rounded px-3 py-1.5 transition ${timeMode === 'range' ? 'bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-400/40' : 'bg-white/5 text-soft hover:text-[var(--text-main)]'}`}
+                onClick={() => setTimeMode('range')}
+                type="button"
+              >
+                持续时间
+              </button>
+            </div>
             <input
               className="w-full border border-white/10 bg-transparent px-3 py-2 text-sm text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)]"
-              id={timeId}
-              onChange={(e) => setCapturedAt(e.target.value)}
+              id={startTimeId}
+              onChange={(e) => setStartAt(e.target.value)}
               type="datetime-local"
-              value={capturedAt}
+              value={startAt}
             />
+            {timeMode === 'range' ? (
+              <input
+                className="mt-2 w-full border border-white/10 bg-transparent px-3 py-2 text-sm text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)]"
+                id={endTimeId}
+                onChange={(e) => setEndAt(e.target.value)}
+                type="datetime-local"
+                value={endAt}
+              />
+            ) : null}
           </div>
 
           {error ? <p className="mt-3 text-sm text-rose-300">{error}</p> : null}

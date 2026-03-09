@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -44,6 +45,37 @@ func assetURLs(ownerLogin string, id string, count int) []string {
 		urls[i] = fmt.Sprintf("/api/images/%s/%s/asset/%d", ownerLogin, id, i)
 	}
 	return urls
+}
+
+func parseImageTimes(c *gin.Context) (string, time.Time, time.Time, error) {
+	timeMode := c.Request.FormValue("timeMode")
+	if timeMode == "" {
+		timeMode = model.ImageTimeModePoint
+	}
+
+	startValue := c.Request.FormValue("startAt")
+	if startValue == "" {
+		startValue = c.Request.FormValue("capturedAt")
+	}
+
+	startAt, err := utils.ParseBeijing(startValue)
+	if err != nil {
+		return "", time.Time{}, time.Time{}, err
+	}
+
+	if timeMode != model.ImageTimeModeRange {
+		return model.ImageTimeModePoint, startAt, time.Time{}, nil
+	}
+
+	endAt, err := utils.ParseBeijing(c.Request.FormValue("endAt"))
+	if err != nil {
+		return "", time.Time{}, time.Time{}, err
+	}
+	if endAt.Before(startAt) {
+		return "", time.Time{}, time.Time{}, fmt.Errorf("end before start")
+	}
+
+	return model.ImageTimeModeRange, startAt, endAt, nil
 }
 
 // Feed returns the aggregated feed for the current user.
@@ -174,9 +206,9 @@ func (controller *ImageController) Create(c *gin.Context) {
 		return
 	}
 
-	capturedAt, err := utils.ParseBeijing(c.Request.FormValue("capturedAt"))
+	timeMode, startAt, endAt, err := parseImageTimes(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid capturedAt"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid time fields"})
 		return
 	}
 
@@ -192,7 +224,7 @@ func (controller *ImageController) Create(c *gin.Context) {
 		return
 	}
 
-	image, err := controller.imageService.Create(c.Request.Context(), session.AccessToken, session.User, c.Request.FormValue("description"), capturedAt, files)
+	image, err := controller.imageService.Create(c.Request.Context(), session.AccessToken, session.User, c.Request.FormValue("description"), timeMode, startAt, endAt, files)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
@@ -208,9 +240,9 @@ func (controller *ImageController) Update(c *gin.Context) {
 	}
 
 	imageID := c.Param("imageID")
-	capturedAt, err := utils.ParseBeijing(c.Request.FormValue("capturedAt"))
+	timeMode, startAt, endAt, err := parseImageTimes(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid capturedAt"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid time fields"})
 		return
 	}
 
@@ -228,7 +260,7 @@ func (controller *ImageController) Update(c *gin.Context) {
 
 	// Users can only edit their own posts
 	ownerLogin := session.User.Login
-	image, err := controller.imageService.Update(c.Request.Context(), session.AccessToken, ownerLogin, imageID, c.Request.FormValue("description"), capturedAt, files)
+	image, err := controller.imageService.Update(c.Request.Context(), session.AccessToken, ownerLogin, imageID, c.Request.FormValue("description"), timeMode, startAt, endAt, files)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return

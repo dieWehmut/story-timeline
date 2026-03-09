@@ -56,6 +56,15 @@ const toBeijingText = (value: string) => {
   return `${year}-${month}-${day} ${hour}:${minute}`;
 };
 
+const toDisplayTime = (item: ImageItem) => {
+  const startText = toBeijingText(item.startAt);
+  if (item.timeMode !== 'range' || !item.endAt) {
+    return startText;
+  }
+
+  return `${startText} - ${toBeijingText(item.endAt)}`;
+};
+
 function ImageGrid({ urls, alt, onImageClick }: { urls: string[]; alt: string; onImageClick: (index: number) => void }) {
   if (urls.length === 0) return null;
 
@@ -91,6 +100,7 @@ export function ImageCard({ busy, canInteract, editable, fallbackAuthorLogin, it
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentBusy, setCommentBusy] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
+  const [commentImageUrl, setCommentImageUrl] = useState<string | null>(null);
   const { confirm } = useToast();
 
   // Load comments on mount if there are any
@@ -115,11 +125,13 @@ export function ImageCard({ busy, canInteract, editable, fallbackAuthorLogin, it
 
   const imageUrls = item.imageUrls ?? [];
 
-  const handleEditSubmit = async (data: { description: string; capturedAt: string; files: File[] }) => {
+  const handleEditSubmit = async (data: { description: string; timeMode: 'point' | 'range'; startAt: string; endAt?: string; files: File[] }) => {
     await onSave({
       id: item.id,
       description: data.description,
-      capturedAt: data.capturedAt,
+      timeMode: data.timeMode,
+      startAt: data.startAt,
+      endAt: data.endAt,
       files: data.files.length > 0 ? data.files : undefined,
     });
     setEditing(false);
@@ -134,11 +146,17 @@ export function ImageCard({ busy, canInteract, editable, fallbackAuthorLogin, it
   const handleToggleLike = async () => {
     if (likeBusy) return;
     setLikeBusy(true);
+    // Optimistic update: show change immediately
+    const optimisticLiked = !item.liked;
+    const optimisticCount = item.likeCount + (optimisticLiked ? 1 : -1);
+    onLikeChange?.(item.id, optimisticCount, optimisticLiked);
     try {
       const result = await api.toggleLike(authorLogin, item.id);
+      // Reconcile with server truth
       onLikeChange?.(item.id, result.likeCount, result.liked);
     } catch {
-      // ignore
+      // Revert on failure
+      onLikeChange?.(item.id, item.likeCount, item.liked);
     } finally {
       setLikeBusy(false);
     }
@@ -221,7 +239,7 @@ export function ImageCard({ busy, canInteract, editable, fallbackAuthorLogin, it
         ) : null}
         {/* Footer: time + like & comment */}
         <div className="flex items-center justify-between gap-4 px-2 pb-1 pt-2">
-          <p className="text-xs text-soft">{toBeijingText(item.capturedAt)}</p>
+          <p className="text-xs text-soft">{toDisplayTime(item)}</p>
           <div className="flex items-center gap-4">
             <button
               className={`inline-flex items-center gap-1 text-xs transition ${item.liked ? 'text-rose-400' : 'text-soft hover:text-rose-300'}`}
@@ -256,12 +274,14 @@ export function ImageCard({ busy, canInteract, editable, fallbackAuthorLogin, it
                 <div className="min-w-0 flex-1">
                   <p className="text-xs text-[var(--text-main)]">
                     <span className="font-medium">{c.authorLogin}</span>
-                    {c.text ? <span className="ml-1">{c.text}</span> : null}
+                    <span>：</span>
+                    {c.text ? <span>{c.text}</span> : null}
                   </p>
                   {c.imageUrl ? (
                     <img
                       alt="评论图片"
-                      className="mt-0.5 max-h-20 max-w-32 rounded object-cover"
+                      className="mt-0.5 max-h-20 max-w-32 rounded object-cover cursor-pointer"
+                      onClick={() => setCommentImageUrl(c.imageUrl!)}
                       src={c.imageUrl}
                     />
                   ) : null}
@@ -289,9 +309,11 @@ export function ImageCard({ busy, canInteract, editable, fallbackAuthorLogin, it
       {/* Edit dialog */}
       <PostDialog
         busy={busy}
-        initialCapturedAt={toDateTimeInputValue(item.capturedAt)}
         initialDescription={item.description}
         initialImageUrls={imageUrls}
+        initialStartAt={toDateTimeInputValue(item.startAt)}
+        initialEndAt={item.endAt ? toDateTimeInputValue(item.endAt) : undefined}
+        initialTimeMode={item.timeMode}
         mode="edit"
         onClose={() => setEditing(false)}
         onSubmit={handleEditSubmit}
@@ -308,6 +330,11 @@ export function ImageCard({ busy, canInteract, editable, fallbackAuthorLogin, it
         onSubmit={handleAddComment}
         open={commentsOpen}
       />
+
+      {/* Comment image viewer */}
+      {commentImageUrl ? (
+        <ImageViewer onClose={() => setCommentImageUrl(null)} urls={[commentImageUrl]} />
+      ) : null}
     </>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, useCallback } from 'react';
 import { ImagePlus, LoaderCircle, Send, X } from 'lucide-react';
+import { ImageViewer } from './ImageViewer';
 import type { CommentItem } from '../types/image';
 
 interface CommentDialogProps {
@@ -32,6 +33,7 @@ export function CommentDialog({ open, onClose, comments, loading, busy, onSubmit
   const [error, setError] = useState<string | null>(null);
   const [animating, setAnimating] = useState(false);
   const [visible, setVisible] = useState(false);
+  const [viewingImage, setViewingImage] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevOpenRef = useRef(false);
@@ -145,7 +147,8 @@ export function CommentDialog({ open, onClose, comments, loading, busy, onSubmit
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-soft">
                       <span className="font-medium text-[var(--text-main)]">{c.authorLogin}</span>
-                      <span className="ml-2">{toBeijingText(c.createdAt)}</span>
+                      <span>：</span>
+                      <span className="ml-1">{toBeijingText(c.createdAt)}</span>
                     </p>
                     {c.text ? (
                       <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--text-main)]">{c.text}</p>
@@ -153,7 +156,8 @@ export function CommentDialog({ open, onClose, comments, loading, busy, onSubmit
                     {c.imageUrl ? (
                       <img
                         alt="评论图片"
-                        className="mt-1 max-h-32 max-w-48 rounded object-cover"
+                        className="mt-1 max-h-32 max-w-48 rounded object-cover cursor-pointer"
+                        onClick={() => setViewingImage(c.imageUrl!)}
                         src={c.imageUrl}
                       />
                     ) : null}
@@ -200,7 +204,7 @@ export function CommentDialog({ open, onClose, comments, loading, busy, onSubmit
                 type="file"
               />
               <input
-                className="flex-1 border border-white/10 bg-transparent px-3 py-1.5 text-sm text-[var(--text-main)] outline-none transition placeholder:text-soft/50 focus:border-[var(--text-accent)]"
+                className="min-w-0 flex-1 border border-white/10 bg-transparent px-3 py-1.5 text-sm text-[var(--text-main)] outline-none transition placeholder:text-soft/50 focus:border-[var(--text-accent)]"
                 disabled={busy}
                 id={inputId}
                 onChange={(e) => setText(e.target.value)}
@@ -225,6 +229,11 @@ export function CommentDialog({ open, onClose, comments, loading, busy, onSubmit
           </div>
         ) : null}
       </div>
+
+      {/* Image viewer for comment images */}
+      {viewingImage ? (
+        <ImageViewer onClose={() => setViewingImage(null)} urls={[viewingImage]} />
+      ) : null}
     </div>
   );
 }

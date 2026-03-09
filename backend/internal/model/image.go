@@ -2,17 +2,61 @@ package model
 
 import "time"
 
+const (
+	ImageTimeModePoint = "point"
+	ImageTimeModeRange = "range"
+)
+
 type Image struct {
 	ID           string    `json:"id"`
 	AuthorLogin  string    `json:"authorLogin,omitempty"`
 	AuthorAvatar string    `json:"authorAvatar,omitempty"`
 	Description  string    `json:"description"`
-	CapturedAt   time.Time `json:"capturedAt"`
+	TimeMode     string    `json:"timeMode,omitempty"`
+	StartAt      time.Time `json:"startAt,omitempty"`
+	EndAt        time.Time `json:"endAt,omitempty"`
+	CapturedAt   time.Time `json:"capturedAt,omitempty"`
 	ImagePath    string    `json:"imagePath,omitempty"`
 	ImagePaths   []string  `json:"imagePaths,omitempty"`
 	MetadataPath string    `json:"metadataPath"`
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
+}
+
+func (img *Image) NormalizeTimeFields() {
+	if img.TimeMode == "" {
+		img.TimeMode = ImageTimeModePoint
+	}
+
+	if img.StartAt.IsZero() {
+		switch {
+		case !img.CapturedAt.IsZero():
+			img.StartAt = img.CapturedAt
+		case !img.CreatedAt.IsZero():
+			img.StartAt = img.CreatedAt
+		}
+	}
+
+	if img.TimeMode != ImageTimeModeRange {
+		img.TimeMode = ImageTimeModePoint
+		img.EndAt = time.Time{}
+	}
+
+	if img.TimeMode == ImageTimeModeRange && img.EndAt.IsZero() {
+		img.EndAt = img.StartAt
+	}
+
+	img.CapturedAt = img.StartAt
+}
+
+func (img Image) SortTime() time.Time {
+	if !img.StartAt.IsZero() {
+		return img.StartAt
+	}
+	if !img.CapturedAt.IsZero() {
+		return img.CapturedAt
+	}
+	return img.CreatedAt
 }
 
 // AllImagePaths returns ImagePaths or falls back to the legacy single ImagePath.

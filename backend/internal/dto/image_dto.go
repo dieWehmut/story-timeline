@@ -7,7 +7,10 @@ type ImageResponse struct {
 	AuthorLogin  string   `json:"authorLogin"`
 	AuthorAvatar string   `json:"authorAvatar"`
 	Description  string   `json:"description"`
-	CapturedAt   string   `json:"capturedAt"`
+	TimeMode     string   `json:"timeMode"`
+	StartAt      string   `json:"startAt"`
+	EndAt        string   `json:"endAt,omitempty"`
+	CapturedAt   string   `json:"capturedAt,omitempty"`
 	ImageURLs    []string `json:"imageUrls"`
 	ImagePaths   []string `json:"imagePaths"`
 	MetadataPath string   `json:"metadataPath"`
@@ -19,18 +22,27 @@ type ImageResponse struct {
 }
 
 func NewImageResponse(image model.Image, assetURLs []string) ImageResponse {
-	return ImageResponse{
+	image.NormalizeTimeFields()
+	response := ImageResponse{
 		ID:           image.ID,
 		AuthorLogin:  image.AuthorLogin,
 		AuthorAvatar: image.AuthorAvatar,
 		Description:  image.Description,
-		CapturedAt:   image.CapturedAt.Format("2006-01-02T15:04:05-07:00"),
+		TimeMode:     image.TimeMode,
+		StartAt:      image.StartAt.Format("2006-01-02T15:04:05-07:00"),
+		CapturedAt:   image.StartAt.Format("2006-01-02T15:04:05-07:00"),
 		ImageURLs:    assetURLs,
 		ImagePaths:   image.AllImagePaths(),
 		MetadataPath: image.MetadataPath,
 		CreatedAt:    image.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
 		UpdatedAt:    image.UpdatedAt.Format("2006-01-02T15:04:05-07:00"),
 	}
+
+	if image.TimeMode == model.ImageTimeModeRange && !image.EndAt.IsZero() {
+		response.EndAt = image.EndAt.Format("2006-01-02T15:04:05-07:00")
+	}
+
+	return response
 }
 
 type CommentResponse struct {

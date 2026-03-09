@@ -98,7 +98,7 @@ export function Header({
 						>
 							<img
 								alt={user.login}
-								className="h-5 w-5 rounded-full object-cover"
+								className="h-6 w-6 rounded-full object-cover"
 								src={user.avatarUrl}
 							/>
 							

@@ -40,6 +40,14 @@ func ParseBeijing(value string) (time.Time, error) {
 	return parsed.In(beijingLocation), nil
 }
 
+func MaxTime(left time.Time, right time.Time) time.Time {
+	if left.After(right) {
+		return left
+	}
+
+	return right
+}
+
 func DayPathParts(input time.Time) (string, string, string) {
 	target := input.In(beijingLocation)
 	return target.Format("2006"), target.Format("01"), target.Format("02")
