@@ -33,7 +33,7 @@ jobs:
       - name: Build
         working-directory: frontend
         env:
-          VITE_API_BASE: https://dieWehmut-story-timeline-backend.hf.space
+          VITE_API_BASE: https://REDACTED.hf.space
         run: pnpm build
 
       - name: Deploy

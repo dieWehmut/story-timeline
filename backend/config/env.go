@@ -25,7 +25,7 @@ func LoadEnv() Env {
 		FrontendBaseURL:    getEnv("FRONTEND_BASE_URL", "http://localhost:5173"),
 		GitHubClientID:     os.Getenv("GITHUB_CLIENT_ID"),
 		GitHubClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
-		GitHubCallbackURL:  getEnv("GITHUB_CALLBACK_URL", "http://localhost:8080/api/auth/github/callback"),
+		GitHubCallbackURL:  getEnv("GITHUB_CALLBACK_URL", "http://localhost:7860/api/auth/github/callback"),
 		GitHubRepoOwner:    os.Getenv("GITHUB_REPO_OWNER"),
 		GitHubRepoName:     getEnv("GITHUB_REPO_NAME", "story-images"),
 		GitHubRepoBranch:   getEnv("GITHUB_REPO_BRANCH", "main"),
