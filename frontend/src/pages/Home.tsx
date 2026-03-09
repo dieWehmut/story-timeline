@@ -45,7 +45,7 @@ export default function Home({
   theme,
   timelineOpen,
 }: HomeProps) {
-  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const monthGroups = useMemo(
     () =>
@@ -59,7 +59,7 @@ export default function Home({
   useEffect(() => {
     const nodes = images.timeline
       .map((month) => sectionRefs.current[month.key])
-      .filter(Boolean) as HTMLDivElement[];
+      .filter(Boolean) as HTMLElement[];
 
     if (!nodes.length) {
       return;
