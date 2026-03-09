@@ -6,6 +6,8 @@ import type {
   UpdateImagePayload,
 } from '../types/image';
 
+export const API_BASE = import.meta.env.VITE_API_BASE || '';
+
 const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => {
   const response = await fetch(input, {
     credentials: 'include',
@@ -76,18 +78,18 @@ const buildImageFormData = async (payload: CreateImagePayload | UpdateImagePaylo
 };
 
 export const api = {
-  getSession: () => request<AuthSession>('/api/auth/session'),
-  logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
-  getImages: () => request<ImageItem[]>('/api/images'),
+  getSession: () => request<AuthSession>(`${API_BASE}/api/auth/session`),
+  logout: () => request<{ ok: boolean }>(`${API_BASE}/api/auth/logout`, { method: 'POST' }),
+  getImages: () => request<ImageItem[]>(`${API_BASE}/api/images`),
   createImage: async (payload: CreateImagePayload) => {
     const body = await buildImageFormData(payload);
-    return request<ImageItem>('/api/images', { method: 'POST', body });
+    return request<ImageItem>(`${API_BASE}/api/images`, { method: 'POST', body });
   },
   updateImage: async (payload: UpdateImagePayload) => {
     const body = await buildImageFormData(payload);
-    return request<ImageItem>(`/api/images/${payload.id}`, { method: 'PATCH', body });
+    return request<ImageItem>(`${API_BASE}/api/images/${payload.id}`, { method: 'PATCH', body });
   },
-  deleteImage: (id: string) => request<{ ok: boolean }>(`/api/images/${id}`, { method: 'DELETE' }),
-  getStats: () => request<HealthStats>('/api/health/stats'),
-  pingStats: () => request<{ ok: boolean }>('/api/health/ping', { method: 'POST' }),
+  deleteImage: (id: string) => request<{ ok: boolean }>(`${API_BASE}/api/images/${id}`, { method: 'DELETE' }),
+  getStats: () => request<HealthStats>(`${API_BASE}/api/health/stats`),
+  pingStats: () => request<{ ok: boolean }>(`${API_BASE}/api/health/ping`, { method: 'POST' }),
 };

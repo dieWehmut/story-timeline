@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, API_BASE } from '../lib/api';
 import type { AuthSession } from '../types/image';
 
 const defaultSession: AuthSession = {
   authenticated: false,
-  loginUrl: '/api/auth/github/login',
+  loginUrl: `${API_BASE}/api/auth/github/login`,
   user: null,
 };
 
@@ -41,7 +41,8 @@ export const useAuth = () => {
   }, []);
 
   const login = () => {
-    window.location.href = session.loginUrl || '/api/auth/github/login';
+    const url = session.loginUrl || `${API_BASE}/api/auth/github/login`;
+    window.location.href = url.startsWith('http') ? url : `${API_BASE}${url}`;
   };
 
   const logout = async () => {

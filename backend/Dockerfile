@@ -23,6 +23,8 @@ WORKDIR /app
 
 COPY --from=builder /app/server ./server
 
+RUN mkdir -p /app/data && chown appuser:appuser /app/data
+
 ENV PORT=7860
 
 USER appuser
