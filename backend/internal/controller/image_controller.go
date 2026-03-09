@@ -283,7 +283,7 @@ func tokenFromSession(session *model.Session) string {
 // ToggleLike toggles a like on a post.
 func (controller *ImageController) ToggleLike(c *gin.Context) {
 	ownerLogin := c.Param("ownerLogin")
-	postID := c.Param("postID")
+	postID := c.Param("imageID")
 
 	session, ok := middleware.SessionFromContext(c)
 	if !ok {
@@ -314,7 +314,7 @@ func (controller *ImageController) ToggleLike(c *gin.Context) {
 // GetComments returns comments for a post.
 func (controller *ImageController) GetComments(c *gin.Context) {
 	ownerLogin := c.Param("ownerLogin")
-	postID := c.Param("postID")
+	postID := c.Param("imageID")
 
 	var feedLogins []string
 	session, _ := controller.authService.ReadSession(c.Request)
@@ -364,7 +364,7 @@ func (controller *ImageController) GetComments(c *gin.Context) {
 // AddComment adds a comment on a post. The comment is stored in the commenter's repo.
 func (controller *ImageController) AddComment(c *gin.Context) {
 	ownerLogin := c.Param("ownerLogin")
-	postID := c.Param("postID")
+	postID := c.Param("imageID")
 
 	session, ok := middleware.SessionFromContext(c)
 	if !ok {

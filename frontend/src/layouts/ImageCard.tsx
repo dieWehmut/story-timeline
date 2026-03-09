@@ -61,8 +61,12 @@ function ImageGrid({ urls, alt, onImageClick }: { urls: string[]; alt: string; o
 
   if (urls.length === 1) {
     return (
-      <div className="cursor-pointer overflow-hidden bg-slate-950/20" onClick={() => onImageClick(0)}>
-        <img alt={alt} className="w-full object-contain" src={urls[0]} />
+      <div className="flex justify-center">
+        <div className="w-2/3 cursor-pointer overflow-hidden bg-slate-950/20" onClick={() => onImageClick(0)}>
+          <div className="relative aspect-square">
+            <img alt={alt} className="absolute inset-0 h-full w-full object-cover" src={urls[0]} />
+          </div>
+        </div>
       </div>
     );
   }

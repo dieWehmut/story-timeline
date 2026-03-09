@@ -44,9 +44,9 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 			images.GET("/:ownerLogin/:imageID/asset/:assetIndex", deps.ImageController.Asset)
 
 			// Interactions (public read, auth write)
-			images.GET("/:ownerLogin/:postID/comments", deps.ImageController.GetComments)
-			images.POST("/:ownerLogin/:postID/like", middleware.RequireAuth(deps.AuthService), deps.ImageController.ToggleLike)
-			images.POST("/:ownerLogin/:postID/comments", middleware.RequireAuth(deps.AuthService), deps.ImageController.AddComment)
+			images.GET("/:ownerLogin/:imageID/comments", deps.ImageController.GetComments)
+			images.POST("/:ownerLogin/:imageID/like", middleware.RequireAuth(deps.AuthService), deps.ImageController.ToggleLike)
+			images.POST("/:ownerLogin/:imageID/comments", middleware.RequireAuth(deps.AuthService), deps.ImageController.AddComment)
 
 			// Write operations require authentication (any logged-in user)
 			images.POST("/", middleware.RequireAuth(deps.AuthService), deps.ImageController.Create)
