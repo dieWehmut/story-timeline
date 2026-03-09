@@ -18,9 +18,10 @@ type InteractionService struct {
 	repoName     string
 	defaultToken string
 
-	mu        sync.RWMutex
-	likeCache map[string]*model.LikeFile    // key: "ownerLogin/postID"
-	cmtCache  map[string]*model.CommentFile // key: "commenterLogin/postOwner/postID"
+	mu          sync.RWMutex
+	likeCache   map[string]*model.LikeFile           // key: "ownerLogin/postID"
+	cmtCache    map[string]*model.CommentFile         // key: "commenterLogin/postOwner/postID"
+	hiddenCache map[string]*model.HiddenCommentFile   // key: "hidden:ownerLogin/postID"
 }
 
 func NewInteractionService(store *storage.GitHubStorage, repoName string, defaultToken string) *InteractionService {
@@ -30,6 +31,7 @@ func NewInteractionService(store *storage.GitHubStorage, repoName string, defaul
 		defaultToken: defaultToken,
 		likeCache:    map[string]*model.LikeFile{},
 		cmtCache:     map[string]*model.CommentFile{},
+		hiddenCache:  map[string]*model.HiddenCommentFile{},
 	}
 }
 
@@ -255,11 +257,20 @@ func (s *InteractionService) AddComment(ctx context.Context, token string, comme
 
 // GetAllComments aggregates comments for a post from multiple users.
 func (s *InteractionService) GetAllComments(ctx context.Context, token string, postOwner, postID string, feedLogins []string) []CommentWithAuthor {
+	hidden := s.loadHidden(ctx, token, postOwner, postID)
+	hiddenSet := make(map[string]bool, len(hidden.HiddenIDs))
+	for _, id := range hidden.HiddenIDs {
+		hiddenSet[id] = true
+	}
+
 	var result []CommentWithAuthor
 
 	for _, login := range feedLogins {
 		cf := s.loadComments(ctx, token, login, postOwner, postID)
 		for _, c := range cf.Comments {
+			if c.Deleted || hiddenSet[c.ID] {
+				continue
+			}
 			result = append(result, CommentWithAuthor{
 				Comment:     c,
 				AuthorLogin: login,
@@ -289,13 +300,149 @@ func (s *InteractionService) GetPostInteractionCounts(ctx context.Context, token
 	lf := s.loadLikes(ctx, token, ownerLogin, postID)
 	likeCount := len(lf.Likes)
 
+	hidden := s.loadHidden(ctx, token, ownerLogin, postID)
+	hiddenSet := make(map[string]bool, len(hidden.HiddenIDs))
+	for _, id := range hidden.HiddenIDs {
+		hiddenSet[id] = true
+	}
+
 	commentCount := 0
 	for _, login := range feedLogins {
 		cf := s.loadComments(ctx, token, login, ownerLogin, postID)
-		commentCount += len(cf.Comments)
+		for _, c := range cf.Comments {
+			if !c.Deleted && !hiddenSet[c.ID] {
+				commentCount++
+			}
+		}
 	}
 
 	return likeCount, commentCount
+}
+
+// --- Hidden comments (stored in post owner's repo) ---
+
+func hiddenPath(postID string) string {
+	return fmt.Sprintf("hidden-comments/%s.json", postID)
+}
+
+func hiddenKey(ownerLogin, postID string) string {
+	return "hidden:" + ownerLogin + "/" + postID
+}
+
+func (s *InteractionService) loadHidden(ctx context.Context, token, ownerLogin, postID string) *model.HiddenCommentFile {
+	key := hiddenKey(ownerLogin, postID)
+
+	s.mu.RLock()
+	cached, ok := s.hiddenCache[key]
+	s.mu.RUnlock()
+	if ok {
+		return cached
+	}
+
+	readToken := token
+	if readToken == "" {
+		readToken = s.defaultToken
+	}
+
+	content, _, _, err := s.storage.GetFile(ctx, readToken, ownerLogin, s.repoName, hiddenPath(postID))
+	if err != nil {
+		hf := &model.HiddenCommentFile{}
+		s.mu.Lock()
+		s.hiddenCache[key] = hf
+		s.mu.Unlock()
+		return hf
+	}
+
+	var hf model.HiddenCommentFile
+	if err := json.Unmarshal(content, &hf); err != nil {
+		hf = model.HiddenCommentFile{}
+	}
+
+	s.mu.Lock()
+	s.hiddenCache[key] = &hf
+	s.mu.Unlock()
+	return &hf
+}
+
+func (s *InteractionService) persistHidden(ctx context.Context, token, ownerLogin, postID string, hf *model.HiddenCommentFile) error {
+	payload, err := json.MarshalIndent(hf, "", "  ")
+	if err != nil {
+		return err
+	}
+	return s.storage.PutFile(ctx, token, ownerLogin, s.repoName, hiddenPath(postID), payload, fmt.Sprintf("Hide comment on %s", postID))
+}
+
+// DeleteComment deletes a comment. If the caller is the comment author, the
+// comment is marked deleted in the commenter's repo. If the caller is the post
+// owner, the comment ID is added to the post owner's hidden-comments file.
+func (s *InteractionService) DeleteComment(ctx context.Context, token string, caller model.GitHubUser, commenterLogin, postOwner, postID, commentID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	callerIsCommenter := strings.EqualFold(caller.Login, commenterLogin)
+	callerIsPostOwner := strings.EqualFold(caller.Login, postOwner)
+
+	if !callerIsCommenter && !callerIsPostOwner {
+		return fmt.Errorf("no permission to delete this comment")
+	}
+
+	if callerIsCommenter {
+		// Mark deleted in commenter's own repo
+		key := cmtKey(commenterLogin, postOwner, postID)
+		cf, ok := s.cmtCache[key]
+		if !ok {
+			s.mu.Unlock()
+			cf = s.loadComments(ctx, token, commenterLogin, postOwner, postID)
+			s.mu.Lock()
+		}
+
+		found := false
+		for i := range cf.Comments {
+			if cf.Comments[i].ID == commentID {
+				cf.Comments[i].Deleted = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("comment not found")
+		}
+
+		if err := s.persistComments(ctx, token, commenterLogin, postOwner, postID, cf); err != nil {
+			return err
+		}
+		s.cmtCache[key] = cf
+	} else {
+		// Post owner hides comment: store in own repo
+		key := hiddenKey(postOwner, postID)
+		hf, ok := s.hiddenCache[key]
+		if !ok {
+			s.mu.Unlock()
+			hf = s.loadHidden(ctx, token, postOwner, postID)
+			s.mu.Lock()
+		}
+
+		// Avoid duplicate
+		for _, id := range hf.HiddenIDs {
+			if id == commentID {
+				return nil
+			}
+		}
+
+		hf.HiddenIDs = append(hf.HiddenIDs, commentID)
+
+		writeToken := token
+		if writeToken == "" {
+			writeToken = s.defaultToken
+		}
+
+		if err := s.persistHidden(ctx, writeToken, postOwner, postID, hf); err != nil {
+			return err
+		}
+		s.hiddenCache[key] = hf
+	}
+
+	return nil
 }
 
 // IsLikedBy checks if a user has liked a post.

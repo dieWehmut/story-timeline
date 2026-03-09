@@ -178,6 +178,10 @@ export const api = {
     });
     return normalizeCommentItem(item);
   },
+  deleteComment: (ownerLogin: string, postID: string, commentID: string, commenterLogin?: string) => {
+    const params = commenterLogin ? `?commenter=${encodeURIComponent(commenterLogin)}` : '';
+    return request<{ ok: boolean }>(`${API_BASE}/api/images/${ownerLogin}/${postID}/comments/${commentID}${params}`, { method: 'DELETE' });
+  },
   getStats: () => request<HealthStats>(`${API_BASE}/api/health/stats`),
   pingStats: () => request<{ ok: boolean }>(`${API_BASE}/api/health/ping`, { method: 'POST' }),
 };

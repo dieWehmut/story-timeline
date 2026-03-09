@@ -195,10 +195,23 @@ export function ImageCard({
 
   const handleAddComment = async (text: string, files?: File[]) => {
     setCommentBusy(true);
+    const optimisticComment: CommentItem = {
+      id: `temp-${Date.now()}`,
+      authorLogin: '',
+      postOwner: authorLogin,
+      postId: item.id,
+      text,
+      imageUrls: files ? files.map((f) => URL.createObjectURL(f)) : undefined,
+      createdAt: new Date().toISOString(),
+    };
+    setComments((prev) => [...prev, optimisticComment]);
+    onCommentCountChange?.(item.id, 1);
     try {
       const newComment = await api.addComment(authorLogin, item.id, text, files);
-      setComments((prev) => [...prev, newComment]);
-      onCommentCountChange?.(item.id, 1);
+      setComments((prev) => prev.map((c) => (c.id === optimisticComment.id ? newComment : c)));
+    } catch {
+      setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
+      onCommentCountChange?.(item.id, -1);
     } finally {
       setCommentBusy(false);
     }
@@ -331,9 +344,9 @@ export function ImageCard({
           </div>
 
           {/* Right: Like + Comment */}
-          <div className="flex w-16 shrink-0 items-end pb-1 pr-2">
+          <div className="flex shrink-0 items-end gap-2 pb-1 pr-2">
             <button
-              className={`flex w-8 flex-col items-center gap-0.5 py-1 transition ${item.liked ? 'text-rose-400' : 'text-soft hover:text-rose-300'}`}
+              className={`flex items-center gap-1 py-1 transition ${item.liked ? 'text-rose-400' : 'text-soft hover:text-rose-300'}`}
               disabled={!canInteract || likeBusy}
               onClick={(e) => { e.stopPropagation(); void handleToggleLike(); }}
               type="button"
@@ -342,7 +355,7 @@ export function ImageCard({
               {item.likeCount > 0 ? <span className="text-[10px] leading-none">{item.likeCount}</span> : null}
             </button>
             <button
-              className="flex w-8 flex-col items-center gap-0.5 py-1 text-soft transition hover:text-[var(--text-main)]"
+              className="flex items-center gap-1 py-1 text-soft transition hover:text-[var(--text-main)]"
               onClick={(e) => { e.stopPropagation(); handleOpenComment(); }}
               type="button"
             >

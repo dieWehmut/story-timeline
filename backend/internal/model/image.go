@@ -88,13 +88,14 @@ type LikeFile struct {
 
 // Comment represents a single comment on a post. Stored in the commenter's repo.
 type Comment struct {
-	ID        string    `json:"id"`
-	PostOwner string    `json:"postOwner"`
-	PostID    string    `json:"postId"`
-	Text      string    `json:"text"`
-	ImagePath string    `json:"imagePath,omitempty"`
-	ImagePaths []string `json:"imagePaths,omitempty"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID         string    `json:"id"`
+	PostOwner  string    `json:"postOwner"`
+	PostID     string    `json:"postId"`
+	Text       string    `json:"text"`
+	ImagePath  string    `json:"imagePath,omitempty"`
+	ImagePaths []string  `json:"imagePaths,omitempty"`
+	Deleted    bool      `json:"deleted,omitempty"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 func (comment Comment) AllImagePaths() []string {
@@ -110,4 +111,10 @@ func (comment Comment) AllImagePaths() []string {
 // CommentFile is persisted as comments/{postOwnerLogin}/{postID}.json in the commenter's repo.
 type CommentFile struct {
 	Comments []Comment `json:"comments"`
+}
+
+// HiddenCommentFile tracks comment IDs hidden by the post owner.
+// Stored as hidden-comments/{postID}.json in the post owner's repo.
+type HiddenCommentFile struct {
+	HiddenIDs []string `json:"hiddenIds"`
 }

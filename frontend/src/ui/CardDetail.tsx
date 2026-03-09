@@ -115,6 +115,7 @@ interface CardDetailProps {
   roleLabel?: string;
   canInteract: boolean;
   editable?: boolean;
+  currentUserLogin?: string;
   onDelete?: (id: string) => Promise<void>;
   onSave?: (payload: UpdateImagePayload) => Promise<void>;
   onLikeChange?: (id: string, likeCount: number, liked: boolean) => void;
@@ -127,6 +128,7 @@ export function CardDetail({
   roleLabel,
   canInteract,
   editable,
+  currentUserLogin,
   onDelete,
   onSave,
   onLikeChange,
@@ -143,6 +145,7 @@ export function CardDetail({
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [viewingCommentImage, setViewingCommentImage] = useState<{ urls: string[]; initialIndex: number } | null>(null);
   const [likeBusy, setLikeBusy] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
 
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -285,20 +288,61 @@ export function CardDetail({
   const handleAddComment = async () => {
     if (!text.trim() && files.length === 0) return;
     setCommentBusy(true);
+
+    const optimisticComment: CommentItem = {
+      id: `temp-${Date.now()}`,
+      authorLogin: '',
+      postOwner: authorLogin,
+      postId: item.id,
+      text: text.trim(),
+      imageUrls: files.map((f) => URL.createObjectURL(f)),
+      createdAt: new Date().toISOString(),
+    };
+    setComments((prev) => [...prev, optimisticComment]);
+    onCommentCountChange?.(item.id, 1);
+    const submittedText = text.trim();
+    const submittedFiles = files.length > 0 ? [...files] : undefined;
+    setText('');
+    replaceCommentFiles([]);
+    detailFileCache.delete(item.id);
+    setError(null);
+
     try {
-      const newComment = await api.addComment(authorLogin, item.id, text.trim(), files.length > 0 ? files : undefined);
-      setComments((prev) => [...prev, newComment]);
-      onCommentCountChange?.(item.id, 1);
-      setText('');
-      replaceCommentFiles([]);
-      detailFileCache.delete(item.id);
-      setError(null);
+      const newComment = await api.addComment(authorLogin, item.id, submittedText, submittedFiles);
+      setComments((prev) => prev.map((c) => (c.id === optimisticComment.id ? newComment : c)));
     } catch (e) {
+      setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
+      onCommentCountChange?.(item.id, -1);
       setError(e instanceof Error ? e.message : '评论失败');
     } finally {
       setCommentBusy(false);
     }
   };
+
+  const handleDeleteComment = async (comment: CommentItem) => {
+    if (deletingCommentId) return;
+    setDeletingCommentId(comment.id);
+    // Optimistically remove
+    setComments((prev) => prev.filter((c) => c.id !== comment.id));
+    onCommentCountChange?.(item.id, -1);
+    try {
+      const commenter = comment.authorLogin !== currentUserLogin ? comment.authorLogin : undefined;
+      await api.deleteComment(authorLogin, item.id, comment.id, commenter);
+    } catch {
+      // Revert
+      setComments((prev) => {
+        const restored = [...prev, comment].sort(
+          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+        return restored;
+      });
+      onCommentCountChange?.(item.id, 1);
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
+
+  const isCardOwner = currentUserLogin ? authorLogin.toLowerCase() === currentUserLogin.toLowerCase() : false;
 
   return (
     <>
@@ -373,9 +417,9 @@ export function CardDetail({
               <div className="min-w-0 flex-1 px-2 pt-3">
                 <p className="text-xs text-soft">{toDisplayTime(item)}</p>
               </div>
-              <div className="flex w-16 shrink-0">
+              <div className="flex shrink-0 gap-2">
                 <button
-                  className={`flex w-8 flex-col items-center gap-0.5 py-1 transition ${item.liked ? 'text-rose-400' : 'text-soft hover:text-rose-300'}`}
+                  className={`flex items-center gap-1 py-1 transition ${item.liked ? 'text-rose-400' : 'text-soft hover:text-rose-300'}`}
                   disabled={!canInteract || likeBusy}
                   onClick={() => void handleToggleLike()}
                   type="button"
@@ -384,7 +428,7 @@ export function CardDetail({
                   {item.likeCount > 0 ? <span className="text-[10px] leading-none">{item.likeCount}</span> : null}
                 </button>
                 <button
-                  className="flex w-8 flex-col items-center gap-0.5 py-1 text-soft transition hover:text-[var(--text-main)]"
+                  className="flex items-center gap-1 py-1 text-soft transition hover:text-[var(--text-main)]"
                   onClick={() => commentInputRef.current?.focus()}
                   type="button"
                 >
@@ -404,7 +448,11 @@ export function CardDetail({
                 <p className="py-8 text-center text-sm text-soft">暂无评论</p>
               ) : (
                 <div className="divide-y divide-[var(--panel-border)]">
-                  {comments.map((c) => (
+                  {comments.map((c) => {
+                    const canDelete = currentUserLogin && (
+                      c.authorLogin.toLowerCase() === currentUserLogin.toLowerCase() || isCardOwner
+                    );
+                    return (
                     <div className="flex gap-3 px-4 py-3" key={c.id}>
                       {/* Avatar */}
                       <img
@@ -435,8 +483,22 @@ export function CardDetail({
                           </div>
                         ) : null}
                       </div>
+                      {canDelete ? (
+                        <button
+                          aria-label="删除评论"
+                          className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center text-soft transition hover:text-rose-300"
+                          disabled={deletingCommentId === c.id}
+                          onClick={() => {
+                            confirm('确定要删除这条评论吗？', () => { void handleDeleteComment(c); });
+                          }}
+                          type="button"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      ) : null}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

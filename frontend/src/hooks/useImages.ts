@@ -155,14 +155,40 @@ export const useImages = () => {
     return [...monthMap.values()].sort((left, right) => right.key.localeCompare(left.key));
   }, [filteredItems]);
 
-  const createImage = async (payload: CreateImagePayload) => {
+  const createImage = async (payload: CreateImagePayload, optimisticUser?: { login: string; avatarUrl: string }) => {
     setSubmitting(true);
     setError(null);
+
+    const tempId = `temp-${Date.now()}`;
+    if (optimisticUser) {
+      const tempItem: ImageItem = {
+        id: tempId,
+        authorLogin: optimisticUser.login,
+        authorAvatar: optimisticUser.avatarUrl,
+        description: payload.description,
+        timeMode: payload.timeMode,
+        startAt: payload.startAt,
+        endAt: payload.endAt,
+        imageUrls: payload.files.map((f) => URL.createObjectURL(f)),
+        imagePaths: [],
+        metadataPath: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        likeCount: 0,
+        commentCount: 0,
+        liked: false,
+      };
+      setItems((currentItems) => sortByDate([tempItem, ...currentItems]));
+    }
 
     try {
       const created = await api.createImage(payload);
       setItems((currentItems) => {
-        const next = sortByDate([created, ...currentItems]);
+        const next = sortByDate(
+          optimisticUser
+            ? currentItems.map((item) => (item.id === tempId ? created : item))
+            : [created, ...currentItems]
+        );
         saveCacheFeed(next);
         return next;
       });
@@ -172,6 +198,9 @@ export const useImages = () => {
         saveCacheUsers(users);
       }).catch(() => undefined);
     } catch (submitError) {
+      if (optimisticUser) {
+        setItems((currentItems) => currentItems.filter((item) => item.id !== tempId));
+      }
       setError(submitError instanceof Error ? submitError.message : '上传失败');
       throw submitError;
     } finally {
@@ -183,6 +212,24 @@ export const useImages = () => {
     setSubmitting(true);
     setError(null);
 
+    let previousItem: ImageItem | undefined;
+    setItems((currentItems) => {
+      previousItem = currentItems.find((item) => item.id === payload.id);
+      return sortByDate(
+        currentItems.map((item) => {
+          if (item.id !== payload.id) return item;
+          return {
+            ...item,
+            description: payload.description,
+            timeMode: payload.timeMode,
+            startAt: payload.startAt,
+            endAt: payload.endAt,
+            updatedAt: new Date().toISOString(),
+          };
+        })
+      );
+    });
+
     try {
       const updated = await api.updateImage(payload);
       setItems((currentItems) => {
@@ -193,6 +240,15 @@ export const useImages = () => {
         return next;
       });
     } catch (submitError) {
+      if (previousItem) {
+        setItems((currentItems) => {
+          const next = sortByDate(
+            currentItems.map((item) => (item.id === payload.id ? previousItem! : item))
+          );
+          saveCacheFeed(next);
+          return next;
+        });
+      }
       setError(submitError instanceof Error ? submitError.message : '更新失败');
       throw submitError;
     } finally {
@@ -204,14 +260,24 @@ export const useImages = () => {
     setSubmitting(true);
     setError(null);
 
+    let removedItem: ImageItem | undefined;
+    setItems((currentItems) => {
+      removedItem = currentItems.find((item) => item.id === id);
+      const next = currentItems.filter((item) => item.id !== id);
+      saveCacheFeed(next);
+      return next;
+    });
+
     try {
       await api.deleteImage(id);
-      setItems((currentItems) => {
-        const next = currentItems.filter((item) => item.id !== id);
-        saveCacheFeed(next);
-        return next;
-      });
     } catch (submitError) {
+      if (removedItem) {
+        setItems((currentItems) => {
+          const next = sortByDate([removedItem!, ...currentItems]);
+          saveCacheFeed(next);
+          return next;
+        });
+      }
       setError(submitError instanceof Error ? submitError.message : '删除失败');
       throw submitError;
     } finally {

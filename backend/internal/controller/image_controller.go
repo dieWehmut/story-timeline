@@ -477,6 +477,35 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 	})
 }
 
+// DeleteComment deletes (hides) a comment. Allowed for comment author or post owner.
+func (controller *ImageController) DeleteComment(c *gin.Context) {
+	ownerLogin := c.Param("ownerLogin")
+	postID := c.Param("imageID")
+	commentID := c.Param("commentID")
+
+	session, ok := middleware.SessionFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing session"})
+		return
+	}
+
+	// Determine the commenter login: try query param, fall back to caller
+	commenterLogin := c.Query("commenter")
+	if commenterLogin == "" {
+		commenterLogin = session.User.Login
+	}
+
+	if err := controller.interactionService.DeleteComment(
+		c.Request.Context(), session.AccessToken, session.User,
+		commenterLogin, ownerLogin, postID, commentID,
+	); err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
 // CommentAsset serves a comment image.
 func (controller *ImageController) CommentAsset(c *gin.Context) {
 	commenterLogin := c.Param("commenterLogin")

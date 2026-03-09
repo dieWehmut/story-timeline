@@ -125,7 +125,7 @@ export default function Home({
         onLogout={auth.logout}
         onThemeToggle={onThemeToggle}
         onTimelineToggle={onTimelineToggle}
-        onUpload={images.createImage}
+        onUpload={(payload) => images.createImage(payload, auth.user ? { login: auth.user.login, avatarUrl: auth.user.avatarUrl } : undefined)}
         theme={theme}
         timelineOpen={timelineOpen}
         uploadBusy={images.submitting}
@@ -192,6 +192,7 @@ export default function Home({
       {selectedItem ? (
         <CardDetail
           canInteract={auth.authenticated}
+          currentUserLogin={auth.user?.login}
           editable={auth.user?.login === selectedItem.authorLogin}
           fallbackAuthorLogin={images.stats.githubOwner || auth.user?.login || undefined}
           item={selectedItem}
