@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { PencilLine, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, PencilLine, Trash2 } from 'lucide-react';
 import { ImageViewer } from '../ui/ImageViewer';
 import { PostDialog } from '../ui/PostDialog';
+import { CommentDialog } from '../ui/CommentDialog';
 import { useToast } from '../ui/useToast';
-import type { ImageItem, UpdateImagePayload } from '../types/image';
+import { api } from '../lib/api';
+import type { CommentItem, ImageItem, UpdateImagePayload } from '../types/image';
 
 interface ImageCardProps {
   item: ImageItem;
@@ -11,9 +13,12 @@ interface ImageCardProps {
   roleLabel?: string;
   editable: boolean;
   busy: boolean;
+  canInteract: boolean;
   onAvatarClick?: (login: string) => void;
   onDelete: (id: string) => Promise<void>;
   onSave: (payload: UpdateImagePayload) => Promise<void>;
+  onLikeChange?: (id: string, likeCount: number, liked: boolean) => void;
+  onCommentCountChange?: (id: string, delta: number) => void;
 }
 
 const toDateTimeInputValue = (value: string) => {
@@ -74,9 +79,14 @@ function ImageGrid({ urls, alt, onImageClick }: { urls: string[]; alt: string; o
   );
 }
 
-export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onAvatarClick, onDelete, onSave, roleLabel }: ImageCardProps) {
+export function ImageCard({ busy, canInteract, editable, fallbackAuthorLogin, item, onAvatarClick, onCommentCountChange, onDelete, onLikeChange, onSave, roleLabel }: ImageCardProps) {
   const [editing, setEditing] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [comments, setComments] = useState<CommentItem[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentBusy, setCommentBusy] = useState(false);
+  const [likeBusy, setLikeBusy] = useState(false);
   const { confirm } = useToast();
 
   const iconButtonClass =
@@ -104,10 +114,47 @@ export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onAvatarC
     });
   };
 
+  const handleToggleLike = async () => {
+    if (likeBusy) return;
+    setLikeBusy(true);
+    try {
+      const result = await api.toggleLike(authorLogin, item.id);
+      onLikeChange?.(item.id, result.likeCount, result.liked);
+    } catch {
+      // ignore
+    } finally {
+      setLikeBusy(false);
+    }
+  };
+
+  const openComments = async () => {
+    setCommentsOpen(true);
+    setCommentsLoading(true);
+    try {
+      const data = await api.getComments(authorLogin, item.id);
+      setComments(data);
+    } catch {
+      setComments([]);
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const handleAddComment = async (text: string) => {
+    setCommentBusy(true);
+    try {
+      const newComment = await api.addComment(authorLogin, item.id, text);
+      setComments((prev) => [...prev, newComment]);
+      onCommentCountChange?.(item.id, 1);
+    } finally {
+      setCommentBusy(false);
+    }
+  };
+
   return (
     <>
       <article className="group overflow-hidden" id={`story-${item.id}`}>
-        {/* Author row */}
+        {/* Author row + edit/delete */}
         <div className="flex items-center gap-2 px-2 pb-0 pt-3">
           {authorAvatar ? (
             <button
@@ -128,10 +175,20 @@ export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onAvatarC
               {authorLabel.slice(0, 1).toUpperCase()}
             </button>
           )}
-          <p className="flex items-center gap-2 text-sm font-medium text-[var(--text-main)]">
+          <p className="flex flex-1 items-center gap-2 text-sm font-medium text-[var(--text-main)]">
             {authorLabel}
             {roleLabel ? <span className="rounded-full bg-white/8 px-2 py-0.5 text-xs text-soft">{roleLabel}</span> : null}
           </p>
+          {editable ? (
+            <div className="flex items-center gap-1 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
+              <button aria-label="修改卡片" className={iconButtonClass} onClick={() => setEditing(true)} type="button">
+                <PencilLine size={15} />
+              </button>
+              <button aria-label="删除卡片" className={`${iconButtonClass} text-rose-300 hover:text-rose-200`} onClick={handleDelete} type="button">
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ) : null}
         </div>
         {/* Description */}
         {item.description.trim() ? (
@@ -145,19 +202,28 @@ export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onAvatarC
             <ImageGrid alt={item.description} onImageClick={setViewerIndex} urls={imageUrls} />
           </div>
         ) : null}
-        {/* Footer */}
+        {/* Footer: time + like & comment */}
         <div className="flex items-center justify-between gap-4 px-2 pb-3 pt-2">
           <p className="text-xs text-soft">{toBeijingText(item.capturedAt)}</p>
-          {editable ? (
-            <div className="flex items-center gap-3 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
-              <button aria-label="修改卡片" className={iconButtonClass} onClick={() => setEditing(true)} type="button">
-                <PencilLine size={17} />
-              </button>
-              <button aria-label="删除卡片" className={`${iconButtonClass} text-rose-300 hover:text-rose-200`} onClick={handleDelete} type="button">
-                <Trash2 size={17} />
-              </button>
-            </div>
-          ) : null}
+          <div className="flex items-center gap-4">
+            <button
+              className={`inline-flex items-center gap-1 text-xs transition ${item.liked ? 'text-rose-400' : 'text-soft hover:text-rose-300'}`}
+              disabled={!canInteract || likeBusy}
+              onClick={() => void handleToggleLike()}
+              type="button"
+            >
+              <Heart className={item.liked ? 'fill-current' : ''} size={16} />
+              {item.likeCount > 0 ? <span>{item.likeCount}</span> : null}
+            </button>
+            <button
+              className="inline-flex items-center gap-1 text-xs text-soft transition hover:text-[var(--text-main)]"
+              onClick={() => void openComments()}
+              type="button"
+            >
+              <MessageCircle size={16} />
+              {item.commentCount > 0 ? <span>{item.commentCount}</span> : null}
+            </button>
+          </div>
         </div>
       </article>
 
@@ -176,6 +242,17 @@ export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onAvatarC
         onClose={() => setEditing(false)}
         onSubmit={handleEditSubmit}
         open={editing}
+      />
+
+      {/* Comment dialog */}
+      <CommentDialog
+        busy={commentBusy}
+        canComment={canInteract}
+        comments={comments}
+        loading={commentsLoading}
+        onClose={() => setCommentsOpen(false)}
+        onSubmit={handleAddComment}
+        open={commentsOpen}
       />
     </>
   );

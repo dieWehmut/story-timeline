@@ -13,6 +13,9 @@ type ImageResponse struct {
 	MetadataPath string   `json:"metadataPath"`
 	CreatedAt    string   `json:"createdAt"`
 	UpdatedAt    string   `json:"updatedAt"`
+	LikeCount    int      `json:"likeCount"`
+	CommentCount int      `json:"commentCount"`
+	Liked        bool     `json:"liked"`
 }
 
 func NewImageResponse(image model.Image, assetURLs []string) ImageResponse {
@@ -28,4 +31,13 @@ func NewImageResponse(image model.Image, assetURLs []string) ImageResponse {
 		CreatedAt:    image.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
 		UpdatedAt:    image.UpdatedAt.Format("2006-01-02T15:04:05-07:00"),
 	}
+}
+
+type CommentResponse struct {
+	ID          string `json:"id"`
+	AuthorLogin string `json:"authorLogin"`
+	PostOwner   string `json:"postOwner"`
+	PostID      string `json:"postId"`
+	Text        string `json:"text"`
+	CreatedAt   string `json:"createdAt"`
 }

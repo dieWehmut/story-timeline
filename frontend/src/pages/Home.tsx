@@ -155,12 +155,15 @@ export default function Home({
                   {items.map((item) => (
                     <ImageCard
                       busy={images.submitting}
+                      canInteract={auth.authenticated}
                       editable={auth.user?.login === item.authorLogin}
                       fallbackAuthorLogin={images.stats.githubOwner || auth.user?.login || undefined}
                       item={item}
                       key={item.id}
                       onAvatarClick={(login) => images.setFilterUser(images.filterUser === login ? null : login)}
+                      onCommentCountChange={images.incrementCommentCount}
                       onDelete={images.deleteImage}
+                      onLikeChange={images.updateLike}
                       onSave={images.updateImage}
                       roleLabel={item.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
                     />

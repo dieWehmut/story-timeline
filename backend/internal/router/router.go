@@ -39,6 +39,11 @@ func New(deps Dependencies, allowedOrigins []string) http.Handler {
 			// Asset serving: /api/images/{ownerLogin}/{imageID}/asset/{assetIndex}
 			images.Get("/{ownerLogin}/{imageID}/asset/{assetIndex}", deps.ImageController.Asset)
 
+			// Interactions (public read, auth write)
+			images.Get("/{ownerLogin}/{postID}/comments", deps.ImageController.GetComments)
+			images.With(middleware.RequireAuth(deps.AuthService)).Post("/{ownerLogin}/{postID}/like", deps.ImageController.ToggleLike)
+			images.With(middleware.RequireAuth(deps.AuthService)).Post("/{ownerLogin}/{postID}/comments", deps.ImageController.AddComment)
+
 			// Write operations require authentication (any logged-in user)
 			images.With(middleware.RequireAuth(deps.AuthService)).Post("/", deps.ImageController.Create)
 			images.With(middleware.RequireAuth(deps.AuthService)).Patch("/{imageID}", deps.ImageController.Update)

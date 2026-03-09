@@ -30,11 +30,13 @@ func main() {
 		log.Fatalf("failed to initialize image service: %v", err)
 	}
 
+	interactionService := service.NewInteractionService(gitHubStorage, env.GitHubRepoName, env.GitHubStorageToken)
+
 	server := &http.Server{
 		Addr: ":" + env.Port,
 		Handler: router.New(router.Dependencies{
 			AuthController:   controller.NewAuthController(authService, env.FrontendBaseURL),
-			ImageController:  controller.NewImageController(imageService, userService, authService),
+			ImageController:  controller.NewImageController(imageService, userService, authService, interactionService),
 			HealthController: controller.NewHealthController(env.GitHubRepoOwner, authService),
 			AuthService:      authService,
 		}, config.AllowedOrigins(env)),

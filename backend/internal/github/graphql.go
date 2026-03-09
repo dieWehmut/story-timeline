@@ -182,15 +182,14 @@ func (c *GraphQLClient) CheckRepo(ctx context.Context, token string, owner strin
 
 // CreateRepo creates a new public repository for the authenticated user.
 func (c *GraphQLClient) CreateRepo(ctx context.Context, token string, name string) error {
-	query := `mutation($name: String!, $visibility: RepositoryVisibility!) {
+	query := `mutation($name: String!) {
 		createRepository(input: {name: $name, visibility: PUBLIC, description: "story-timeline data repository"}) {
 			repository { name }
 		}
 	}`
 
 	return c.execute(ctx, token, query, map[string]any{
-		"name":       name,
-		"visibility": "PUBLIC",
+		"name": name,
 	}, nil)
 }
 

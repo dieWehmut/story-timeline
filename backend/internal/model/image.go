@@ -29,3 +29,29 @@ func (img Image) AllImagePaths() []string {
 type ImageIndex struct {
 	Items []Image `json:"items"`
 }
+
+// Like represents a single like on a post. Stored in the post owner's repo.
+type Like struct {
+	Login     string    `json:"login"`
+	AvatarURL string    `json:"avatarUrl"`
+	LikedAt   time.Time `json:"likedAt"`
+}
+
+// LikeFile is persisted as likes/{postID}.json in the post owner's repo.
+type LikeFile struct {
+	Likes []Like `json:"likes"`
+}
+
+// Comment represents a single comment on a post. Stored in the commenter's repo.
+type Comment struct {
+	ID        string    `json:"id"`
+	PostOwner string    `json:"postOwner"`
+	PostID    string    `json:"postId"`
+	Text      string    `json:"text"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// CommentFile is persisted as comments/{postOwnerLogin}/{postID}.json in the commenter's repo.
+type CommentFile struct {
+	Comments []Comment `json:"comments"`
+}

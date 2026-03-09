@@ -175,6 +175,22 @@ export const useImages = () => {
     }
   };
 
+  const updateLike = (id: string, likeCount: number, liked: boolean) => {
+    setItems((currentItems) =>
+      currentItems.map((item) =>
+        item.id === id ? { ...item, likeCount, liked } : item
+      )
+    );
+  };
+
+  const incrementCommentCount = (id: string, delta: number) => {
+    setItems((currentItems) =>
+      currentItems.map((item) =>
+        item.id === id ? { ...item, commentCount: item.commentCount + delta } : item
+      )
+    );
+  };
+
   return {
     items: filteredItems,
     allItems: items,
@@ -189,5 +205,7 @@ export const useImages = () => {
     createImage,
     updateImage,
     deleteImage,
+    updateLike,
+    incrementCommentCount,
   };
 };

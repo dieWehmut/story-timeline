@@ -9,6 +9,9 @@ export interface ImageItem {
   metadataPath: string;
   createdAt: string;
   updatedAt: string;
+  likeCount: number;
+  commentCount: number;
+  liked: boolean;
 }
 
 export interface TimelineMonth {
@@ -57,4 +60,18 @@ export interface AuthSession {
   canPost: boolean;
   roleLabel: string;
   user: AuthUser | null;
+}
+
+export interface CommentItem {
+  id: string;
+  authorLogin: string;
+  postOwner: string;
+  postId: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface LikeToggleResult {
+  likeCount: number;
+  liked: boolean;
 }

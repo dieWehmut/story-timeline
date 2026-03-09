@@ -70,7 +70,7 @@ export function Header({
 
 			{/* Feed user avatars row */}
 			{feedUsers.length > 1 ? (
-				<div className="mx-auto mt-2 flex w-full max-w-6xl items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+				<div className="mx-auto mt-2 flex w-full max-w-6xl items-center gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
 					<button
 						className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition ${
 							filterUser === null
@@ -84,9 +84,9 @@ export function Header({
 					</button>
 					{feedUsers.map((user) => (
 						<button
-							className={`shrink-0 transition-all duration-200 ${
+							className={`flex shrink-0 items-center gap-1.5 transition-all duration-200 ${
 								filterUser === user.login
-									? 'scale-110 ring-2 ring-cyan-400 rounded-full'
+									? 'scale-105 rounded-full bg-cyan-500/10 px-1.5 py-0.5 ring-1 ring-cyan-400/40'
 									: filterUser !== null
 										? 'opacity-50 hover:opacity-80'
 										: 'hover:scale-105'
@@ -98,9 +98,10 @@ export function Header({
 						>
 							<img
 								alt={user.login}
-								className="h-7 w-7 rounded-full object-cover"
+								className="h-6 w-6 rounded-full object-cover"
 								src={user.avatarUrl}
 							/>
+							<span className="max-w-[72px] truncate text-xs text-soft">{user.login}</span>
 						</button>
 					))}
 				</div>
