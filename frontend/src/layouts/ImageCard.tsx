@@ -371,8 +371,7 @@ export function ImageCard({
       <CommentDialog
         busy={commentBusy}
         canComment={canInteract}
-        comments={comments}
-        loading={commentsLoading}
+        draftKey={item.id}
         onClose={() => setCommentDialogOpen(false)}
         onSubmit={handleAddComment}
         open={commentDialogOpen}

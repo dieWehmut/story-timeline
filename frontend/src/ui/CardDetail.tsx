@@ -252,7 +252,7 @@ export function CardDetail({
       <div className="fixed inset-0 z-[35] flex flex-col bg-[var(--page-bg)]">
         {/* Scrollable content area */}
         <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-xl pb-6 pt-12 md:pt-14">
+          <div className="mx-auto max-w-xl pb-6 pt-11 md:pt-12">
             {/* Author row + right action column */}
             <div className="group flex px-2 pt-1">
               {/* Left: avatar + name */}
