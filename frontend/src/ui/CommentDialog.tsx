@@ -1,6 +1,9 @@
 import { useEffect, useId, useRef, useState, useCallback } from 'react';
 import { ImagePlus, LoaderCircle, Send, X } from 'lucide-react';
 
+// Module-level cache: persists draft files across dialog open/close within a session
+const commentFileCache = new Map<string, File>();
+
 interface CommentDialogProps {
   open: boolean;
   onClose: () => void;
@@ -20,6 +23,10 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
   const [visible, setVisible] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevOpenRef = useRef(false);
+  const fileRef = useRef<File | null>(null);
+
+  // Keep fileRef in sync with current file state
+  useEffect(() => { fileRef.current = file; }, [file]);
 
   useEffect(() => {
     if (open && !prevOpenRef.current) {
@@ -30,12 +37,29 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
         } catch {
           setText('');
         }
+        // Restore draft file from session cache
+        const cachedFile = commentFileCache.get(draftKey);
+        if (cachedFile) {
+          setFile(cachedFile);
+          setPreview(URL.createObjectURL(cachedFile));
+          commentFileCache.delete(draftKey);
+        } else {
+          setFile(null);
+          setPreview(null);
+        }
       } else {
         setText('');
+        setFile(null);
+        setPreview(null);
       }
-      setFile(null);
-      setPreview(null);
       setError(null);
+    } else if (!open && prevOpenRef.current) {
+      // Dialog closing without submit: cache the draft file for next open
+      if (draftKey && fileRef.current) {
+        commentFileCache.set(draftKey, fileRef.current);
+      } else if (draftKey) {
+        commentFileCache.delete(draftKey);
+      }
     }
     prevOpenRef.current = open;
   }, [open, draftKey]);
@@ -85,7 +109,10 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
     if (!text.trim() && !file) return;
     try {
       await onSubmit(text.trim(), file ?? undefined);
-      if (draftKey) localStorage.removeItem(`draft:comment:${draftKey}`);
+      if (draftKey) {
+        localStorage.removeItem(`draft:comment:${draftKey}`);
+        commentFileCache.delete(draftKey);
+      }
       setText('');
       removeFile();
       setError(null);
@@ -176,13 +203,6 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
           ) : (
             <p className="flex-1 py-2 text-center text-sm text-soft">登录后才能评论</p>
           )}
-          <button
-            className="shrink-0 text-sm text-soft transition hover:text-[var(--text-main)]"
-            onClick={onClose}
-            type="button"
-          >
-            取消
-          </button>
         </div>
       </div>
     </div>

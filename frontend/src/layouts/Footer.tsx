@@ -36,19 +36,19 @@ export function Footer({ stats }: FooterProps) {
   }, []);
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 z-30 bg-[color:var(--panel-bg)] px-5 py-2 backdrop-blur-xl md:px-8">
-      <div className="mx-auto flex max-w-6xl flex-col items-center justify-center gap-2 text-center text-sm text-soft">
-        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[var(--text-main)]">
-          <span className="inline-flex items-center gap-2" title="累计用户">
-            <User className="text-cyan-300" size={16} />
+    <footer className="fixed bottom-0 left-0 right-0 z-30 bg-[color:var(--panel-bg)] px-5 py-1 backdrop-blur-xl md:px-8">
+      <div className="mx-auto flex max-w-6xl flex-col items-center justify-center gap-0.5 text-center text-xs text-soft">
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-0 text-[var(--text-main)]">
+          <span className="inline-flex items-center gap-1" title="累计用户">
+            <User className="text-cyan-300" size={12} />
             <span>{stats.userCount}</span>
           </span>
-          <span className="inline-flex items-center gap-2" title="近 90 秒在线">
-            <Eye className="text-cyan-300" size={16} />
+          <span className="inline-flex items-center gap-1" title="近 90 秒在线">
+            <Eye className="text-cyan-300" size={12} />
             <span>{stats.onlineUsers}</span>
           </span>
-          <span className="inline-flex items-center gap-2">
-            <TimerReset className="text-cyan-300" size={16} />
+          <span className="inline-flex items-center gap-1">
+            <TimerReset className="text-cyan-300" size={12} />
             <span>{formatUptime(uptimeSeconds)}</span>
           </span>
         </div>

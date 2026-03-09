@@ -6,6 +6,9 @@ import { useToast } from './useToast';
 import { api } from '../lib/api';
 import type { CommentItem, ImageItem, UpdateImagePayload } from '../types/image';
 
+// Module-level cache: persists draft comment files while detail view is closed
+const detailFileCache = new Map<string, File>();
+
 const toDateTimeInputValue = (value: string) => {
   const formatter = new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Asia/Shanghai',
@@ -137,6 +140,27 @@ export function CardDetail({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
   const { confirm } = useToast();
+  const fileRef = useRef<File | null>(null);
+
+  // Keep fileRef current for unmount cleanup
+  useEffect(() => { fileRef.current = file; }, [file]);
+
+  // Restore draft file on mount; save draft file on unmount
+  useEffect(() => {
+    const cached = detailFileCache.get(item.id);
+    if (cached) {
+      setFile(cached);
+      setPreview(URL.createObjectURL(cached));
+      detailFileCache.delete(item.id);
+    }
+    return () => {
+      if (fileRef.current) {
+        detailFileCache.set(item.id, fileRef.current);
+      } else {
+        detailFileCache.delete(item.id);
+      }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const authorLogin = item.authorLogin || fallbackAuthorLogin || 'GitHub';
   const authorAvatar =
@@ -238,6 +262,7 @@ export function CardDetail({
       onCommentCountChange?.(item.id, 1);
       setText('');
       removeFile();
+      detailFileCache.delete(item.id);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : '评论失败');

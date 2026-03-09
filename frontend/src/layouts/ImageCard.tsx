@@ -107,6 +107,7 @@ export function ImageCard({
   fallbackAuthorLogin,
   item,
   onAvatarClick,
+  onCommentCountChange,
   onDelete,
   onLikeChange,
   onOpenDetail,
@@ -121,7 +122,6 @@ export function ImageCard({
   const [commentBusy, setCommentBusy] = useState(false);
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
   const [commentImageUrl, setCommentImageUrl] = useState<string | null>(null);
-  const [visibleCommentCount, setVisibleCommentCount] = useState(5);
   const { confirm } = useToast();
 
   // Auto-load comments on mount if there are any (for inline preview)
@@ -207,8 +207,8 @@ export function ImageCard({
   return (
     <>
       <article className="group" id={`story-${item.id}`}>
-        <div className="flex py-3">
-          {/* Left: main content — clicking opens the detail view */}
+        {/* Row 1: Author + Description (left) + Edit/Delete (right) */}
+        <div className="flex pt-3">
           <div
             className="min-w-0 flex-1 cursor-pointer px-2"
             onClick={() => onOpenDetail?.()}
@@ -252,54 +252,10 @@ export function ImageCard({
                 {item.description}
               </p>
             ) : null}
-
-            {/* Images */}
-            {imageUrls.length > 0 ? (
-              <div className="mt-2">
-                <ImageGrid alt={item.description} onImageClick={setViewerIndex} urls={imageUrls} />
-              </div>
-            ) : null}
-
-            {/* Time */}
-            <p className="pt-2 text-xs text-soft">{toDisplayTime(item)}</p>
-
-            {/* Inline comments preview */}
-            {comments.length > 0 && !commentsLoading ? (
-              <div
-                className="space-y-1 pb-1 pt-2"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {comments.slice(0, visibleCommentCount).map((c) => (
-                  <div className="text-xs" key={c.id}>
-                    <span className="font-medium text-[var(--text-main)]">{c.authorLogin}</span>
-                    <span className="text-[var(--text-main)]">：</span>
-                    {c.text ? <span className="text-[var(--text-main)]">{c.text}</span> : null}
-                    {c.imageUrl ? (
-                      <img
-                        alt="评论图片"
-                        className="mt-0.5 block max-h-16 max-w-28 cursor-pointer rounded object-cover"
-                        onClick={(e) => { e.stopPropagation(); setCommentImageUrl(c.imageUrl!); }}
-                        src={c.imageUrl}
-                      />
-                    ) : null}
-                  </div>
-                ))}
-                {comments.length > visibleCommentCount ? (
-                  <button
-                    className="text-base leading-none text-soft transition hover:text-[var(--text-main)]"
-                    onClick={(e) => { e.stopPropagation(); setVisibleCommentCount((v) => v + 5); }}
-                    type="button"
-                  >
-                    ···
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
           </div>
 
-          {/* Right: 2-column action area (each column w-8; edit↔like same col, delete↔comment same col) */}
-          <div className="flex w-16 shrink-0 flex-col pr-2">
-            {/* Top: Edit + Delete */}
+          {/* Right: Edit + Delete */}
+          <div className="flex w-16 shrink-0 pr-2">
             {editable ? (
               <div className="flex opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
                 <button
@@ -322,28 +278,69 @@ export function ImageCard({
             ) : (
               <div className="h-8" />
             )}
-            {/* Spacer */}
-            <div className="flex-1" />
-            {/* Bottom: Like + Comment */}
-            <div className="flex">
-              <button
-                className={`flex w-8 flex-col items-center gap-0.5 py-1 transition ${item.liked ? 'text-rose-400' : 'text-soft hover:text-rose-300'}`}
-                disabled={!canInteract || likeBusy}
-                onClick={(e) => { e.stopPropagation(); void handleToggleLike(); }}
-                type="button"
-              >
-                <Heart className={item.liked ? 'fill-current' : ''} size={14} />
-                {item.likeCount > 0 ? <span className="text-[10px] leading-none">{item.likeCount}</span> : null}
-              </button>
-              <button
-                className="flex w-8 flex-col items-center gap-0.5 py-1 text-soft transition hover:text-[var(--text-main)]"
-                onClick={(e) => { e.stopPropagation(); handleOpenComment(); }}
-                type="button"
-              >
-                <MessageCircle size={14} />
-                {item.commentCount > 0 ? <span className="text-[10px] leading-none">{item.commentCount}</span> : null}
-              </button>
-            </div>
+          </div>
+        </div>
+
+        {/* Full-width images — not constrained by right action column */}
+        {imageUrls.length > 0 ? (
+          <div className="mt-2 cursor-pointer" onClick={() => onOpenDetail?.()}>
+            <ImageGrid alt={item.description} onImageClick={setViewerIndex} urls={imageUrls} />
+          </div>
+        ) : null}
+
+        {/* Row 2: Time + Comments (left, clicking opens detail) + Like/Comment (right) */}
+        <div className="flex pb-3">
+          <div
+            className="min-w-0 flex-1 cursor-pointer px-2"
+            onClick={() => onOpenDetail?.()}
+          >
+            {/* Time */}
+            <p className="pt-2 text-xs text-soft">{toDisplayTime(item)}</p>
+
+            {/* Inline comments preview — clicking propagates to open detail */}
+            {comments.length > 0 && !commentsLoading ? (
+              <div className="space-y-1 pb-1 pt-2">
+                {comments.slice(0, 5).map((c) => (
+                  <div className="text-xs" key={c.id}>
+                    <span className="font-medium text-[var(--text-main)]">{c.authorLogin}</span>
+                    <span className="text-[var(--text-main)]">：</span>
+                    {c.text ? <span className="text-[var(--text-main)]">{c.text}</span> : null}
+                    {c.imageUrl ? (
+                      <img
+                        alt="评论图片"
+                        className="mt-0.5 block max-h-16 max-w-28 cursor-pointer rounded object-cover"
+                        onClick={(e) => { e.stopPropagation(); setCommentImageUrl(c.imageUrl!); }}
+                        src={c.imageUrl}
+                      />
+                    ) : null}
+                  </div>
+                ))}
+                {comments.length > 5 ? (
+                  <span className="text-base leading-none text-soft">···</span>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          {/* Right: Like + Comment */}
+          <div className="flex w-16 shrink-0 items-end pb-1 pr-2">
+            <button
+              className={`flex w-8 flex-col items-center gap-0.5 py-1 transition ${item.liked ? 'text-rose-400' : 'text-soft hover:text-rose-300'}`}
+              disabled={!canInteract || likeBusy}
+              onClick={(e) => { e.stopPropagation(); void handleToggleLike(); }}
+              type="button"
+            >
+              <Heart className={item.liked ? 'fill-current' : ''} size={14} />
+              {item.likeCount > 0 ? <span className="text-[10px] leading-none">{item.likeCount}</span> : null}
+            </button>
+            <button
+              className="flex w-8 flex-col items-center gap-0.5 py-1 text-soft transition hover:text-[var(--text-main)]"
+              onClick={(e) => { e.stopPropagation(); handleOpenComment(); }}
+              type="button"
+            >
+              <MessageCircle size={14} />
+              {item.commentCount > 0 ? <span className="text-[10px] leading-none">{item.commentCount}</span> : null}
+            </button>
           </div>
         </div>
       </article>
