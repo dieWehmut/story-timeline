@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { LoaderCircle } from 'lucide-react';
-import { FloatingActions } from '../layouts/FloatingActions';
 import { Footer } from '../layouts/Footer';
 import { Header } from '../layouts/Header';
 import { ImageCard } from '../layouts/ImageCard';
@@ -105,25 +104,26 @@ export default function Home({
     <div className="relative min-h-screen overflow-x-hidden">
 
 
-      <Header activeMonth={activeMonth} authUser={auth.user} roleLabel={auth.roleLabel} onTimelineToggle={onTimelineToggle} timelineOpen={timelineOpen} />
+      <Header
+        activeMonth={activeMonth}
+        authLoading={auth.loading}
+        authUser={auth.user}
+        isAdmin={auth.isAdmin}
+        onLogin={auth.login}
+        onLogout={auth.logout}
+        onThemeToggle={onThemeToggle}
+        onTimelineToggle={onTimelineToggle}
+        onUpload={images.createImage}
+        theme={theme}
+        timelineOpen={timelineOpen}
+        uploadBusy={images.submitting}
+      />
 
       {timelineOpen && (
         <div className="fixed inset-0 z-30" onClick={onTimelineClose} />
       )}
 
       <TimeColumn activeMonth={activeMonth} months={images.timeline} onJump={jumpToMonth} open={timelineOpen} />
-
-      <FloatingActions
-        authLoading={auth.loading}
-        isAdmin={auth.isAdmin}
-        authUser={auth.user}
-        onLogin={auth.login}
-        onLogout={auth.logout}
-        onThemeToggle={onThemeToggle}
-        onUpload={images.createImage}
-        theme={theme}
-        uploadBusy={images.submitting}
-      />
 
       <main className="relative mx-auto flex w-full max-w-6xl flex-col px-4 pb-36 pt-28 md:px-8 md:pt-36">
 
@@ -158,6 +158,7 @@ export default function Home({
                       key={item.id}
                       onDelete={images.deleteImage}
                       onSave={images.updateImage}
+                      roleLabel={auth.roleLabel}
                     />
                   ))}
                 </div>

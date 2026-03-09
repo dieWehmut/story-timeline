@@ -4,8 +4,8 @@ export interface ImageItem {
   authorAvatar: string;
   description: string;
   capturedAt: string;
-  imageUrl: string;
-  imagePath: string;
+  imageUrls: string[];
+  imagePaths: string[];
   metadataPath: string;
   createdAt: string;
   updatedAt: string;
@@ -22,14 +22,14 @@ export interface TimelineMonth {
 export interface CreateImagePayload {
   description: string;
   capturedAt: string;
-  file: File;
+  files: File[];
 }
 
 export interface UpdateImagePayload {
   id: string;
   description: string;
   capturedAt: string;
-  file?: File | null;
+  files?: File[];
 }
 
 export interface HealthStats {

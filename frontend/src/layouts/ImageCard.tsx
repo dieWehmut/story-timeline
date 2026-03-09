@@ -5,6 +5,7 @@ import type { ImageItem, UpdateImagePayload } from '../types/image';
 interface ImageCardProps {
   item: ImageItem;
   fallbackAuthorLogin?: string;
+  roleLabel?: string;
   editable: boolean;
   busy: boolean;
   onDelete: (id: string) => Promise<void>;
@@ -46,13 +47,37 @@ const toBeijingText = (value: string) => {
   return `${year}-${month}-${day} ${hour}:${minute}`;
 };
 
-export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onDelete, onSave }: ImageCardProps) {
+function ImageGrid({ urls, alt }: { urls: string[]; alt: string }) {
+  if (urls.length === 0) return null;
+
+  if (urls.length === 1) {
+    return (
+      <div className="overflow-hidden bg-slate-950/20 pr-12">
+        <img alt={alt} className="w-full object-contain" src={urls[0]} />
+      </div>
+    );
+  }
+
+  // 2-9 images: square grid, 3 columns max
+  const cols = urls.length <= 2 ? 2 : 3;
+  return (
+    <div className={`grid gap-0.5 ${cols === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+      {urls.map((url, i) => (
+        <div className="relative aspect-square overflow-hidden bg-slate-950/20" key={i}>
+          <img alt={`${alt} ${i + 1}`} className="absolute inset-0 h-full w-full object-cover" src={url} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onDelete, onSave, roleLabel }: ImageCardProps) {
   const descriptionId = useId();
   const timeId = useId();
   const [editing, setEditing] = useState(false);
   const [description, setDescription] = useState(item.description);
   const [capturedAt, setCapturedAt] = useState(toDateTimeInputValue(item.capturedAt));
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
@@ -61,10 +86,10 @@ export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onDelete,
         id: item.id,
         description: description.trim(),
         capturedAt: `${capturedAt}:00+08:00`,
-        file,
+        files: files.length > 0 ? files : undefined,
       });
       setEditing(false);
-      setFile(null);
+      setFiles([]);
       setError(null);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : '保存失败');
@@ -74,7 +99,7 @@ export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onDelete,
   const reset = () => {
     setDescription(item.description);
     setCapturedAt(toDateTimeInputValue(item.capturedAt));
-    setFile(null);
+    setFiles([]);
     setError(null);
     setEditing(false);
   };
@@ -86,10 +111,12 @@ export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onDelete,
   const authorLabel = authorLogin;
   const authorAvatar = item.authorAvatar || (authorLogin !== 'GitHub' ? `https://github.com/${authorLogin}.png?size=64` : '');
 
+  const imageUrls = item.imageUrls ?? [];
+
   return (
-    <article className="glass-panel group rounded-[2.2rem] p-5 md:p-6" id={`story-${item.id}`}>
+    <article className="glass-panel group overflow-hidden rounded-[2.2rem]" id={`story-${item.id}`}>
       {editing ? (
-        <div className="space-y-4">
+        <div className="space-y-4 p-5 md:p-6">
           <label className="block space-y-2" htmlFor={descriptionId}>
             <span className="text-sm text-soft">说明</span>
             <textarea
@@ -112,14 +139,14 @@ export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onDelete,
           </label>
 
           <label className="block space-y-2">
-            <span className="text-sm text-soft">替换图片</span>
-            <input accept="image/*" onChange={(event) => setFile(event.target.files?.[0] ?? null)} type="file" />
+            <span className="text-sm text-soft">替换图片（多选）</span>
+            <input accept="image/*" multiple onChange={(event) => setFiles(Array.from(event.target.files ?? []))} type="file" />
           </label>
           {error ? <p className="text-sm text-rose-300">{error}</p> : null}
         </div>
       ) : (
         <>
-          <div className="mb-4 flex items-center gap-3">
+          <div className="flex items-center gap-3 p-5 pb-0 md:px-6 md:pt-6">
             {authorAvatar ? (
               <img alt={authorLabel} className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10" src={authorAvatar} />
             ) : (
@@ -128,18 +155,23 @@ export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onDelete,
               </div>
             )}
             <div>
-              <p className="text-sm font-medium text-[var(--text-main)]">{authorLabel}</p>
+              <p className="flex items-center gap-2 text-sm font-medium text-[var(--text-main)]">
+                {authorLabel}
+                {roleLabel ? <span className="rounded-full bg-white/8 px-2 py-0.5 text-xs text-soft">{roleLabel}</span> : null}
+              </p>
             </div>
           </div>
           {item.description.trim() ? (
-            <p className="mb-5 whitespace-pre-wrap font-serif text-2xl leading-relaxed text-[var(--text-main)] md:text-[2rem]">
+            <p className="whitespace-pre-wrap px-5 pt-4 font-serif text-2xl leading-relaxed text-[var(--text-main)] md:px-6 md:text-[2rem]">
               {item.description}
             </p>
           ) : null}
-          <div className="overflow-hidden rounded-[1.8rem] bg-slate-950/20">
-            <img alt={item.description} className="aspect-[4/5] w-full object-cover transition duration-500 group-hover:scale-[1.015]" src={item.imageUrl} />
-          </div>
-          <div className="mt-5 flex items-center justify-between gap-4">
+          {imageUrls.length > 0 ? (
+            <div className="mt-4">
+              <ImageGrid alt={item.description} urls={imageUrls} />
+            </div>
+          ) : null}
+          <div className="flex items-center justify-between gap-4 p-5 pt-4 md:px-6 md:pb-6">
             <p className="text-sm text-soft">{toBeijingText(item.capturedAt)}</p>
             {editable ? (
               <div className="flex items-center gap-3 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
@@ -156,7 +188,7 @@ export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onDelete,
       )}
 
       {editable && editing ? (
-        <div className="mt-5 flex items-center justify-end gap-3">
+        <div className="flex items-center justify-end gap-3 p-5 pt-0 md:px-6 md:pb-6">
           <button aria-label="保存修改" className={iconButtonClass} onClick={() => void handleSave()} type="button">
             <Save size={19} />
           </button>
@@ -166,7 +198,7 @@ export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onDelete,
         </div>
       ) : null}
 
-      {busy && editing ? <p className="mt-3 text-xs text-soft">正在提交修改…</p> : null}
+      {busy && editing ? <p className="px-5 pb-5 text-xs text-soft md:px-6 md:pb-6">正在提交修改…</p> : null}
     </article>
   );
 }

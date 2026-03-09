@@ -8,6 +8,10 @@ interface UploadButtonProps {
   onSubmit: (payload: CreateImagePayload) => Promise<void>;
 }
 
+const MAX_FILES = 9;
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_TOTAL_SIZE = 25 * 1024 * 1024; // 25 MB
+
 const getDefaultDateTime = () => {
   const formatter = new Intl.DateTimeFormat('sv-SE', {
     timeZone: 'Asia/Shanghai',
@@ -30,19 +34,48 @@ export function UploadButton({ busy, onSubmit }: UploadButtonProps) {
   const [open, setOpen] = useState(false);
   const [description, setDescription] = useState('');
   const [capturedAt, setCapturedAt] = useState(getDefaultDateTime());
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const reset = () => {
     setDescription('');
     setCapturedAt(getDefaultDateTime());
-    setFile(null);
+    setFiles([]);
     setError(null);
   };
 
+  const handleFilesChange = (incoming: FileList | null) => {
+    if (!incoming) return;
+    const next = [...files, ...Array.from(incoming)].slice(0, MAX_FILES);
+
+    let totalSize = 0;
+    for (const f of next) {
+      if (f.size > MAX_FILE_SIZE) {
+        setError(`单张图片不能超过 5MB: ${f.name}`);
+        return;
+      }
+      totalSize += f.size;
+    }
+    if (totalSize > MAX_TOTAL_SIZE) {
+      setError('帖子总大小不能超过 25MB');
+      return;
+    }
+
+    setError(null);
+    setFiles(next);
+  };
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async () => {
-    if (!file || !capturedAt) {
-	  setError('请选择图片并填写时间');
+    if (!capturedAt) {
+      setError('请填写时间');
+      return;
+    }
+    if (!description.trim() && files.length === 0) {
+      setError('请输入文字或选择图片');
       return;
     }
 
@@ -50,7 +83,7 @@ export function UploadButton({ busy, onSubmit }: UploadButtonProps) {
       await onSubmit({
         description: description.trim(),
         capturedAt: toBeijingIso(capturedAt),
-        file,
+        files,
       });
       reset();
       setOpen(false);
@@ -61,14 +94,14 @@ export function UploadButton({ busy, onSubmit }: UploadButtonProps) {
 
   return (
     <>
-      <Button
+      <button
         aria-label="上传图片"
-        className="floating-btn h-12 w-12 rounded-xl p-0 transition-all duration-300 hover:-translate-y-0.5 hover:scale-105 active:scale-95"
+        className="inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition-all duration-300 hover:scale-110 hover:text-[var(--text-accent)] active:scale-95"
         onClick={() => setOpen(true)}
-        variant="secondary"
+        type="button"
       >
-        <ImagePlus className="transition-transform duration-300 hover:rotate-6" size={34} />
-      </Button>
+        <ImagePlus size={24} />
+      </button>
 
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 px-4">
@@ -106,13 +139,29 @@ export function UploadButton({ busy, onSubmit }: UploadButtonProps) {
                 />
               </label>
 
-              <label className="block space-y-2">
-                <span className="text-sm text-soft">图片</span>
+              <div className="space-y-2">
+                <span className="text-sm text-soft">图片（可选，最多 {MAX_FILES} 张）</span>
                 <div className="rounded-[1.75rem] border border-dashed border-white/15 bg-slate-950/20 p-4">
-                  <input accept="image/*" onChange={(event) => setFile(event.target.files?.[0] ?? null)} type="file" />
-                  <p className="mt-3 text-xs text-soft">浏览器会先转换成 WebP，再上传到 story-images。</p>
+                  <input
+                    accept="image/*"
+                    disabled={files.length >= MAX_FILES}
+                    multiple
+                    onChange={(event) => { handleFilesChange(event.target.files); event.target.value = ''; }}
+                    type="file"
+                  />
+                  <p className="mt-3 text-xs text-soft">单张 ≤ 5MB · 总计 ≤ 25MB · 浏览器会先转成 WebP</p>
                 </div>
-              </label>
+                {files.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {files.map((f, i) => (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/8 px-2 py-1 text-xs text-soft" key={`${f.name}-${i}`}>
+                        {f.name.length > 16 ? `${f.name.slice(0, 14)}…` : f.name}
+                        <button className="ml-0.5 hover:text-rose-300" onClick={() => removeFile(i)} type="button"><X size={12} /></button>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
 
               {error ? <p className="text-sm text-rose-300">{error}</p> : null}
             </div>

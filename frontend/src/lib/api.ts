@@ -23,7 +23,7 @@ const normalizeSession = (session: AuthSession): AuthSession => ({
 
 const normalizeImageItem = (item: ImageItem): ImageItem => ({
   ...item,
-  imageUrl: withApiBase(item.imageUrl),
+  imageUrls: (item.imageUrls ?? []).map(withApiBase),
 });
 
 const extractErrorMessage = async (response: Response) => {
@@ -106,10 +106,11 @@ const buildImageFormData = async (payload: CreateImagePayload | UpdateImagePaylo
     formData.set('id', payload.id);
   }
 
-  if (payload.file) {
-    const webpBlob = await fileToWebp(payload.file);
-    const fileName = payload.file.name.replace(/\.[^.]+$/, '') || 'image';
-    formData.set('file', webpBlob, `${fileName}.webp`);
+  const files = 'files' in payload ? (payload.files ?? []) : [];
+  for (const file of files) {
+    const webpBlob = await fileToWebp(file);
+    const fileName = file.name.replace(/\.[^.]+$/, '') || 'image';
+    formData.append('files', webpBlob, `${fileName}.webp`);
   }
 
   return formData;

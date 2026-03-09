@@ -1,5 +1,4 @@
 import { LogOut, UserRound } from 'lucide-react';
-import { Button } from '../ui/Button';
 import type { AuthUser } from '../types/image';
 
 interface AuthButtonProps {
@@ -9,44 +8,29 @@ interface AuthButtonProps {
   onLogout: () => Promise<void>;
 }
 
-const btnCls =
-  'floating-btn h-12 w-12 rounded-xl p-0 transition-all duration-300 hover:-translate-y-0.5 hover:scale-105 active:scale-95';
+const iconBtnCls =
+  'inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition-all duration-300 hover:scale-110 hover:text-[var(--text-accent)] active:scale-95';
 
 export function AuthButton({ loading, onLogin, onLogout, user }: AuthButtonProps) {
   if (loading) {
     return (
-      <Button
-        aria-label="载入中"
-        className={btnCls}
-        disabled
-        variant="secondary"
-      >
-        <UserRound size={34} />
-      </Button>
+      <button aria-label="载入中" className={`${iconBtnCls} opacity-50`} disabled type="button">
+        <UserRound size={24} />
+      </button>
     );
   }
 
   if (!user) {
     return (
-      <Button
-        aria-label="GitHub 登录"
-        className={btnCls}
-        onClick={onLogin}
-        variant="secondary"
-      >
-        <UserRound size={34} />
-      </Button>
+      <button aria-label="GitHub 登录" className={iconBtnCls} onClick={onLogin} type="button">
+        <UserRound size={24} />
+      </button>
     );
   }
 
   return (
-    <Button
-      aria-label={`退出 ${user.login}`}
-      className={btnCls}
-      onClick={() => void onLogout()}
-      variant="secondary"
-    >
-      <LogOut size={34} />
-    </Button>
+    <button aria-label={`退出 ${user.login}`} className={iconBtnCls} onClick={() => void onLogout()} type="button">
+      <LogOut size={24} />
+    </button>
   );
 }
