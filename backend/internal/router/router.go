@@ -49,10 +49,15 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 			images.POST("/:ownerLogin/:imageID/comments", middleware.RequireAuth(deps.AuthService), deps.ImageController.AddComment)
 			images.DELETE("/:ownerLogin/:imageID/comments/:commentID", middleware.RequireAuth(deps.AuthService), deps.ImageController.DeleteComment)
 
-			// Write operations require authentication (any logged-in user)
+			// Create
 			images.POST("/", middleware.RequireAuth(deps.AuthService), deps.ImageController.Create)
-			images.PATCH("/:imageID", middleware.RequireAuth(deps.AuthService), deps.ImageController.Update)
-			images.DELETE("/:imageID", middleware.RequireAuth(deps.AuthService), deps.ImageController.Delete)
+		}
+
+		// Update/delete use a separate prefix to avoid wildcard conflict with /:ownerLogin routes
+		my := api.Group("/my/images", middleware.RequireAuth(deps.AuthService))
+		{
+			my.PATCH("/:imageID", deps.ImageController.Update)
+			my.DELETE("/:imageID", deps.ImageController.Delete)
 		}
 
 		comments := api.Group("/comments")

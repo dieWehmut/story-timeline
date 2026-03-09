@@ -148,9 +148,9 @@ export const api = {
   },
   updateImage: async (payload: UpdateImagePayload) => {
     const body = await buildImageFormData(payload);
-    return normalizeImageItem(await request<ImageItem>(`${API_BASE}/api/images/${payload.id}`, { method: 'PATCH', body }));
+    return normalizeImageItem(await request<ImageItem>(`${API_BASE}/api/my/images/${payload.id}`, { method: 'PATCH', body }));
   },
-  deleteImage: (id: string) => request<{ ok: boolean }>(`${API_BASE}/api/images/${id}`, { method: 'DELETE' }),
+  deleteImage: (id: string) => request<{ ok: boolean }>(`${API_BASE}/api/my/images/${id}`, { method: 'DELETE' }),
   toggleLike: (ownerLogin: string, postID: string) =>
     request<LikeToggleResult>(`${API_BASE}/api/images/${ownerLogin}/${postID}/like`, { method: 'POST' }),
   getComments: async (ownerLogin: string, postID: string) => {
