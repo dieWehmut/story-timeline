@@ -45,7 +45,7 @@ func (service *ImageService) List() []model.Image {
 	return items
 }
 
-func (service *ImageService) Create(ctx context.Context, token string, description string, capturedAt time.Time, file []byte) (model.Image, error) {
+func (service *ImageService) Create(ctx context.Context, token string, author model.GitHubUser, description string, capturedAt time.Time, file []byte) (model.Image, error) {
 	service.mu.Lock()
 	defer service.mu.Unlock()
 
@@ -53,6 +53,8 @@ func (service *ImageService) Create(ctx context.Context, token string, descripti
 	imagePath, metadataPath := service.nextPaths(capturedAt, "")
 	image := model.Image{
 		ID:           utils.NewID(),
+		AuthorLogin:  author.Login,
+		AuthorAvatar: author.AvatarURL,
 		Description:  description,
 		CapturedAt:   capturedAt,
 		ImagePath:    imagePath,

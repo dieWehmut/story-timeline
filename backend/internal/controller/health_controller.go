@@ -12,17 +12,19 @@ import (
 type HealthController struct {
 	startedAt   time.Time
 	githubOwner string
+	secureCookies bool
 	mu          sync.Mutex
 	visitors    map[string]time.Time
 	active      map[string]time.Time
 }
 
-func NewHealthController(githubOwner string) *HealthController {
+func NewHealthController(githubOwner string, secureCookies bool) *HealthController {
 	startedAt := time.Date(2025, 10, 10, 17, 0, 0, 0, utils.BeijingLocation())
 
 	return &HealthController{
 		startedAt:   startedAt,
 		githubOwner: githubOwner,
+		secureCookies: secureCookies,
 		visitors:    map[string]time.Time{},
 		active:      map[string]time.Time{},
 	}
@@ -61,7 +63,9 @@ func (controller *HealthController) touchViewer(w http.ResponseWriter, r *http.R
 			Name:     "story_viewer",
 			Value:    viewerID,
 			Path:     "/",
-			SameSite: http.SameSiteLaxMode,
+			HttpOnly: true,
+			Secure:   controller.secureCookies,
+			SameSite: controller.sameSiteMode(),
 			MaxAge:   int((365 * 24 * time.Hour).Seconds()),
 		})
 	}
@@ -87,4 +91,12 @@ func fallback(value string, defaultValue string) string {
 	}
 
 	return value
+}
+
+func (controller *HealthController) sameSiteMode() http.SameSite {
+	if controller.secureCookies {
+		return http.SameSiteNoneMode
+	}
+
+	return http.SameSiteLaxMode
 }

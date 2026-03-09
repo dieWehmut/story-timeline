@@ -39,13 +39,13 @@ export function Footer({ stats }: FooterProps) {
     <footer className="fixed bottom-0 left-0 right-0 z-30 bg-[color:var(--panel-bg)] px-5 py-2 backdrop-blur-xl md:px-8">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-center gap-2 text-center text-sm text-soft">
         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[var(--text-main)]">
-          <span className="inline-flex items-center gap-2">
+          <span className="inline-flex items-center gap-2" title="累计访客">
             <Activity className="text-cyan-300" size={16} />
-            <span>{stats.visitorCount}</span>
+            <span>访客 {stats.visitorCount}</span>
           </span>
-          <span className="inline-flex items-center gap-2">
+          <span className="inline-flex items-center gap-2" title="近 90 秒在线">
             <Eye className="text-cyan-300" size={16} />
-            <span>{stats.activeViewers}</span>
+            <span>在线 {stats.activeViewers}</span>
           </span>
           <span className="inline-flex items-center gap-2">
             <TimerReset className="text-cyan-300" size={16} />

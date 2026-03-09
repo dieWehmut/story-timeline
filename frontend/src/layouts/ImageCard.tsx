@@ -4,6 +4,7 @@ import type { ImageItem, UpdateImagePayload } from '../types/image';
 
 interface ImageCardProps {
   item: ImageItem;
+  fallbackAuthorLogin?: string;
   editable: boolean;
   busy: boolean;
   onDelete: (id: string) => Promise<void>;
@@ -45,7 +46,7 @@ const toBeijingText = (value: string) => {
   return `${year}-${month}-${day} ${hour}:${minute}`;
 };
 
-export function ImageCard({ busy, editable, item, onDelete, onSave }: ImageCardProps) {
+export function ImageCard({ busy, editable, fallbackAuthorLogin, item, onDelete, onSave }: ImageCardProps) {
   const descriptionId = useId();
   const timeId = useId();
   const [editing, setEditing] = useState(false);
@@ -81,6 +82,10 @@ export function ImageCard({ busy, editable, item, onDelete, onSave }: ImageCardP
   const iconButtonClass =
     'inline-flex h-8 w-8 items-center justify-center text-soft transition hover:text-[var(--text-main)]';
 
+  const authorLogin = item.authorLogin || fallbackAuthorLogin || 'GitHub';
+  const authorLabel = authorLogin;
+  const authorAvatar = item.authorAvatar || (authorLogin !== 'GitHub' ? `https://github.com/${authorLogin}.png?size=64` : '');
+
   return (
     <article className="glass-panel group rounded-[2.2rem] p-5 md:p-6" id={`story-${item.id}`}>
       {editing ? (
@@ -114,9 +119,23 @@ export function ImageCard({ busy, editable, item, onDelete, onSave }: ImageCardP
         </div>
       ) : (
         <>
-          <p className="mb-5 whitespace-pre-wrap font-serif text-2xl leading-relaxed text-[var(--text-main)] md:text-[2rem]">
-            {item.description}
-          </p>
+          <div className="mb-4 flex items-center gap-3">
+            {authorAvatar ? (
+              <img alt={authorLabel} className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10" src={authorAvatar} />
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/8 text-sm font-semibold text-soft ring-1 ring-white/10">
+                {authorLabel.slice(0, 1).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <p className="text-sm font-medium text-[var(--text-main)]">{authorLabel}</p>
+            </div>
+          </div>
+          {item.description.trim() ? (
+            <p className="mb-5 whitespace-pre-wrap font-serif text-2xl leading-relaxed text-[var(--text-main)] md:text-[2rem]">
+              {item.description}
+            </p>
+          ) : null}
           <div className="overflow-hidden rounded-[1.8rem] bg-slate-950/20">
             <img alt={item.description} className="aspect-[4/5] w-full object-cover transition duration-500 group-hover:scale-[1.015]" src={item.imageUrl} />
           </div>

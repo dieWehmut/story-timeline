@@ -1,5 +1,7 @@
 export interface ImageItem {
   id: string;
+  authorLogin: string;
+  authorAvatar: string;
   description: string;
   capturedAt: string;
   imageUrl: string;

@@ -55,7 +55,7 @@ func (controller *ImageController) Create(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	image, err := controller.imageService.Create(r.Context(), session.AccessToken, r.FormValue("description"), capturedAt, fileBytes)
+	image, err := controller.imageService.Create(r.Context(), session.AccessToken, session.User, r.FormValue("description"), capturedAt, fileBytes)
 	if err != nil {
 		dto.WriteError(w, http.StatusBadGateway, err.Error())
 		return

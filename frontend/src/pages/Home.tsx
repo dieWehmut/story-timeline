@@ -153,6 +153,7 @@ export default function Home({
                     <ImageCard
                       busy={images.submitting}
                       editable={auth.isAdmin}
+                      fallbackAuthorLogin={images.stats.githubOwner || auth.user?.login || undefined}
                       item={item}
                       key={item.id}
                       onDelete={images.deleteImage}

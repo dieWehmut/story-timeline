@@ -30,7 +30,7 @@ func main() {
 		Handler:           router.New(router.Dependencies{
 			AuthController:   controller.NewAuthController(authService, env.FrontendBaseURL),
 			ImageController:  controller.NewImageController(imageService),
-			HealthController: controller.NewHealthController(env.GitHubRepoOwner),
+			HealthController: controller.NewHealthController(env.GitHubRepoOwner, env.SecureCookies),
 			AuthService:      authService,
 		}, config.AllowedOrigins(env)),
 		ReadHeaderTimeout: 5 * time.Second,
