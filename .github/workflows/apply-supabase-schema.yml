@@ -2,13 +2,14 @@ name: Apply Supabase Schema
 
 on:
   push:
-    branches: [ 'main' ]
+    branches: [ "main" ]
   workflow_dispatch: {}
 
 jobs:
   apply-schema:
     name: Apply schema to Supabase
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -18,13 +19,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-            echo "MIGRATION=${SUPABASE_MIGRATION_DB_URL:+set}"
-            echo "DB=${SUPABASE_DB_URL:+set}"
       - name: Debug DB_URL (masked)
         env:
           SUPABASE_MIGRATION_DB_URL: ${{ secrets.SUPABASE_MIGRATION_DB_URL }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
+          set -euo pipefail
+
           DB_URL="${SUPABASE_MIGRATION_DB_URL}"
           if [ -z "${DB_URL}" ]; then
             DB_URL="${SUPABASE_DB_URL}"
@@ -36,21 +37,20 @@ jobs:
           fi
 
           echo "DB_URL (masked):"
-          echo "${DB_URL}" | sed -E 's#(postgres://[^:]+:)[^@]+@#\1***@#'
+          echo "${DB_URL}" | sed -E 's#(postgres(ql)?://[^:]+:)[^@]+@#\1***@#'
 
           echo "DB host/port/dbname:"
           echo "${DB_URL}" | sed -E 's#.*@([^/]+/[^?]+).*#\1#'
 
-          # Print non-secret user info: length and sha256 (safe to log)
-          USER_PART=$(echo "${DB_URL}" | sed -E 's#postgres://([^:]+):.*#\1#')
+          USER_PART=$(echo "${DB_URL}" | sed -E 's#postgres(ql)?://([^:]+):.*#\2#')
+
           if [ -z "${USER_PART}" ]; then
             echo "DB user: (not found)"
           else
             echo "DB user length: $(echo -n "${USER_PART}" | wc -c)"
-            echo "DB user sha256: $(echo -n "${USER_PART}" | sha256sum | cut -d' ' -f1)"
+            echo "DB user sha256: $(echo -n "${USER_PART}" | sha256sum | cut -d" " -f1)"
           fi
 
-          # Which secret was selected (no secret value printed)
           if [ -n "${SUPABASE_MIGRATION_DB_URL}" ]; then
             echo "Selected secret: SUPABASE_MIGRATION_DB_URL"
           elif [ -n "${SUPABASE_DB_URL}" ]; then
@@ -58,12 +58,15 @@ jobs:
           else
             echo "Selected secret: none"
           fi
+
       - name: Apply Supabase schema
         env:
           SUPABASE_MIGRATION_DB_URL: ${{ secrets.SUPABASE_MIGRATION_DB_URL }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           PGSSLMODE: require
         run: |
+          set -euo pipefail
+
           DB_URL="${SUPABASE_MIGRATION_DB_URL}"
           if [ -z "${DB_URL}" ]; then
             DB_URL="${SUPABASE_DB_URL}"
@@ -73,6 +76,10 @@ jobs:
             echo "ERROR: SUPABASE_MIGRATION_DB_URL or SUPABASE_DB_URL secret must be set" >&2
             exit 1
           fi
+
           echo "Applying Supabase schema from backend/supabase/schema.sql"
-          echo "Tip: prefer SUPABASE_MIGRATION_DB_URL with Supabase pooler/IPv4 connection string for GitHub Actions"
-          psql "${DB_URL}" -v ON_ERROR_STOP=1 -f backend/supabase/schema.sql
+          echo "Tip: prefer SUPABASE_MIGRATION_DB_URL with Supabase pooler IPv4 connection string for GitHub Actions"
+
+          psql -d "${DB_URL}" \
+            -v ON_ERROR_STOP=1 \
+            -f backend/supabase/schema.sql
