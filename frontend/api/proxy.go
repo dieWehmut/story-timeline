@@ -117,7 +117,13 @@ func proxyToHF(w http.ResponseWriter, r *http.Request, options proxyOptions) {
 		req.Header.Set("User-Agent", options.UserAgent)
 	}
 
-	response, err := http.DefaultClient.Do(req)
+	client := &http.Client{
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	response, err := client.Do(req)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, errorResponse{Error: "failed to reach private Hugging Face Space"})
 		return
