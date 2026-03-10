@@ -45,8 +45,8 @@ func (service *AuthService) NewState() string {
 	return utils.NewID()
 }
 
-func (service *AuthService) LoginURL(state string) string {
-	return service.oauth.AuthCodeURL(state)
+func (service *AuthService) LoginURL(state string, redirectURL string) string {
+	return service.oauth.AuthCodeURL(state, redirectURL)
 }
 
 func (service *AuthService) SetOAuthStateCookie(w http.ResponseWriter, state string) {
@@ -70,8 +70,8 @@ func (service *AuthService) ValidateState(r *http.Request, incoming string) bool
 	return incoming != "" && stateCookie.Value == incoming
 }
 
-func (service *AuthService) CompleteLogin(ctx context.Context, code string) (model.Session, error) {
-	token, err := service.oauth.Exchange(ctx, code)
+func (service *AuthService) CompleteLogin(ctx context.Context, code string, redirectURL string) (model.Session, error) {
+	token, err := service.oauth.Exchange(ctx, code, redirectURL)
 	if err != nil {
 		return model.Session{}, err
 	}

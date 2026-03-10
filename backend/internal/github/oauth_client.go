@@ -23,10 +23,19 @@ func NewOAuthClient(clientID string, clientSecret string, callbackURL string) *O
 	}
 }
 
-func (client *OAuthClient) AuthCodeURL(state string) string {
-	return client.config.AuthCodeURL(state, oauth2.AccessTypeOnline)
+func (client *OAuthClient) AuthCodeURL(state string, redirectURL string) string {
+	return client.withRedirectURL(redirectURL).AuthCodeURL(state, oauth2.AccessTypeOnline)
 }
 
-func (client *OAuthClient) Exchange(ctx context.Context, code string) (*oauth2.Token, error) {
-	return client.config.Exchange(ctx, code)
+func (client *OAuthClient) Exchange(ctx context.Context, code string, redirectURL string) (*oauth2.Token, error) {
+	return client.withRedirectURL(redirectURL).Exchange(ctx, code)
+}
+
+func (client *OAuthClient) withRedirectURL(redirectURL string) *oauth2.Config {
+	configCopy := *client.config
+	if redirectURL != "" {
+		configCopy.RedirectURL = redirectURL
+	}
+
+	return &configCopy
 }

@@ -21,7 +21,7 @@ The backend now uses:
 
 - `GITHUB_CLIENT_ID`
 - `GITHUB_CLIENT_SECRET`
-- `GITHUB_CALLBACK_URL`
+- `GITHUB_CALLBACK_URL` : optional, defaults to `FRONTEND_BASE_URL + /api/auth/github/callback`
 - `GITHUB_REPO_OWNER` : admin login used for feed defaults and UI labeling
 - `SESSION_SECRET`
 - `SUPABASE_URL`
@@ -59,6 +59,7 @@ For GitHub Actions schema sync, prefer a separate `SUPABASE_MIGRATION_DB_URL` se
 ### Notes
 
 - Vercel frontend and Go proxy layout does not change.
+- GitHub OAuth callback should point to the public Vercel domain, not the HF Space domain.
 - The HF backend should expose the same HTTP routes as before.
 - GitHub repository storage is no longer used for application data.
 

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -20,7 +21,7 @@ func NewAuthController(authService *service.AuthService, frontendBaseURL string)
 func (controller *AuthController) Login(c *gin.Context) {
 	state := controller.authService.NewState()
 	controller.authService.SetOAuthStateCookie(c.Writer, state)
-	c.Redirect(http.StatusTemporaryRedirect, controller.authService.LoginURL(state))
+	c.Redirect(http.StatusTemporaryRedirect, controller.authService.LoginURL(state, controller.callbackURL(c.Request)))
 }
 
 func (controller *AuthController) Callback(c *gin.Context) {
@@ -29,7 +30,7 @@ func (controller *AuthController) Callback(c *gin.Context) {
 		return
 	}
 
-	session, err := controller.authService.CompleteLogin(c.Request.Context(), c.Query("code"))
+	session, err := controller.authService.CompleteLogin(c.Request.Context(), c.Query("code"), controller.callbackURL(c.Request))
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
@@ -40,7 +41,7 @@ func (controller *AuthController) Callback(c *gin.Context) {
 		return
 	}
 
-	c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL)
+	c.Redirect(http.StatusTemporaryRedirect, controller.publicBaseURL(c.Request))
 }
 
 func (controller *AuthController) Session(c *gin.Context) {
@@ -80,4 +81,28 @@ func (controller *AuthController) Session(c *gin.Context) {
 func (controller *AuthController) Logout(c *gin.Context) {
 	controller.authService.ClearSession(c.Writer)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func (controller *AuthController) callbackURL(r *http.Request) string {
+	return strings.TrimRight(controller.publicBaseURL(r), "/") + "/api/auth/github/callback"
+}
+
+func (controller *AuthController) publicBaseURL(r *http.Request) string {
+	host := strings.TrimSpace(r.Header.Get("X-Forwarded-Host"))
+	if host == "" {
+		host = strings.TrimSpace(r.Host)
+	}
+	if host != "" {
+		scheme := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto"))
+		if scheme == "" {
+			scheme = "https"
+			if r.TLS == nil {
+				scheme = "http"
+			}
+		}
+
+		return scheme + "://" + host
+	}
+
+	return strings.TrimRight(controller.frontendBaseURL, "/")
 }

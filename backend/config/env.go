@@ -25,24 +25,16 @@ type Env struct {
 }
 
 func LoadEnv() Env {
-	frontendBase := getEnv("FRONTEND_BASE_URL", "http://localhost:5173")
-
-	// If SECURE_COOKIES is explicitly set, use that. Otherwise infer from frontend URL scheme.
-	secureCookiesEnv := os.Getenv("SECURE_COOKIES")
-	secureCookies := false
-	if secureCookiesEnv != "" {
-		secureCookies = getEnv("SECURE_COOKIES", "false") == "true"
-	} else {
-		secureCookies = strings.HasPrefix(strings.ToLower(frontendBase), "https://")
-	}
+	frontendBaseURL := getEnv("FRONTEND_BASE_URL", "http://localhost:5173")
+	defaultCallbackURL := strings.TrimRight(frontendBaseURL, "/") + "/api/auth/github/callback"
 
 	return Env{
 		Port:                getEnv("PORT", "7860"),
 		FrontendOrigin:      getEnv("FRONTEND_ORIGIN", "http://localhost:5173"),
-		FrontendBaseURL:     frontendBase,
+		FrontendBaseURL:     frontendBaseURL,
 		GitHubClientID:      os.Getenv("GITHUB_CLIENT_ID"),
 		GitHubClientSecret:  os.Getenv("GITHUB_CLIENT_SECRET"),
-		GitHubCallbackURL:   getEnv("GITHUB_CALLBACK_URL", "http://localhost:7860/api/auth/github/callback"),
+		GitHubCallbackURL:   getEnv("GITHUB_CALLBACK_URL", defaultCallbackURL),
 		GitHubRepoOwner:     os.Getenv("GITHUB_REPO_OWNER"),
 		SupabaseURL:         os.Getenv("SUPABASE_URL"),
 		SupabaseServiceKey:  os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
@@ -52,7 +44,7 @@ func LoadEnv() Env {
 		CloudinaryAPIKey:    os.Getenv("CLOUDINARY_API_KEY"),
 		CloudinaryAPISecret: os.Getenv("CLOUDINARY_API_SECRET"),
 		SessionSecret:       getEnv("SESSION_SECRET", "change-me"),
-		SecureCookies:       secureCookies,
+		SecureCookies:       getEnv("SECURE_COOKIES", "false") == "true",
 	}
 }
 

@@ -49,7 +49,7 @@ Automatic option:
 - In Space Variables / Secrets, configure:
   - `GITHUB_CLIENT_ID`
   - `GITHUB_CLIENT_SECRET`
-  - `GITHUB_CALLBACK_URL`
+  - `GITHUB_CALLBACK_URL` optional, defaults to `FRONTEND_BASE_URL + /api/auth/github/callback`
   - `GITHUB_REPO_OWNER`
   - `SESSION_SECRET`
   - `SUPABASE_URL`
@@ -63,7 +63,8 @@ Automatic option:
   - `GITHUB_STORAGE_TOKEN`
   - `GITHUB_REPO_NAME=story-timeline-data`
   - `GITHUB_REPO_BRANCH=main`
-- Make sure `GITHUB_CALLBACK_URL` points back to the HF backend domain, for example `https://<space>.hf.space/api/auth/github/callback`.
+- Make sure the GitHub OAuth callback uses the public frontend domain handled by Vercel, for example `https://<your-site>/api/auth/github/callback`.
+- If you keep `GITHUB_CALLBACK_URL`, set it to that same public callback URL instead of the HF Space domain.
 - Redeploy the Space after updating secrets.
 
 ### 4. Vercel
