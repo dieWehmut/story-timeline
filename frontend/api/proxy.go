@@ -32,6 +32,10 @@ type proxyOptions struct {
 	TargetPath     string
 	UserAgent      string
 	Timeout        time.Duration
+	// Any query string that should be forwarded to the target (excluding
+	// the internal proxy parameters).  This is computed by the Handler and
+	// passed through so proxyToHF can construct the proper URL.
+	CleanQuery string
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -39,6 +43,22 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if targetPath == "" {
 		writeJSON(w, http.StatusBadRequest, errorResponse{Error: "missing target path"})
 		return
+	}
+
+	// When Vercel rewrites a request it appends its own query parameters to
+	// carry the original path (e.g. ?target=/api/images&path=images).  Those
+	// values are only for the proxy and must **not** be forwarded upstream.
+	// Strip them now so that the backend sees a clean URL.
+	q := r.URL.Query()
+	q.Del("target")
+	q.Del("path")
+	cleanQuery := q.Encode()
+
+	// Some endpoints (currently only the image creation route) require a
+	// trailing slash.  The rewrite rule strips it, which causes the Hugging
+	// Face server to return 404.  Add it back for POST /api/images.
+	if targetPath == "/api/images" && r.Method == http.MethodPost {
+		targetPath = "/api/images/"
 	}
 
 	options := proxyOptions{
@@ -53,6 +73,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		},
 		TargetPath: targetPath,
 		UserAgent:  "story-timeline-vercel-proxy/1.0",
+		CleanQuery: cleanQuery,
 	}
 
 	if targetPath == "/ping" {
@@ -93,8 +114,8 @@ func proxyToHF(w http.ResponseWriter, r *http.Request, options proxyOptions) {
 	}
 
 	targetURL := targetBaseURL + targetPath
-	if r.URL.RawQuery != "" {
-		targetURL += "?" + r.URL.RawQuery
+	if options.CleanQuery != "" {
+		targetURL += "?" + options.CleanQuery
 	}
 
 	timeout := options.Timeout

@@ -8,7 +8,8 @@ import (
 	"os"
 	"strings"
 
-	githubclient "github.com/dieWehmut/story-timeline/backend/internal/github"
+	"github.com/joho/godotenv"
+
 	"github.com/dieWehmut/story-timeline/backend/internal/model"
 	"github.com/dieWehmut/story-timeline/backend/internal/storage"
 )
@@ -21,7 +22,7 @@ type migratedPost struct {
 
 func main() {
 	ctx := context.Background()
-
+	godotenv.Load()
 	repoName := getenv("GITHUB_REPO_NAME", "story-timeline-data")
 	branch := getenv("GITHUB_REPO_BRANCH", "main")
 	githubToken := strings.TrimSpace(os.Getenv("GITHUB_STORAGE_TOKEN"))
@@ -39,13 +40,13 @@ func main() {
 		log.Fatalf("failed to initialize Cloudinary client: %v", err)
 	}
 
-	graphQL := githubclient.NewGraphQLClient()
-	githubStorage := storage.NewGitHubStorage(branch, githubToken)
 
-	owners, err := graphQL.SearchRepoOwners(ctx, githubToken, repoName)
-	if err != nil {
-		log.Fatalf("failed to find legacy data repositories: %v", err)
+	githubStorage := storage.NewGitHubStorage(branch, githubToken)
+	owners := []model.GitHubUser{
+		{Login: "dieWehmut"},
+		{Login: "dieSehnsucht"},
 	}
+	
 	if len(owners) == 0 {
 		log.Fatal("no legacy data repositories found")
 	}
@@ -56,6 +57,7 @@ func main() {
 	for _, owner := range owners {
 		ownerByLogin[strings.ToLower(owner.Login)] = owner
 		items, err := loadImageIndex(ctx, githubStorage, githubToken, owner.Login, repoName)
+		log.Printf("loaded %d posts from %s", len(items), owner.Login)
 		if err != nil {
 			log.Printf("skip %s index: %v", owner.Login, err)
 			continue
@@ -75,6 +77,10 @@ func main() {
 				log.Printf("skip image %s/%s assets: %v", owner.Login, item.ID, err)
 				continue
 			}
+			if imagePaths == nil {
+				imagePaths = []string{}
+			}
+
 			item.ImagePaths = imagePaths
 			item.ImagePath = ""
 
@@ -130,6 +136,11 @@ func main() {
 					log.Printf("comment assets %s/%s/%s: %v", commenter.Login, post.owner.Login, comment.ID, err)
 					continue
 				}
+
+				if imagePaths == nil {
+					imagePaths = []string{}
+				}
+
 				comment.ImagePaths = imagePaths
 				comment.ImagePath = ""
 
