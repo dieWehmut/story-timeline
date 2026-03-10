@@ -43,10 +43,15 @@ const sortByDate = (itemsList: ImageItem[]) =>
     (left, right) => new Date(right.startAt).getTime() - new Date(left.startAt).getTime()
   );
 
+const normalizeCachedItem = (item: ImageItem): ImageItem => ({
+  ...item,
+  tags: item.tags ?? [],
+});
+
 const loadCachedFeed = (): ImageItem[] | null => {
   try {
     const raw = localStorage.getItem(CACHE_KEY_FEED);
-    return raw ? (JSON.parse(raw) as ImageItem[]) : null;
+    return raw ? (JSON.parse(raw) as ImageItem[]).map(normalizeCachedItem) : null;
   } catch {
     return null;
   }
@@ -166,6 +171,7 @@ export const useImages = () => {
         authorLogin: optimisticUser.login,
         authorAvatar: optimisticUser.avatarUrl,
         description: payload.description,
+        tags: payload.tags,
         timeMode: payload.timeMode,
         startAt: payload.startAt,
         endAt: payload.endAt,
@@ -221,6 +227,7 @@ export const useImages = () => {
           return {
             ...item,
             description: payload.description,
+            tags: payload.tags,
             timeMode: payload.timeMode,
             startAt: payload.startAt,
             endAt: payload.endAt,

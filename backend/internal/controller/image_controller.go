@@ -18,10 +18,12 @@ import (
 )
 
 const (
-	maxFiles     = 9
+	maxFiles        = 9
 	maxCommentFiles = 3
-	maxFileSize  = 5 << 20  // 5 MB
-	maxTotalSize = 25 << 20 // 25 MB
+	maxFileSize     = 5 << 20  // 5 MB
+	maxTotalSize    = 25 << 20 // 25 MB
+	maxTags         = 12
+	maxTagLength    = 32
 )
 
 type ImageController struct {
@@ -85,6 +87,40 @@ func parseImageTimes(c *gin.Context) (string, time.Time, time.Time, error) {
 	}
 
 	return model.ImageTimeModeRange, startAt, endAt, nil
+}
+
+func parseTags(c *gin.Context) ([]string, error) {
+	rawTags := c.Request.Form["tags"]
+	if len(rawTags) == 0 {
+		if csvValue := c.Request.FormValue("tags"); csvValue != "" {
+			rawTags = strings.Split(csvValue, ",")
+		}
+	}
+
+	seen := map[string]struct{}{}
+	tags := make([]string, 0, len(rawTags))
+	for _, rawTag := range rawTags {
+		for _, part := range strings.Split(rawTag, ",") {
+			tag := strings.TrimSpace(part)
+			if tag == "" {
+				continue
+			}
+			if len([]rune(tag)) > maxTagLength {
+				return nil, fmt.Errorf("tag too long")
+			}
+			key := strings.ToLower(tag)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			tags = append(tags, tag)
+			if len(tags) > maxTags {
+				return nil, fmt.Errorf("too many tags")
+			}
+		}
+	}
+
+	return tags, nil
 }
 
 // Feed returns the aggregated feed for the current user.
@@ -215,6 +251,12 @@ func (controller *ImageController) Create(c *gin.Context) {
 		return
 	}
 
+	tags, err := parseTags(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tags"})
+		return
+	}
+
 	timeMode, startAt, endAt, err := parseImageTimes(c)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid time fields"})
@@ -227,13 +269,7 @@ func (controller *ImageController) Create(c *gin.Context) {
 		return
 	}
 
-	// Ensure user has a story-timeline-data repository
-	if err := controller.userService.EnsureRepo(c.Request.Context(), session.AccessToken, session.User.Login); err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("无法创建数据仓库: %s", err.Error())})
-		return
-	}
-
-	image, err := controller.imageService.Create(c.Request.Context(), session.AccessToken, session.User, c.Request.FormValue("description"), timeMode, startAt, endAt, files)
+	image, err := controller.imageService.Create(c.Request.Context(), session.AccessToken, session.User, c.Request.FormValue("description"), tags, timeMode, startAt, endAt, files)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
@@ -261,6 +297,12 @@ func (controller *ImageController) Update(c *gin.Context) {
 		return
 	}
 
+	tags, err := parseTags(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tags"})
+		return
+	}
+
 	session, ok := middleware.SessionFromContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing session"})
@@ -269,7 +311,7 @@ func (controller *ImageController) Update(c *gin.Context) {
 
 	// Users can only edit their own posts
 	ownerLogin := session.User.Login
-	image, err := controller.imageService.Update(c.Request.Context(), session.AccessToken, ownerLogin, imageID, c.Request.FormValue("description"), timeMode, startAt, endAt, files)
+	image, err := controller.imageService.Update(c.Request.Context(), session.AccessToken, ownerLogin, imageID, c.Request.FormValue("description"), tags, timeMode, startAt, endAt, files)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
@@ -412,12 +454,6 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 	session, ok := middleware.SessionFromContext(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing session"})
-		return
-	}
-
-	// Ensure commenter has a repo
-	if err := controller.userService.EnsureRepo(c.Request.Context(), session.AccessToken, session.User.Login); err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("无法创建数据仓库: %s", err.Error())})
 		return
 	}
 

@@ -185,6 +185,7 @@ export function CardDetail({
   const authorAvatar =
     item.authorAvatar || (authorLogin !== 'GitHub' ? `https://github.com/${authorLogin}.png?size=64` : '');
   const imageUrls = item.imageUrls ?? [];
+  const tags = item.tags ?? [];
 
   // Lock body scroll while detail is open
   useEffect(() => {
@@ -238,6 +239,7 @@ export function CardDetail({
 
   const handleEditSubmit = async (data: {
     description: string;
+    tags: string[];
     timeMode: 'point' | 'range';
     startAt: string;
     endAt?: string;
@@ -246,6 +248,7 @@ export function CardDetail({
     await onSave?.({
       id: item.id,
       description: data.description,
+      tags: data.tags,
       timeMode: data.timeMode,
       startAt: data.startAt,
       endAt: data.endAt,
@@ -403,6 +406,16 @@ export function CardDetail({
               <p className="whitespace-pre-wrap px-4 pt-2 font-serif text-xl leading-relaxed text-[var(--text-main)] md:text-2xl">
                 {item.description}
               </p>
+            ) : null}
+
+            {tags.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2 px-4">
+                {tags.map((tag) => (
+                  <span className="rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200" key={tag}>
+                    #{tag}
+                  </span>
+                ))}
+              </div>
             ) : null}
 
             {/* Images */}
@@ -578,6 +591,7 @@ export function CardDetail({
           busy={false}
           initialDescription={item.description}
           initialImageUrls={imageUrls}
+          initialTags={tags}
           initialStartAt={toDateTimeInputValue(item.startAt)}
           initialEndAt={item.endAt ? toDateTimeInputValue(item.endAt) : undefined}
           initialTimeMode={item.timeMode}

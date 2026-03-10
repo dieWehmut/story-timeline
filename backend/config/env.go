@@ -10,12 +10,16 @@ type Env struct {
 	GitHubClientSecret string
 	GitHubCallbackURL  string
 	GitHubRepoOwner    string
-	GitHubRepoName     string
-	GitHubRepoBranch   string
-	GitHubStorageToken string
+	SupabaseURL        string
+	SupabaseServiceKey string
+	R2AccountID        string
+	R2AccessKeyID      string
+	R2SecretAccessKey  string
+	R2Bucket           string
+	R2Endpoint         string
+	R2Region           string
 	SessionSecret      string
 	SecureCookies      bool
-	CacheFile          string
 }
 
 func LoadEnv() Env {
@@ -27,12 +31,16 @@ func LoadEnv() Env {
 		GitHubClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
 		GitHubCallbackURL:  getEnv("GITHUB_CALLBACK_URL", "http://localhost:7860/api/auth/github/callback"),
 		GitHubRepoOwner:    os.Getenv("GITHUB_REPO_OWNER"),
-		GitHubRepoName:     getEnv("GITHUB_REPO_NAME", "story-timeline-data"),
-		GitHubRepoBranch:   getEnv("GITHUB_REPO_BRANCH", "main"),
-		GitHubStorageToken: os.Getenv("GITHUB_STORAGE_TOKEN"),
+		SupabaseURL:        os.Getenv("SUPABASE_URL"),
+		SupabaseServiceKey: os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
+		R2AccountID:        os.Getenv("R2_ACCOUNT_ID"),
+		R2AccessKeyID:      os.Getenv("R2_ACCESS_KEY_ID"),
+		R2SecretAccessKey:  os.Getenv("R2_SECRET_ACCESS_KEY"),
+		R2Bucket:           os.Getenv("R2_BUCKET"),
+		R2Endpoint:         os.Getenv("R2_ENDPOINT"),
+		R2Region:           getEnv("R2_REGION", "auto"),
 		SessionSecret:      getEnv("SESSION_SECRET", "change-me"),
 		SecureCookies:      getEnv("SECURE_COOKIES", "false") == "true",
-		CacheFile:          getEnv("CACHE_FILE", "data/cache.json"),
 	}
 }
 

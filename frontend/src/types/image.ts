@@ -5,6 +5,7 @@ export interface ImageItem {
   authorLogin: string;
   authorAvatar: string;
   description: string;
+  tags: string[];
   timeMode: ImageTimeMode;
   startAt: string;
   endAt?: string;
@@ -29,6 +30,7 @@ export interface TimelineMonth {
 
 export interface CreateImagePayload {
   description: string;
+  tags: string[];
   timeMode: ImageTimeMode;
   startAt: string;
   endAt?: string;
@@ -38,6 +40,7 @@ export interface CreateImagePayload {
 export interface UpdateImagePayload {
   id: string;
   description: string;
+  tags: string[];
   timeMode: ImageTimeMode;
   startAt: string;
   endAt?: string;

@@ -2,12 +2,8 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -18,122 +14,95 @@ import (
 )
 
 type ImageService struct {
-	storage      *storage.GitHubStorage
-	repoName     string
-	adminLogin   string
-	defaultToken string
-	cacheFile    string
-	mu           sync.RWMutex
-	userItems    map[string][]model.Image // login -> items
+	database   *storage.SupabaseStorage
+	assets     *storage.R2Storage
+	adminLogin string
+	mu         sync.Mutex
 }
 
-func NewImageService(ctx context.Context, store *storage.GitHubStorage, repoName string, adminLogin string, defaultToken string, cacheFile string) (*ImageService, error) {
-	service := &ImageService{
-		storage:      store,
-		repoName:     repoName,
-		adminLogin:   adminLogin,
-		defaultToken: defaultToken,
-		cacheFile:    cacheFile,
-		userItems:    map[string][]model.Image{},
+func NewImageService(_ context.Context, database *storage.SupabaseStorage, assets *storage.R2Storage, adminLogin string) (*ImageService, error) {
+	if database == nil {
+		return nil, fmt.Errorf("supabase storage is required")
 	}
-	if err := service.bootstrapAdmin(ctx); err != nil {
-		return nil, err
+	if assets == nil {
+		return nil, fmt.Errorf("R2 storage is required")
 	}
 
-	return service, nil
+	return &ImageService{
+		database:   database,
+		assets:     assets,
+		adminLogin: strings.TrimSpace(adminLogin),
+	}, nil
 }
 
-// GetFeed returns aggregated posts from multiple users, sorted by startAt desc.
-func (service *ImageService) GetFeed(ctx context.Context, token string, feedLogins []string) []model.Image {
-	// Always include admin
+func (service *ImageService) GetFeed(ctx context.Context, _ string, feedLogins []string) []model.Image {
 	logins := uniqueStrings(append(feedLogins, service.adminLogin))
-
-	var all []model.Image
-	for _, login := range logins {
-		items := service.loadUser(ctx, token, login)
-		all = append(all, items...)
+	items, err := service.database.ListImagesByAuthors(ctx, logins)
+	if err != nil {
+		return []model.Image{}
 	}
 
-	sort.Slice(all, func(i, j int) bool {
-		return all[i].SortTime().After(all[j].SortTime())
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].SortTime().After(items[j].SortTime())
 	})
-
-	return all
+	return items
 }
 
-// GetUserItems returns items for a single user (from cache or fetched).
-func (service *ImageService) GetUserItems(ctx context.Context, token string, login string) []model.Image {
-	return service.loadUser(ctx, token, login)
+func (service *ImageService) GetUserItems(ctx context.Context, _ string, login string) []model.Image {
+	items, err := service.database.ListImagesByAuthor(ctx, login)
+	if err != nil {
+		return []model.Image{}
+	}
+	return items
 }
 
-func (service *ImageService) Create(ctx context.Context, token string, author model.GitHubUser, description string, timeMode string, startAt time.Time, endAt time.Time, files [][]byte) (model.Image, error) {
-	ownerLogin := author.Login
-
-	// Ensure their data is loaded
-	service.loadUser(ctx, token, ownerLogin)
-
+func (service *ImageService) Create(ctx context.Context, _ string, author model.GitHubUser, description string, tags []string, timeMode string, startAt time.Time, endAt time.Time, files [][]byte) (model.Image, error) {
 	service.mu.Lock()
 	defer service.mu.Unlock()
 
 	now := utils.NowBeijing()
-	items := service.userItems[ownerLogin]
-	metadataPath := nextMetadataPath(items, startAt)
-	var imagePaths []string
-	for i, file := range files {
-		imagePaths = append(imagePaths, nextImagePath(startAt, i))
-		if err := service.storage.PutFile(ctx, token, ownerLogin, service.repoName, imagePaths[i], file, fmt.Sprintf("Add image %d for post", i+1)); err != nil {
-			return model.Image{}, err
-		}
-	}
-
+	imageID := utils.NewID()
 	image := model.Image{
-		ID:           utils.NewID(),
+		ID:           imageID,
 		AuthorLogin:  author.Login,
 		AuthorAvatar: author.AvatarURL,
 		Description:  description,
+		Tags:         normalizeTags(tags),
 		TimeMode:     timeMode,
 		StartAt:      startAt,
 		EndAt:        endAt,
 		CapturedAt:   startAt,
-		ImagePaths:   imagePaths,
-		MetadataPath: metadataPath,
+		MetadataPath: metadataPath(author.Login, imageID),
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
 	image.NormalizeTimeFields()
 
-	if err := service.writeMetadata(ctx, token, ownerLogin, image); err != nil {
+	imagePaths, err := service.uploadImageAssets(ctx, author.Login, imageID, files)
+	if err != nil {
 		return model.Image{}, err
 	}
+	image.ImagePaths = imagePaths
 
-	service.userItems[ownerLogin] = append(service.userItems[ownerLogin], image)
-	if err := service.persistIndex(ctx, token, ownerLogin); err != nil {
+	if err := service.database.UpsertImage(ctx, image); err != nil {
 		return model.Image{}, err
 	}
 
 	return image, nil
 }
 
-func (service *ImageService) Update(ctx context.Context, token string, ownerLogin string, id string, description string, timeMode string, startAt time.Time, endAt time.Time, files [][]byte) (model.Image, error) {
+func (service *ImageService) Update(ctx context.Context, _ string, ownerLogin string, id string, description string, tags []string, timeMode string, startAt time.Time, endAt time.Time, files [][]byte) (model.Image, error) {
 	service.mu.Lock()
 	defer service.mu.Unlock()
 
-	items := service.userItems[ownerLogin]
-	index := -1
-	for currentIndex, item := range items {
-		if item.ID == id {
-			index = currentIndex
-			break
-		}
-	}
-	if index == -1 {
-		return model.Image{}, fmt.Errorf("image %s not found", id)
+	current, err := service.database.GetImage(ctx, ownerLogin, id)
+	if err != nil {
+		return model.Image{}, err
 	}
 
-	current := items[index]
-	current.NormalizeTimeFields()
 	updated := current
 	updated.Description = description
+	updated.Tags = normalizeTags(tags)
 	updated.TimeMode = timeMode
 	updated.StartAt = startAt
 	updated.EndAt = endAt
@@ -142,109 +111,49 @@ func (service *ImageService) Update(ctx context.Context, token string, ownerLogi
 	updated.NormalizeTimeFields()
 
 	if len(files) > 0 {
-		var newPaths []string
-		for i, file := range files {
-			p := nextImagePath(startAt, i)
-			newPaths = append(newPaths, p)
-			if err := service.storage.PutFile(ctx, token, ownerLogin, service.repoName, p, file, fmt.Sprintf("Update image %d for %s", i+1, id)); err != nil {
-				return model.Image{}, err
-			}
+		newPaths, uploadErr := service.uploadImageAssets(ctx, ownerLogin, id, files)
+		if uploadErr != nil {
+			return model.Image{}, uploadErr
 		}
-		for _, oldPath := range current.AllImagePaths() {
-			_ = service.storage.DeleteFile(ctx, token, ownerLogin, service.repoName, oldPath, fmt.Sprintf("Remove old image %s", id))
-		}
+		oldPaths := current.AllImagePaths()
 		updated.ImagePaths = newPaths
 		updated.ImagePath = ""
-	} else {
-		moved := !utils.SameBeijingDay(current.SortTime(), startAt)
-		if moved {
-			oldPaths := current.AllImagePaths()
-			var newPaths []string
-			for i, oldPath := range oldPaths {
-				existingImage, _, _, err := service.storage.GetFile(ctx, token, ownerLogin, service.repoName, oldPath)
-				if err != nil {
-					return model.Image{}, err
-				}
-				newPath := nextImagePath(startAt, i)
-				newPaths = append(newPaths, newPath)
-				if err := service.storage.PutFile(ctx, token, ownerLogin, service.repoName, newPath, existingImage, fmt.Sprintf("Move image %s", id)); err != nil {
-					return model.Image{}, err
-				}
+		for _, oldPath := range oldPaths {
+			if !containsString(newPaths, oldPath) {
+				_ = service.assets.DeleteObject(ctx, oldPath)
 			}
-			for _, oldPath := range oldPaths {
-				_ = service.storage.DeleteFile(ctx, token, ownerLogin, service.repoName, oldPath, fmt.Sprintf("Remove old image %s", id))
-			}
-			updated.ImagePaths = newPaths
-			updated.ImagePath = ""
 		}
 	}
 
-	newMetadataPath := nextMetadataPath(items, startAt)
-	if newMetadataPath != current.MetadataPath {
-		_ = service.storage.DeleteFile(ctx, token, ownerLogin, service.repoName, current.MetadataPath, fmt.Sprintf("Remove old metadata %s", id))
-	}
-	updated.MetadataPath = newMetadataPath
-
-	if err := service.writeMetadata(ctx, token, ownerLogin, updated); err != nil {
-		return model.Image{}, err
-	}
-
-	service.userItems[ownerLogin][index] = updated
-	if err := service.persistIndex(ctx, token, ownerLogin); err != nil {
+	if err := service.database.UpsertImage(ctx, updated); err != nil {
 		return model.Image{}, err
 	}
 
 	return updated, nil
 }
 
-func (service *ImageService) Delete(ctx context.Context, token string, ownerLogin string, id string) error {
+func (service *ImageService) Delete(ctx context.Context, _ string, ownerLogin string, id string) error {
 	service.mu.Lock()
 	defer service.mu.Unlock()
 
-	items := service.userItems[ownerLogin]
-	index := -1
-	for currentIndex, item := range items {
-		if item.ID == id {
-			index = currentIndex
-			break
-		}
-	}
-	if index == -1 {
-		return fmt.Errorf("image %s not found", id)
-	}
-
-	item := items[index]
-	for _, imgPath := range item.AllImagePaths() {
-		if err := service.storage.DeleteFile(ctx, token, ownerLogin, service.repoName, imgPath, fmt.Sprintf("Delete image %s", item.ID)); err != nil {
-			return err
-		}
-	}
-	if err := service.storage.DeleteFile(ctx, token, ownerLogin, service.repoName, item.MetadataPath, fmt.Sprintf("Delete metadata %s", item.ID)); err != nil {
+	item, err := service.database.GetImage(ctx, ownerLogin, id)
+	if err != nil {
 		return err
 	}
 
-	service.userItems[ownerLogin] = append(items[:index], items[index+1:]...)
-	return service.persistIndex(ctx, token, ownerLogin)
-}
-
-// FindImage looks up an image by owner and ID.
-func (service *ImageService) FindImage(ownerLogin string, id string) (model.Image, bool) {
-	service.mu.RLock()
-	defer service.mu.RUnlock()
-
-	for _, item := range service.userItems[ownerLogin] {
-		if item.ID == id {
-			return item, true
+	for _, objectKey := range item.AllImagePaths() {
+		if deleteErr := service.assets.DeleteObject(ctx, objectKey); deleteErr != nil {
+			return deleteErr
 		}
 	}
 
-	return model.Image{}, false
+	return service.database.DeleteImage(ctx, ownerLogin, id)
 }
 
-func (service *ImageService) ReadAsset(ctx context.Context, token string, ownerLogin string, id string, assetIndex int) ([]byte, string, error) {
-	item, ok := service.FindImage(ownerLogin, id)
-	if !ok {
-		return nil, "", fmt.Errorf("image %s not found", id)
+func (service *ImageService) ReadAsset(ctx context.Context, _ string, ownerLogin string, id string, assetIndex int) ([]byte, string, error) {
+	item, err := service.database.GetImage(ctx, ownerLogin, id)
+	if err != nil {
+		return nil, "", err
 	}
 
 	paths := item.AllImagePaths()
@@ -252,184 +161,70 @@ func (service *ImageService) ReadAsset(ctx context.Context, token string, ownerL
 		return nil, "", fmt.Errorf("asset index %d out of range", assetIndex)
 	}
 
-	readToken := token
-	if readToken == "" {
-		readToken = service.defaultToken
-	}
-
-	content, _, contentType, err := service.storage.GetFile(ctx, readToken, ownerLogin, service.repoName, paths[assetIndex])
-	return content, contentType, err
+	return service.assets.GetObject(ctx, paths[assetIndex])
 }
 
-// loadUser loads a user's items if not cached, returns cached items.
-func (service *ImageService) loadUser(ctx context.Context, token string, login string) []model.Image {
-	service.mu.RLock()
-	items, ok := service.userItems[login]
-	service.mu.RUnlock()
-
-	if ok {
-		return append([]model.Image(nil), items...)
-	}
-
-	readToken := token
-	if readToken == "" {
-		readToken = service.defaultToken
-	}
-
-	content, _, _, err := service.storage.GetFile(ctx, readToken, login, service.repoName, "index.json")
-	if err != nil {
-		service.mu.Lock()
-		service.userItems[login] = []model.Image{}
-		service.mu.Unlock()
-		return nil
-	}
-
-	var idx model.ImageIndex
-	if err := json.Unmarshal(content, &idx); err != nil {
-		service.mu.Lock()
-		service.userItems[login] = []model.Image{}
-		service.mu.Unlock()
-		return nil
-	}
-
-	// Ensure AuthorLogin is set on all items
-	for i := range idx.Items {
-		if idx.Items[i].AuthorLogin == "" {
-			idx.Items[i].AuthorLogin = login
+func (service *ImageService) uploadImageAssets(ctx context.Context, ownerLogin string, imageID string, files [][]byte) ([]string, error) {
+	paths := make([]string, 0, len(files))
+	for index, file := range files {
+		objectKey := imageObjectKey(ownerLogin, imageID, index)
+		if err := service.assets.PutObject(ctx, objectKey, file, "image/webp"); err != nil {
+			return nil, err
 		}
-		idx.Items[i].NormalizeTimeFields()
+		paths = append(paths, objectKey)
 	}
-
-	service.mu.Lock()
-	service.userItems[login] = idx.Items
-	service.mu.Unlock()
-
-	return append([]model.Image(nil), idx.Items...)
+	return paths, nil
 }
 
-func (service *ImageService) bootstrapAdmin(ctx context.Context) error {
-	if service.adminLogin == "" {
-		return nil
-	}
-
-	// Try loading from cache file first
-	if cachePayload, err := os.ReadFile(service.cacheFile); err == nil {
-		var index model.ImageIndex
-		if err := json.Unmarshal(cachePayload, &index); err == nil {
-			for i := range index.Items {
-				if index.Items[i].AuthorLogin == "" {
-					index.Items[i].AuthorLogin = service.adminLogin
-				}
-				index.Items[i].NormalizeTimeFields()
-			}
-			service.userItems[service.adminLogin] = index.Items
-			return nil
-		}
-	}
-
-	// Fetch from GitHub
-	content, _, _, err := service.storage.GetFile(ctx, service.defaultToken, service.adminLogin, service.repoName, "index.json")
-	if err != nil {
-		service.userItems[service.adminLogin] = []model.Image{}
-		return service.writeCache(service.adminLogin)
-	}
-
-	var index model.ImageIndex
-	if err := json.Unmarshal(content, &index); err != nil {
-		return err
-	}
-
-	for i := range index.Items {
-		if index.Items[i].AuthorLogin == "" {
-			index.Items[i].AuthorLogin = service.adminLogin
-		}
-		index.Items[i].NormalizeTimeFields()
-	}
-
-	service.userItems[service.adminLogin] = index.Items
-	return service.writeCache(service.adminLogin)
+func imageObjectKey(ownerLogin string, imageID string, assetIndex int) string {
+	return fmt.Sprintf("images/%s/%s/%d.webp", ownerLogin, imageID, assetIndex)
 }
 
-func (service *ImageService) persistIndex(ctx context.Context, token string, ownerLogin string) error {
-	items := service.userItems[ownerLogin]
-	payload, err := json.MarshalIndent(model.ImageIndex{Items: items}, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	if err := service.storage.PutFile(ctx, token, ownerLogin, service.repoName, "index.json", payload, "Update story index"); err != nil {
-		return err
-	}
-
-	return service.writeCache(ownerLogin)
+func metadataPath(ownerLogin string, imageID string) string {
+	return fmt.Sprintf("supabase/images/%s/%s", ownerLogin, imageID)
 }
 
-func (service *ImageService) writeMetadata(ctx context.Context, token string, ownerLogin string, image model.Image) error {
-	payload, err := json.MarshalIndent(image, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return service.storage.PutFile(ctx, token, ownerLogin, service.repoName, image.MetadataPath, payload, fmt.Sprintf("Update metadata %s", image.ID))
-}
-
-func (service *ImageService) writeCache(ownerLogin string) error {
-	if ownerLogin != service.adminLogin {
-		return nil
-	}
-
-	items := service.userItems[ownerLogin]
-	if err := os.MkdirAll(filepath.Dir(service.cacheFile), 0o755); err != nil {
-		return err
-	}
-
-	payload, err := json.MarshalIndent(model.ImageIndex{Items: items}, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(service.cacheFile, payload, 0o644)
-}
-
-func nextMetadataPath(items []model.Image, capturedAt time.Time) string {
-	year, month, day := utils.DayPathParts(capturedAt)
-	prefix := filepath.ToSlash(filepath.Join(year, month, day))
-	maxSequence := 0
-
-	for _, item := range items {
-		if !strings.HasPrefix(item.MetadataPath, prefix+"/") {
+func normalizeTags(tags []string) []string {
+	seen := map[string]struct{}{}
+	result := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		trimmed := strings.TrimSpace(tag)
+		if trimmed == "" {
 			continue
 		}
-
-		baseName := strings.TrimSuffix(filepath.Base(item.MetadataPath), filepath.Ext(item.MetadataPath))
-		parts := strings.SplitN(baseName, "_", 2)
-		sequence, err := strconv.Atoi(parts[0])
-		if err == nil && sequence > maxSequence {
-			maxSequence = sequence
+		key := strings.ToLower(trimmed)
+		if _, ok := seen[key]; ok {
+			continue
 		}
+		seen[key] = struct{}{}
+		result = append(result, trimmed)
 	}
-
-	next := strconv.Itoa(maxSequence + 1)
-	return filepath.ToSlash(filepath.Join(prefix, next+".json"))
+	return result
 }
 
-func nextImagePath(capturedAt time.Time, fileIndex int) string {
-	year, month, day := utils.DayPathParts(capturedAt)
-	prefix := filepath.ToSlash(filepath.Join(year, month, day))
-	ts := time.Now().UnixMilli()
-	return filepath.ToSlash(filepath.Join(prefix, fmt.Sprintf("%d_%d.webp", ts, fileIndex)))
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func uniqueStrings(input []string) []string {
 	seen := map[string]struct{}{}
 	var result []string
-	for _, s := range input {
-		lower := strings.ToLower(s)
-		if _, ok := seen[lower]; ok {
+	for _, value := range input {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
 			continue
 		}
-		seen[lower] = struct{}{}
-		result = append(result, s)
+		key := strings.ToLower(trimmed)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, trimmed)
 	}
 	return result
 }

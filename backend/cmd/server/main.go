@@ -22,15 +22,27 @@ func main() {
 	graphqlClient := github.NewGraphQLClient()
 
 	authService := service.NewAuthService(githubOAuthClient, graphqlClient, env.SessionSecret, env.SecureCookies, env.GitHubRepoOwner)
-	userService := service.NewUserService(graphqlClient, env.GitHubRepoName, env.GitHubRepoBranch, env.GitHubRepoOwner)
-	gitHubStorage := storage.NewGitHubStorage(env.GitHubRepoBranch, env.GitHubStorageToken)
+	supabaseStorage := storage.NewSupabaseStorage(env.SupabaseURL, env.SupabaseServiceKey)
+	r2Storage, err := storage.NewR2Storage(ctx, storage.R2Config{
+		AccountID:       env.R2AccountID,
+		AccessKeyID:     env.R2AccessKeyID,
+		SecretAccessKey: env.R2SecretAccessKey,
+		Bucket:          env.R2Bucket,
+		Endpoint:        env.R2Endpoint,
+		Region:          env.R2Region,
+	})
+	if err != nil {
+		log.Fatalf("failed to initialize R2 storage: %v", err)
+	}
 
-	imageService, err := service.NewImageService(ctx, gitHubStorage, env.GitHubRepoName, env.GitHubRepoOwner, env.GitHubStorageToken, env.CacheFile)
+	userService := service.NewUserService(graphqlClient, supabaseStorage, env.GitHubRepoOwner)
+
+	imageService, err := service.NewImageService(ctx, supabaseStorage, r2Storage, env.GitHubRepoOwner)
 	if err != nil {
 		log.Fatalf("failed to initialize image service: %v", err)
 	}
 
-	interactionService := service.NewInteractionService(gitHubStorage, env.GitHubRepoName, env.GitHubStorageToken)
+	interactionService := service.NewInteractionService(supabaseStorage, r2Storage)
 
 	server := &http.Server{
 		Addr: ":" + env.Port,

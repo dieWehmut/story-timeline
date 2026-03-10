@@ -7,6 +7,7 @@ type ImageResponse struct {
 	AuthorLogin  string   `json:"authorLogin"`
 	AuthorAvatar string   `json:"authorAvatar"`
 	Description  string   `json:"description"`
+	Tags         []string `json:"tags"`
 	TimeMode     string   `json:"timeMode"`
 	StartAt      string   `json:"startAt"`
 	EndAt        string   `json:"endAt,omitempty"`
@@ -28,6 +29,7 @@ func NewImageResponse(image model.Image, assetURLs []string) ImageResponse {
 		AuthorLogin:  image.AuthorLogin,
 		AuthorAvatar: image.AuthorAvatar,
 		Description:  image.Description,
+		Tags:         image.Tags,
 		TimeMode:     image.TimeMode,
 		StartAt:      image.StartAt.Format("2006-01-02T15:04:05-07:00"),
 		CapturedAt:   image.StartAt.Format("2006-01-02T15:04:05-07:00"),

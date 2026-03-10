@@ -11,9 +11,10 @@ interface UploadButtonProps {
 export function UploadButton({ busy, onSubmit }: UploadButtonProps) {
   const [open, setOpen] = useState(false);
 
-  const handleSubmit = async (data: { description: string; timeMode: 'point' | 'range'; startAt: string; endAt?: string; files: File[] }) => {
+  const handleSubmit = async (data: { description: string; tags: string[]; timeMode: 'point' | 'range'; startAt: string; endAt?: string; files: File[] }) => {
     await onSubmit({
       description: data.description,
+      tags: data.tags,
       timeMode: data.timeMode,
       startAt: data.startAt,
       endAt: data.endAt,

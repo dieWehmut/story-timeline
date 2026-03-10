@@ -136,9 +136,11 @@ export function ImageCard({
   const authorAvatar =
     item.authorAvatar || (authorLogin !== 'GitHub' ? `https://github.com/${authorLogin}.png?size=64` : '');
   const imageUrls = item.imageUrls ?? [];
+  const tags = item.tags ?? [];
 
   const handleEditSubmit = async (data: {
     description: string;
+    tags: string[];
     timeMode: 'point' | 'range';
     startAt: string;
     endAt?: string;
@@ -147,6 +149,7 @@ export function ImageCard({
     await onSave({
       id: item.id,
       description: data.description,
+      tags: data.tags,
       timeMode: data.timeMode,
       startAt: data.startAt,
       endAt: data.endAt,
@@ -265,6 +268,16 @@ export function ImageCard({
                 {item.description}
               </p>
             ) : null}
+
+            {tags.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <span className="rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200" key={tag}>
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           {/* Right: Edit + Delete */}
@@ -376,6 +389,7 @@ export function ImageCard({
         busy={busy}
         initialDescription={item.description}
         initialImageUrls={imageUrls}
+        initialTags={tags}
         initialStartAt={toDateTimeInputValue(item.startAt)}
         initialEndAt={item.endAt ? toDateTimeInputValue(item.endAt) : undefined}
         initialTimeMode={item.timeMode}

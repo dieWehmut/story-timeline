@@ -12,6 +12,7 @@ type Image struct {
 	AuthorLogin  string    `json:"authorLogin,omitempty"`
 	AuthorAvatar string    `json:"authorAvatar,omitempty"`
 	Description  string    `json:"description"`
+	Tags         []string  `json:"tags,omitempty"`
 	TimeMode     string    `json:"timeMode,omitempty"`
 	StartAt      time.Time `json:"startAt,omitempty"`
 	EndAt        time.Time `json:"endAt,omitempty"`
@@ -91,10 +92,13 @@ type Comment struct {
 	ID         string    `json:"id"`
 	PostOwner  string    `json:"postOwner"`
 	PostID     string    `json:"postId"`
+	AuthorLogin string   `json:"authorLogin,omitempty"`
+	AuthorAvatar string  `json:"authorAvatar,omitempty"`
 	Text       string    `json:"text"`
 	ImagePath  string    `json:"imagePath,omitempty"`
 	ImagePaths []string  `json:"imagePaths,omitempty"`
 	Deleted    bool      `json:"deleted,omitempty"`
+	Hidden     bool      `json:"hidden,omitempty"`
 	CreatedAt  time.Time `json:"createdAt"`
 }
 

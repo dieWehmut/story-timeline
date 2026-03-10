@@ -1,5 +1,5 @@
-import { useId, useState, useRef, useCallback, useEffect } from 'react';
-import { Trash2, X, Plus } from 'lucide-react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { Plus, Trash2, X } from 'lucide-react';
 
 interface PostDialogProps {
   open: boolean;
@@ -7,16 +7,19 @@ interface PostDialogProps {
   busy: boolean;
   mode: 'create' | 'edit';
   initialDescription?: string;
+  initialTags?: string[];
   initialTimeMode?: 'point' | 'range';
   initialStartAt?: string;
   initialEndAt?: string;
   initialImageUrls?: string[];
-  onSubmit: (data: { description: string; timeMode: 'point' | 'range'; startAt: string; endAt?: string; files: File[]; removedUrls?: string[] }) => Promise<void>;
+  onSubmit: (data: { description: string; tags: string[]; timeMode: 'point' | 'range'; startAt: string; endAt?: string; files: File[]; removedUrls?: string[] }) => Promise<void>;
 }
 
 const MAX_FILES = 9;
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_TOTAL_SIZE = 25 * 1024 * 1024;
+const MAX_TAGS = 12;
+const MAX_TAG_LENGTH = 32;
 const DRAFT_KEY = 'draft:post';
 const postDraftFileCache = new Map<string, File[]>();
 
@@ -39,6 +42,8 @@ interface PreviewItem {
   url: string;
 }
 
+const normalizeTag = (value: string) => value.trim().replace(/^#/, '').replace(/\s+/g, ' ');
+
 const buildFilePreviewItems = (files: File[]): PreviewItem[] =>
   files.map((file) => ({ type: 'file' as const, file, url: URL.createObjectURL(file) }));
 
@@ -56,6 +61,7 @@ export function PostDialog({
   busy,
   mode,
   initialDescription = '',
+  initialTags = [],
   initialTimeMode = 'point',
   initialStartAt,
   initialEndAt,
@@ -68,6 +74,8 @@ export function PostDialog({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [description, setDescription] = useState(initialDescription);
+  const [tags, setTags] = useState<string[]>(initialTags);
+  const [tagInput, setTagInput] = useState('');
   const [timeMode, setTimeMode] = useState<'point' | 'range'>(initialTimeMode);
   const [startAt, setStartAt] = useState(initialStartAt ?? getDefaultDateTime());
   const [endAt, setEndAt] = useState(initialEndAt ?? initialStartAt ?? getDefaultDateTime());
@@ -87,10 +95,9 @@ export function PostDialog({
     previewsRef.current = previews;
   }, [previews]);
 
-  // Stable key for initialImageUrls to avoid re-triggering effect
   const initialUrlsKey = initialImageUrls.join(',');
+  const initialTagsKey = initialTags.join(',');
 
-  // Reset state only when dialog freshly opens (false → true)
   useEffect(() => {
     if (open && !prevOpenRef.current) {
       const draftFiles = mode === 'create' ? (postDraftFileCache.get(DRAFT_KEY) ?? []) : [];
@@ -98,29 +105,34 @@ export function PostDialog({
         try {
           const saved = localStorage.getItem(DRAFT_KEY);
           if (saved) {
-            const d = JSON.parse(saved) as { description?: string; timeMode?: 'point' | 'range'; startAt?: string; endAt?: string };
-            setDescription(d.description ?? initialDescription);
-            setTimeMode(d.timeMode ?? initialTimeMode);
-            setStartAt(d.startAt ?? initialStartAt ?? getDefaultDateTime());
-            setEndAt(d.endAt ?? initialEndAt ?? initialStartAt ?? getDefaultDateTime());
+            const draft = JSON.parse(saved) as { description?: string; tags?: string[]; timeMode?: 'point' | 'range'; startAt?: string; endAt?: string };
+            setDescription(draft.description ?? initialDescription);
+            setTags(draft.tags ?? initialTags);
+            setTimeMode(draft.timeMode ?? initialTimeMode);
+            setStartAt(draft.startAt ?? initialStartAt ?? getDefaultDateTime());
+            setEndAt(draft.endAt ?? initialEndAt ?? initialStartAt ?? getDefaultDateTime());
           } else {
             setDescription(initialDescription);
+            setTags(initialTags);
             setTimeMode(initialTimeMode);
             setStartAt(initialStartAt ?? getDefaultDateTime());
             setEndAt(initialEndAt ?? initialStartAt ?? getDefaultDateTime());
           }
         } catch {
           setDescription(initialDescription);
+          setTags(initialTags);
           setTimeMode(initialTimeMode);
           setStartAt(initialStartAt ?? getDefaultDateTime());
           setEndAt(initialEndAt ?? initialStartAt ?? getDefaultDateTime());
         }
       } else {
         setDescription(initialDescription);
+        setTags(initialTags);
         setTimeMode(initialTimeMode);
         setStartAt(initialStartAt ?? getDefaultDateTime());
         setEndAt(initialEndAt ?? initialStartAt ?? getDefaultDateTime());
       }
+      setTagInput('');
       setPreviews((current) => {
         revokeFilePreviews(current);
         return [...initialImageUrls.map((url) => ({ type: 'url' as const, url })), ...buildFilePreviewItems(draftFiles)];
@@ -138,23 +150,21 @@ export function PostDialog({
     }
     prevOpenRef.current = open;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialDescription, initialEndAt, initialStartAt, initialTimeMode, initialUrlsKey, mode]);
+  }, [open, initialDescription, initialEndAt, initialStartAt, initialTagsKey, initialTimeMode, initialUrlsKey, mode]);
 
   useEffect(() => () => {
     revokeFilePreviews(previewsRef.current);
   }, []);
 
-  // Persist create-mode draft to localStorage whenever fields change
   useEffect(() => {
     if (mode !== 'create') return;
-    if (description.trim() || timeMode !== 'point') {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ description, timeMode, startAt, endAt }));
+    if (description.trim() || tags.length > 0 || timeMode !== 'point') {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ description, tags, timeMode, startAt, endAt }));
     } else {
       localStorage.removeItem(DRAFT_KEY);
     }
-  }, [description, timeMode, startAt, endAt, mode]);
+  }, [description, tags, timeMode, startAt, endAt, mode]);
 
-  // Animation: mount → animate in, close → animate out → unmount
   useEffect(() => {
     if (open) {
       setAnimating(true);
@@ -171,10 +181,10 @@ export function PostDialog({
   const addFiles = useCallback(
     (incoming: FileList | null) => {
       if (!incoming) return;
-      const newItems: PreviewItem[] = Array.from(incoming).map((f) => ({
+      const newItems: PreviewItem[] = Array.from(incoming).map((file) => ({
         type: 'file' as const,
-        file: f,
-        url: URL.createObjectURL(f),
+        file,
+        url: URL.createObjectURL(file),
       }));
       const next = [...previews, ...newItems].slice(0, MAX_FILES);
 
@@ -199,11 +209,40 @@ export function PostDialog({
   );
 
   const removePreview = useCallback((index: number) => {
-    setPreviews((prev) => {
-      const item = prev[index];
-      if (item?.type === 'file') URL.revokeObjectURL(item.url);
-      return prev.filter((_, i) => i !== index);
+    setPreviews((current) => {
+      const item = current[index];
+      if (item?.type === 'file') {
+        URL.revokeObjectURL(item.url);
+      }
+      return current.filter((_, currentIndex) => currentIndex !== index);
     });
+  }, []);
+
+  const commitTagInput = useCallback(() => {
+    const normalized = normalizeTag(tagInput);
+    if (!normalized) {
+      setTagInput('');
+      return;
+    }
+    if (normalized.length > MAX_TAG_LENGTH) {
+      setError(`标签不能超过 ${MAX_TAG_LENGTH} 个字符`);
+      return;
+    }
+    if (tags.some((tag) => tag.toLowerCase() === normalized.toLowerCase())) {
+      setTagInput('');
+      return;
+    }
+    if (tags.length >= MAX_TAGS) {
+      setError(`最多添加 ${MAX_TAGS} 个标签`);
+      return;
+    }
+    setTags((current) => [...current, normalized]);
+    setTagInput('');
+    setError(null);
+  }, [tagInput, tags]);
+
+  const removeTag = useCallback((tagToRemove: string) => {
+    setTags((current) => current.filter((tag) => tag !== tagToRemove));
   }, []);
 
   const handleSubmit = async () => {
@@ -223,13 +262,15 @@ export function PostDialog({
       setError('请输入文字或选择图片');
       return;
     }
+
     try {
-      const files = previews.filter((p) => p.type === 'file').map((p) => p.file!);
+      const files = previews.filter((item) => item.type === 'file').map((item) => item.file!);
       const removedUrls = initialImageUrls.filter(
-        (url) => !previews.some((p) => p.type === 'url' && p.url === url)
+        (url) => !previews.some((item) => item.type === 'url' && item.url === url)
       );
       await onSubmit({
         description: description.trim(),
+        tags,
         timeMode,
         startAt: `${startAt}:00+08:00`,
         endAt: timeMode === 'range' ? `${endAt}:00+08:00` : undefined,
@@ -245,7 +286,6 @@ export function PostDialog({
     }
   };
 
-  // Drag handling
   const handleDragStart = (index: number) => {
     setDraggingIndex(index);
   };
@@ -259,9 +299,9 @@ export function PostDialog({
   };
 
   const handleTouchMove = useCallback(
-    (e: React.TouchEvent) => {
+    (event: React.TouchEvent) => {
       if (draggingIndex === null || !deleteZoneRef.current) return;
-      const touch = e.touches[0];
+      const touch = event.touches[0];
       const rect = deleteZoneRef.current.getBoundingClientRect();
       const isOver =
         touch.clientX >= rect.left &&
@@ -289,13 +329,8 @@ export function PostDialog({
   return (
     <div className={`fixed inset-0 z-50 flex flex-col md:items-center md:justify-center transition-colors duration-250 ${visible ? 'bg-[var(--page-bg)] md:bg-slate-950/65' : 'bg-transparent md:bg-transparent'}`}>
       <div className={`flex h-full w-full flex-col bg-[var(--page-bg)] transition-all duration-250 md:h-auto md:max-h-[90vh] md:max-w-lg md:border md:border-[var(--panel-border)] md:bg-[var(--panel-bg)] md:backdrop-blur-xl ${visible ? 'translate-y-0 opacity-100 md:scale-100' : 'translate-y-full opacity-100 md:translate-y-0 md:scale-95 md:opacity-0'}`}>
-        {/* Header bar */}
         <div className="flex shrink-0 items-center justify-between px-4 py-3">
-          <button
-            className="text-sm text-soft hover:text-[var(--text-main)] transition"
-            onClick={onClose}
-            type="button"
-          >
+          <button className="text-sm text-soft hover:text-[var(--text-main)] transition" onClick={onClose} type="button">
             取消
           </button>
           <button
@@ -308,43 +343,66 @@ export function PostDialog({
           </button>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto px-4 pb-4">
-          {/* Description */}
           <textarea
             className="min-h-20 w-full resize-none bg-transparent text-base text-[var(--text-main)] outline-none placeholder:text-soft/50"
             id={descriptionId}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(event) => setDescription(event.target.value)}
             placeholder="記錄一下..."
             value={description}
           />
 
-          {/* Image previews grid */}
+          <div className="mt-3 rounded border border-white/10 px-3 py-2">
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <button
+                  className="inline-flex items-center gap-1 rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200"
+                  key={tag}
+                  onClick={() => removeTag(tag)}
+                  type="button"
+                >
+                  <span>#{tag}</span>
+                  <X size={12} />
+                </button>
+              ))}
+            </div>
+            <input
+              className="mt-2 w-full bg-transparent text-sm text-[var(--text-main)] outline-none placeholder:text-soft/50"
+              onBlur={commitTagInput}
+              onChange={(event) => setTagInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ',') {
+                  event.preventDefault();
+                  commitTagInput();
+                }
+                if (event.key === 'Backspace' && !tagInput && tags.length > 0) {
+                  removeTag(tags[tags.length - 1]);
+                }
+              }}
+              placeholder="添加标签，回车确认"
+              value={tagInput}
+            />
+          </div>
+
           <div
             className={`mt-3 grid gap-0.5 ${totalPreviews === 0 ? '' : cols === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}
-            onDragOver={(e) => e.preventDefault()}
+            onDragOver={(event) => event.preventDefault()}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
-            {previews.map((item, i) => (
+            {previews.map((item, index) => (
               <div
-                className={`relative aspect-square overflow-hidden bg-slate-950/20 cursor-grab active:cursor-grabbing ${
-                  draggingIndex === i ? 'opacity-40' : ''
-                }`}
+                className={`relative aspect-square overflow-hidden bg-slate-950/20 cursor-grab active:cursor-grabbing ${draggingIndex === index ? 'opacity-40' : ''}`}
                 draggable
-                key={`${item.url}-${i}`}
-                onDragStart={() => handleDragStart(i)}
+                key={`${item.url}-${index}`}
                 onDragEnd={handleDragEnd}
-                onTouchStart={() => handleDragStart(i)}
+                onDragStart={() => handleDragStart(index)}
+                onTouchStart={() => handleDragStart(index)}
               >
-                <img
-                  alt=""
-                  className="absolute inset-0 h-full w-full object-cover"
-                  src={item.url}
-                />
+                <img alt="" className="absolute inset-0 h-full w-full object-cover" src={item.url} />
                 <button
                   className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white/80 hover:text-white"
-                  onClick={() => removePreview(i)}
+                  onClick={() => removePreview(index)}
                   type="button"
                 >
                   <X size={14} />
@@ -365,15 +423,14 @@ export function PostDialog({
             accept="image/*"
             className="hidden"
             multiple
-            onChange={(e) => {
-              addFiles(e.target.files);
-              e.target.value = '';
+            onChange={(event) => {
+              addFiles(event.target.files);
+              event.target.value = '';
             }}
             ref={fileInputRef}
             type="file"
           />
 
-          {/* Time */}
           <div className="mt-4">
             <div className="mb-3 flex gap-2 text-sm">
               <button
@@ -394,7 +451,7 @@ export function PostDialog({
             <input
               className="w-full border border-white/10 bg-transparent px-3 py-2 text-sm text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)]"
               id={startTimeId}
-              onChange={(e) => setStartAt(e.target.value)}
+              onChange={(event) => setStartAt(event.target.value)}
               type="datetime-local"
               value={startAt}
             />
@@ -402,7 +459,7 @@ export function PostDialog({
               <input
                 className="mt-2 w-full border border-white/10 bg-transparent px-3 py-2 text-sm text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)]"
                 id={endTimeId}
-                onChange={(e) => setEndAt(e.target.value)}
+                onChange={(event) => setEndAt(event.target.value)}
                 type="datetime-local"
                 value={endAt}
               />
@@ -412,19 +469,18 @@ export function PostDialog({
           {error ? <p className="mt-3 text-sm text-rose-300">{error}</p> : null}
         </div>
 
-        {/* Drag-to-delete zone */}
         {draggingIndex !== null ? (
           <div
-            className={`shrink-0 flex items-center justify-center gap-2 py-4 text-sm transition-colors ${
-              overDelete ? 'bg-rose-700 text-white' : 'bg-rose-600/70 text-rose-100'
-            }`}
-            onDragOver={(e) => {
-              e.preventDefault();
+            className={`shrink-0 flex items-center justify-center gap-2 py-4 text-sm transition-colors ${overDelete ? 'bg-rose-700 text-white' : 'bg-rose-600/70 text-rose-100'}`}
+            onDragLeave={() => setOverDelete(false)}
+            onDragOver={(event) => {
+              event.preventDefault();
               setOverDelete(true);
             }}
-            onDragLeave={() => setOverDelete(false)}
             onDrop={() => {
-              if (draggingIndex !== null) removePreview(draggingIndex);
+              if (draggingIndex !== null) {
+                removePreview(draggingIndex);
+              }
               setDraggingIndex(null);
               setOverDelete(false);
             }}
