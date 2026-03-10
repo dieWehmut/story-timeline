@@ -20,6 +20,29 @@ jobs:
 
             echo "MIGRATION=${SUPABASE_MIGRATION_DB_URL:+set}"
             echo "DB=${SUPABASE_DB_URL:+set}"
+      - name: Debug DB_URL (masked)
+        env:
+          SUPABASE_MIGRATION_DB_URL: ${{ secrets.SUPABASE_MIGRATION_DB_URL }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          DB_URL="${SUPABASE_MIGRATION_DB_URL}"
+          if [ -z "${DB_URL}" ]; then
+            DB_URL="${SUPABASE_DB_URL}"
+          fi
+
+          if [ -z "${DB_URL}" ]; then
+            echo "DB_URL is not set"
+            exit 1
+          fi
+
+          echo "DB_URL (masked):"
+          echo "${DB_URL}" | sed -E 's#(postgres://[^:]+:)[^@]+@#\1***@#'
+
+          echo "DB host/port/dbname:"
+          echo "${DB_URL}" | sed -E 's#.*@([^/]+/[^?]+).*#\1#'
+
+          echo "DB user:"
+          echo "${DB_URL}" | sed -E 's#postgres://([^:]+):.*#\1#'
       - name: Apply Supabase schema
         env:
           SUPABASE_MIGRATION_DB_URL: ${{ secrets.SUPABASE_MIGRATION_DB_URL }}
