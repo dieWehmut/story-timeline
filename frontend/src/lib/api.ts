@@ -11,16 +11,16 @@ import type {
 
 const normalizeApiBase = (value: string) => value.trim().replace(/\/$/, '');
 
-export const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE || '');
-
-// Fallback HF Space base — used only as a last-resort retry when the proxy
-// appears to be redirecting back to the frontend domain.
+// Public HF Space base — when no `VITE_API_BASE` is provided the client will
+// call the public Space directly (no serverless proxy or token required).
 const HF_SPACE_FALLBACK = 'https://REDACTED.hf.space';
+
+export const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE || HF_SPACE_FALLBACK);
 
 // log the computed base so we can spot misconfiguration in client consoles
 if (typeof window !== 'undefined') {
   // eslint-disable-next-line no-console
-  console.info('story-timeline API_BASE =', API_BASE || '(empty)');
+  
 }
 
 const withApiBase = (value: string) => {
