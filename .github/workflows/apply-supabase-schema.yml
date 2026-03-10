@@ -1,0 +1,31 @@
+name: Apply Supabase Schema
+
+on:
+  push:
+    branches: [ 'main' ]
+  workflow_dispatch: {}
+
+jobs:
+  apply-schema:
+    name: Apply schema to Supabase
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install psql client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Apply Supabase schema
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          if [ -z "${SUPABASE_DB_URL}" ]; then
+            echo "ERROR: SUPABASE_DB_URL secret is not set" >&2
+            exit 1
+          fi
+          echo "Applying Supabase schema from backend/supabase/schema.sql"
+          psql "${SUPABASE_DB_URL}" -f backend/supabase/schema.sql
