@@ -13,6 +13,12 @@ const normalizeApiBase = (value: string) => value.trim().replace(/\/$/, '');
 
 export const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE || '');
 
+// log the computed base so we can spot misconfiguration in client consoles
+if (typeof window !== 'undefined') {
+  // eslint-disable-next-line no-console
+  console.info('story-timeline API_BASE =', API_BASE || '(empty)');
+}
+
 const withApiBase = (value: string) => {
   if (!value || value.startsWith('http://') || value.startsWith('https://')) {
     return value;
@@ -62,21 +68,45 @@ const extractErrorMessage = async (response: Response) => {
 };
 
 const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => {
-  const response = await fetch(input, {
-    credentials: 'include',
-    ...init,
-  });
+  const doFetch = async (url: string | URL) => {
+    const response = await fetch(url, {
+      credentials: 'include',
+      ...init,
+    });
 
-  if (!response.ok) {
-    throw new Error(await extractErrorMessage(response));
+    if (!response.ok) {
+      throw new Error(await extractErrorMessage(response));
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error(await extractErrorMessage(response));
+    }
+
+    return (await response.json()) as T;
+  };
+
+  try {
+    return await doFetch(input as any);
+  } catch (err: any) {
+    // if we hit a HTML page from the HF space base, fall back to proxying via
+    // the same origin. this guards against accidentally building the app with
+    // VITE_API_BASE set to the space URL while running on Vercel.
+    if (
+      API_BASE &&
+      API_BASE.includes('.hf.space') &&
+      typeof input === 'string' &&
+      input.startsWith(API_BASE) &&
+      err instanceof Error &&
+      typeof err.message === 'string' &&
+      err.message.includes('HTML 页面')
+    ) {
+      const alt = input.replace(API_BASE, '');
+      console.warn('API request failed against HF URL, retrying via proxy', input, '->', alt);
+      return await doFetch(alt);
+    }
+    throw err;
   }
-
-  const contentType = response.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    throw new Error(await extractErrorMessage(response));
-  }
-
-  return (await response.json()) as T;
 };
 
 const fileToWebp = async (file: File): Promise<Blob> => {
