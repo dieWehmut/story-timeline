@@ -18,6 +18,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
+            echo "MIGRATION=${SUPABASE_MIGRATION_DB_URL:+set}"
+            echo "DB=${SUPABASE_DB_URL:+set}"
       - name: Apply Supabase schema
         env:
           SUPABASE_MIGRATION_DB_URL: ${{ secrets.SUPABASE_MIGRATION_DB_URL }}
