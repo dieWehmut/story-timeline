@@ -155,6 +155,17 @@ func proxyToHF(w http.ResponseWriter, r *http.Request, options proxyOptions) {
 	}
 	defer response.Body.Close()
 
+	// if the upstream returned an error page or other non-JSON body, wrap it
+	// in our own JSON so the frontend code doesn’t complain about HTML.
+	if response.StatusCode >= 400 {
+		contentType := response.Header.Get("Content-Type")
+		if !strings.Contains(strings.ToLower(contentType), "application/json") {
+			body, _ := io.ReadAll(response.Body)
+			writeJSON(w, response.StatusCode, errorResponse{Error: strings.TrimSpace(string(body))})
+			return
+		}
+	}
+
 	copyResponseHeaders(w.Header(), response.Header, targetBaseURL, publicBaseURL(r))
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(response.StatusCode)
