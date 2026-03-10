@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -146,7 +147,10 @@ func proxyToHF(w http.ResponseWriter, r *http.Request, options proxyOptions) {
 
 	response, err := client.Do(req)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, errorResponse{Error: "failed to reach private Hugging Face Space"})
+		// record the underlying error so we can see why the proxy failed
+		// (network issue, name resolution, TLS, etc.)
+		log.Printf("proxy request failed: %v", err)
+		writeJSON(w, http.StatusBadGateway, errorResponse{Error: "failed to reach private Hugging Face Space: " + err.Error()})
 		return
 	}
 	defer response.Body.Close()
