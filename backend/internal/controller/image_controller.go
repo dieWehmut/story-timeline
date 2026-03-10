@@ -14,6 +14,7 @@ import (
 	"github.com/dieWehmut/story-timeline/backend/internal/middleware"
 	"github.com/dieWehmut/story-timeline/backend/internal/model"
 	"github.com/dieWehmut/story-timeline/backend/internal/service"
+	"github.com/dieWehmut/story-timeline/backend/internal/storage"
 	"github.com/dieWehmut/story-timeline/backend/internal/utils"
 )
 
@@ -31,31 +32,36 @@ type ImageController struct {
 	userService        *service.UserService
 	authService        *service.AuthService
 	interactionService *service.InteractionService
+	assets             *storage.CloudinaryStorage
 }
 
-func NewImageController(imageService *service.ImageService, userService *service.UserService, authService *service.AuthService, interactionService *service.InteractionService) *ImageController {
+func NewImageController(imageService *service.ImageService, userService *service.UserService, authService *service.AuthService, interactionService *service.InteractionService, assets *storage.CloudinaryStorage) *ImageController {
 	return &ImageController{
 		imageService:       imageService,
 		userService:        userService,
 		authService:        authService,
 		interactionService: interactionService,
+		assets:             assets,
 	}
 }
 
-func assetURLs(ownerLogin string, id string, count int) []string {
-	urls := make([]string, count)
-	for i := range count {
-		urls[i] = fmt.Sprintf("/api/images/%s/%s/asset/%d", ownerLogin, id, i)
+func (controller *ImageController) assetURLs(paths []string) []string {
+	urls := make([]string, 0, len(paths))
+	for _, path := range paths {
+		resolved := strings.TrimSpace(path)
+		if resolved == "" {
+			continue
+		}
+		if controller.assets != nil {
+			resolved = controller.assets.URLFor(resolved)
+		}
+		urls = append(urls, resolved)
 	}
 	return urls
 }
 
-func commentAssetURLs(commenterLogin string, comment model.Comment, count int) []string {
-	urls := make([]string, count)
-	for i := range count {
-		urls[i] = fmt.Sprintf("/api/comments/%s/%s/%s/%s/asset/%d", commenterLogin, comment.PostOwner, comment.PostID, comment.ID, i)
-	}
-	return urls
+func (controller *ImageController) commentAssetURLs(comment model.Comment) []string {
+	return controller.assetURLs(comment.AllImagePaths())
 }
 
 func parseImageTimes(c *gin.Context) (string, time.Time, time.Time, error) {
@@ -162,7 +168,7 @@ func (controller *ImageController) Feed(c *gin.Context) {
 		if ownerLogin == "" {
 			ownerLogin = adminLogin
 		}
-		resp := dto.NewImageResponse(item, assetURLs(ownerLogin, item.ID, len(item.AllImagePaths())))
+		resp := dto.NewImageResponse(item, controller.assetURLs(item.AllImagePaths()))
 
 		likeCount, commentCount := controller.interactionService.GetPostInteractionCounts(
 			c.Request.Context(), tokenFromSession(session), ownerLogin, item.ID, allLogins,
@@ -275,7 +281,7 @@ func (controller *ImageController) Create(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, dto.NewImageResponse(image, assetURLs(session.User.Login, image.ID, len(image.AllImagePaths()))))
+	c.JSON(http.StatusCreated, dto.NewImageResponse(image, controller.assetURLs(image.AllImagePaths())))
 }
 
 func (controller *ImageController) Update(c *gin.Context) {
@@ -317,7 +323,7 @@ func (controller *ImageController) Update(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.NewImageResponse(image, assetURLs(ownerLogin, image.ID, len(image.AllImagePaths()))))
+	c.JSON(http.StatusOK, dto.NewImageResponse(image, controller.assetURLs(image.AllImagePaths())))
 }
 
 func (controller *ImageController) Delete(c *gin.Context) {
@@ -427,7 +433,7 @@ func (controller *ImageController) GetComments(c *gin.Context) {
 	result := make([]dto.CommentResponse, 0, len(comments))
 	for _, cm := range comments {
 		var imageUrl string
-		imageURLs := commentAssetURLs(cm.AuthorLogin, cm.Comment, len(cm.AllImagePaths()))
+		imageURLs := controller.commentAssetURLs(cm.Comment)
 		if len(imageURLs) > 0 {
 			imageUrl = imageURLs[0]
 		}
@@ -496,7 +502,7 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 	}
 
 	var imageUrl string
-	imageURLs := commentAssetURLs(session.User.Login, comment, len(comment.AllImagePaths()))
+	imageURLs := controller.commentAssetURLs(comment)
 	if len(imageURLs) > 0 {
 		imageUrl = imageURLs[0]
 	}

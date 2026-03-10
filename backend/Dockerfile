@@ -22,6 +22,7 @@ RUN adduser -D -u 10001 appuser
 WORKDIR /app
 
 COPY --from=builder /app/server ./server
+COPY --from=builder /app/supabase ./supabase
 
 RUN mkdir -p /app/data && chown appuser:appuser /app/data
 

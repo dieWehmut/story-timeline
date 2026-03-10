@@ -15,17 +15,17 @@ import (
 
 type ImageService struct {
 	database   *storage.SupabaseStorage
-	assets     *storage.R2Storage
+	assets     *storage.CloudinaryStorage
 	adminLogin string
 	mu         sync.Mutex
 }
 
-func NewImageService(_ context.Context, database *storage.SupabaseStorage, assets *storage.R2Storage, adminLogin string) (*ImageService, error) {
+func NewImageService(_ context.Context, database *storage.SupabaseStorage, assets *storage.CloudinaryStorage, adminLogin string) (*ImageService, error) {
 	if database == nil {
 		return nil, fmt.Errorf("supabase storage is required")
 	}
 	if assets == nil {
-		return nil, fmt.Errorf("R2 storage is required")
+		return nil, fmt.Errorf("Cloudinary storage is required")
 	}
 
 	return &ImageService{
@@ -177,7 +177,7 @@ func (service *ImageService) uploadImageAssets(ctx context.Context, ownerLogin s
 }
 
 func imageObjectKey(ownerLogin string, imageID string, assetIndex int) string {
-	return fmt.Sprintf("images/%s/%s/%d.webp", ownerLogin, imageID, assetIndex)
+	return fmt.Sprintf("images/%s/%s/%d", ownerLogin, imageID, assetIndex)
 }
 
 func metadataPath(ownerLogin string, imageID string) string {

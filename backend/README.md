@@ -15,7 +15,7 @@ The backend now uses:
 
 - GitHub OAuth and GraphQL only for login and follow relationships
 - Supabase for posts, likes, and comments
-- Cloudflare R2 for image object storage
+- Cloudinary for image object storage
 
 ### Required environment variables
 
@@ -26,20 +26,29 @@ The backend now uses:
 - `SESSION_SECRET`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `R2_ACCOUNT_ID` or `R2_ENDPOINT`
-- `R2_ACCESS_KEY_ID`
-- `R2_SECRET_ACCESS_KEY`
-- `R2_BUCKET`
-- `R2_REGION` : defaults to `auto`
+- `SUPABASE_DB_URL` : direct Postgres connection string for automatic schema apply
+- `AUTO_APPLY_SCHEMA` : defaults to `true`
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
 
 ### Supabase schema
 
-Apply [supabase/schema.sql](supabase/schema.sql) in the Supabase SQL editor before starting the backend.
+The backend can automatically apply [supabase/schema.sql](supabase/schema.sql) during startup.
+
+Required for automatic execution:
+
+- `SUPABASE_DB_URL`
+- `AUTO_APPLY_SCHEMA=true`
+
+If `AUTO_APPLY_SCHEMA=true` and `SUPABASE_DB_URL` is missing, startup will fail fast.
+
+If you want to manage schema separately, set `AUTO_APPLY_SCHEMA=false`.
 
 ### Storage layout
 
-- Post images: `images/{authorLogin}/{imageID}/{assetIndex}.webp`
-- Comment images: `comments/{commenterLogin}/{postOwner}/{postID}/{commentID}/{assetIndex}.webp`
+- Post images: `images/{authorLogin}/{imageID}/{assetIndex}`
+- Comment images: `comments/{commenterLogin}/{postOwner}/{postID}/{commentID}/{assetIndex}`
 
 ### Notes
 
@@ -49,7 +58,7 @@ Apply [supabase/schema.sql](supabase/schema.sql) in the Supabase SQL editor befo
 
 ## Legacy data migration
 
-Use the one-time migration command to copy old GitHub repository data into Supabase and Cloudflare R2:
+Use the one-time migration command to copy old GitHub repository data into Supabase and Cloudinary:
 
 ```bash
 go run ./cmd/migrate_github_data
@@ -60,11 +69,14 @@ Additional environment variables required by the migration command:
 - `GITHUB_STORAGE_TOKEN`
 - `GITHUB_REPO_NAME` : defaults to `story-timeline-data`
 - `GITHUB_REPO_BRANCH` : defaults to `main`
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
 
 The migration command:
 
 - scans all legacy `story-timeline-data` repositories visible to `GITHUB_STORAGE_TOKEN`
 - copies post metadata into Supabase
 - copies likes and comments into Supabase
-- copies post and comment images into R2
+- copies post and comment images into Cloudinary
 - can be re-run safely because image, like, and comment writes are idempotent

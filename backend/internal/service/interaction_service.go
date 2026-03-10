@@ -12,10 +12,10 @@ import (
 
 type InteractionService struct {
 	database *storage.SupabaseStorage
-	assets   *storage.R2Storage
+	assets   *storage.CloudinaryStorage
 }
 
-func NewInteractionService(database *storage.SupabaseStorage, assets *storage.R2Storage) *InteractionService {
+func NewInteractionService(database *storage.SupabaseStorage, assets *storage.CloudinaryStorage) *InteractionService {
 	return &InteractionService{database: database, assets: assets}
 }
 
@@ -59,7 +59,7 @@ func (service *InteractionService) GetLikes(ctx context.Context, _ string, owner
 }
 
 func commentImagePath(commenterLogin, postOwner, postID, commentID string, assetIndex int) string {
-	return fmt.Sprintf("comments/%s/%s/%s/%s/%d.webp", commenterLogin, postOwner, postID, commentID, assetIndex)
+	return fmt.Sprintf("comments/%s/%s/%s/%s/%d", commenterLogin, postOwner, postID, commentID, assetIndex)
 }
 
 func (service *InteractionService) AddComment(ctx context.Context, _ string, commenter model.GitHubUser, postOwner, postID, text string, imageData [][]byte) (model.Comment, error) {

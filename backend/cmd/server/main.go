@@ -18,37 +18,40 @@ func main() {
 	env := config.LoadEnv()
 	ctx := context.Background()
 
+	if env.AutoApplySchema {
+		if err := storage.ApplySchemaFile(ctx, env.SupabaseDBURL, "supabase/schema.sql"); err != nil {
+			log.Fatalf("failed to apply Supabase schema: %v", err)
+		}
+	}
+
 	githubOAuthClient := github.NewOAuthClient(env.GitHubClientID, env.GitHubClientSecret, env.GitHubCallbackURL)
 	graphqlClient := github.NewGraphQLClient()
 
 	authService := service.NewAuthService(githubOAuthClient, graphqlClient, env.SessionSecret, env.SecureCookies, env.GitHubRepoOwner)
 	supabaseStorage := storage.NewSupabaseStorage(env.SupabaseURL, env.SupabaseServiceKey)
-	r2Storage, err := storage.NewR2Storage(ctx, storage.R2Config{
-		AccountID:       env.R2AccountID,
-		AccessKeyID:     env.R2AccessKeyID,
-		SecretAccessKey: env.R2SecretAccessKey,
-		Bucket:          env.R2Bucket,
-		Endpoint:        env.R2Endpoint,
-		Region:          env.R2Region,
+	cloudinaryStorage, err := storage.NewCloudinaryStorage(storage.CloudinaryConfig{
+		CloudName: env.CloudinaryCloudName,
+		APIKey:    env.CloudinaryAPIKey,
+		APISecret: env.CloudinaryAPISecret,
 	})
 	if err != nil {
-		log.Fatalf("failed to initialize R2 storage: %v", err)
+		log.Fatalf("failed to initialize Cloudinary storage: %v", err)
 	}
 
 	userService := service.NewUserService(graphqlClient, supabaseStorage, env.GitHubRepoOwner)
 
-	imageService, err := service.NewImageService(ctx, supabaseStorage, r2Storage, env.GitHubRepoOwner)
+	imageService, err := service.NewImageService(ctx, supabaseStorage, cloudinaryStorage, env.GitHubRepoOwner)
 	if err != nil {
 		log.Fatalf("failed to initialize image service: %v", err)
 	}
 
-	interactionService := service.NewInteractionService(supabaseStorage, r2Storage)
+	interactionService := service.NewInteractionService(supabaseStorage, cloudinaryStorage)
 
 	server := &http.Server{
 		Addr: ":" + env.Port,
 		Handler: router.New(router.Dependencies{
 			AuthController:   controller.NewAuthController(authService, env.FrontendBaseURL),
-			ImageController:  controller.NewImageController(imageService, userService, authService, interactionService),
+			ImageController:  controller.NewImageController(imageService, userService, authService, interactionService, cloudinaryStorage),
 			HealthController: controller.NewHealthController(env.GitHubRepoOwner, authService),
 			AuthService:      authService,
 		}, config.AllowedOrigins(env)),

@@ -30,16 +30,13 @@ func main() {
 	}
 
 	supabaseStorage := storage.NewSupabaseStorage(os.Getenv("SUPABASE_URL"), os.Getenv("SUPABASE_SERVICE_ROLE_KEY"))
-	r2Storage, err := storage.NewR2Storage(ctx, storage.R2Config{
-		AccountID:       os.Getenv("R2_ACCOUNT_ID"),
-		AccessKeyID:     os.Getenv("R2_ACCESS_KEY_ID"),
-		SecretAccessKey: os.Getenv("R2_SECRET_ACCESS_KEY"),
-		Bucket:          os.Getenv("R2_BUCKET"),
-		Endpoint:        os.Getenv("R2_ENDPOINT"),
-		Region:          getenv("R2_REGION", "auto"),
+	cloudinaryStorage, err := storage.NewCloudinaryStorage(storage.CloudinaryConfig{
+		CloudName: os.Getenv("CLOUDINARY_CLOUD_NAME"),
+		APIKey:    os.Getenv("CLOUDINARY_API_KEY"),
+		APISecret: os.Getenv("CLOUDINARY_API_SECRET"),
 	})
 	if err != nil {
-		log.Fatalf("failed to initialize R2 client: %v", err)
+		log.Fatalf("failed to initialize Cloudinary client: %v", err)
 	}
 
 	graphQL := githubclient.NewGraphQLClient()
@@ -73,7 +70,7 @@ func main() {
 			}
 			item.Tags = normalizeTags(item.Tags)
 
-			imagePaths, err := migrateImageAssets(ctx, githubStorage, githubToken, r2Storage, owner.Login, repoName, item)
+			imagePaths, err := migrateImageAssets(ctx, githubStorage, githubToken, cloudinaryStorage, owner.Login, repoName, item)
 			if err != nil {
 				log.Printf("skip image %s/%s assets: %v", owner.Login, item.ID, err)
 				continue
@@ -128,7 +125,7 @@ func main() {
 				comment.AuthorAvatar = resolveAvatar(ownerByLogin, commenter.Login)
 				comment.Hidden = hasHidden(post.hiddenIDs, comment.ID)
 
-				imagePaths, err := migrateCommentAssets(ctx, githubStorage, githubToken, r2Storage, commenter.Login, repoName, comment)
+				imagePaths, err := migrateCommentAssets(ctx, githubStorage, githubToken, cloudinaryStorage, commenter.Login, repoName, comment)
 				if err != nil {
 					log.Printf("comment assets %s/%s/%s: %v", commenter.Login, post.owner.Login, comment.ID, err)
 					continue
@@ -213,7 +210,7 @@ func loadCommentFile(ctx context.Context, githubStorage *storage.GitHubStorage, 
 	return &commentFile, nil
 }
 
-func migrateImageAssets(ctx context.Context, githubStorage *storage.GitHubStorage, token string, r2Storage *storage.R2Storage, owner string, repoName string, image model.Image) ([]string, error) {
+func migrateImageAssets(ctx context.Context, githubStorage *storage.GitHubStorage, token string, cloudinaryStorage *storage.CloudinaryStorage, owner string, repoName string, image model.Image) ([]string, error) {
 	legacyPaths := image.AllImagePaths()
 	result := make([]string, 0, len(legacyPaths))
 	for assetIndex, legacyPath := range legacyPaths {
@@ -221,8 +218,8 @@ func migrateImageAssets(ctx context.Context, githubStorage *storage.GitHubStorag
 		if err != nil {
 			return nil, err
 		}
-		objectKey := fmt.Sprintf("images/%s/%s/%d%s", owner, image.ID, assetIndex, preferredExt(legacyPath, contentType))
-		if err := r2Storage.PutObject(ctx, objectKey, payload, contentType); err != nil {
+		objectKey := fmt.Sprintf("images/%s/%s/%d", owner, image.ID, assetIndex)
+		if err := cloudinaryStorage.PutObject(ctx, objectKey, payload, contentType); err != nil {
 			return nil, err
 		}
 		result = append(result, objectKey)
@@ -230,7 +227,7 @@ func migrateImageAssets(ctx context.Context, githubStorage *storage.GitHubStorag
 	return result, nil
 }
 
-func migrateCommentAssets(ctx context.Context, githubStorage *storage.GitHubStorage, token string, r2Storage *storage.R2Storage, commenter string, repoName string, comment model.Comment) ([]string, error) {
+func migrateCommentAssets(ctx context.Context, githubStorage *storage.GitHubStorage, token string, cloudinaryStorage *storage.CloudinaryStorage, commenter string, repoName string, comment model.Comment) ([]string, error) {
 	legacyPaths := comment.AllImagePaths()
 	result := make([]string, 0, len(legacyPaths))
 	for assetIndex, legacyPath := range legacyPaths {
@@ -238,31 +235,13 @@ func migrateCommentAssets(ctx context.Context, githubStorage *storage.GitHubStor
 		if err != nil {
 			return nil, err
 		}
-		objectKey := fmt.Sprintf("comments/%s/%s/%s/%s/%d%s", commenter, comment.PostOwner, comment.PostID, comment.ID, assetIndex, preferredExt(legacyPath, contentType))
-		if err := r2Storage.PutObject(ctx, objectKey, payload, contentType); err != nil {
+		objectKey := fmt.Sprintf("comments/%s/%s/%s/%s/%d", commenter, comment.PostOwner, comment.PostID, comment.ID, assetIndex)
+		if err := cloudinaryStorage.PutObject(ctx, objectKey, payload, contentType); err != nil {
 			return nil, err
 		}
 		result = append(result, objectKey)
 	}
 	return result, nil
-}
-
-func preferredExt(path string, contentType string) string {
-	trimmedPath := strings.TrimSpace(path)
-	if lastDot := strings.LastIndex(trimmedPath, "."); lastDot >= 0 {
-		return trimmedPath[lastDot:]
-	}
-
-	switch strings.ToLower(strings.TrimSpace(contentType)) {
-	case "image/png":
-		return ".png"
-	case "image/jpeg":
-		return ".jpg"
-	case "image/gif":
-		return ".gif"
-	default:
-		return ".webp"
-	}
 }
 
 func postKey(ownerLogin string, postID string) string {

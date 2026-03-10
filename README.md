@@ -6,7 +6,7 @@
 - Edge/API proxy: Vercel Go serverless function, forwards `/api/*` to HF backend when needed
 - Backend runtime: Hugging Face Space Docker app
 - App data: Supabase
-- Image objects: Cloudflare R2
+- Image objects: Cloudinary
 - Login and follow graph: GitHub OAuth + GitHub GraphQL
 
 ## One-time migration
@@ -17,28 +17,30 @@ From the `backend` directory:
 go run ./cmd/migrate_github_data
 ```
 
-This migrates old GitHub repo data into Supabase and R2.
+This migrates old GitHub repo data into Supabase and Cloudinary.
 
 ## Deployment checklist
 
 ### 1. Supabase
 
 - Create a new project.
-- Open the SQL editor and run [backend/supabase/schema.sql](backend/supabase/schema.sql).
 - Copy the project URL as `SUPABASE_URL`.
 - Copy the service role key as `SUPABASE_SERVICE_ROLE_KEY`.
+- Copy the direct Postgres connection string as `SUPABASE_DB_URL`.
 
-### 2. Cloudflare R2
+Automatic option:
 
-- Create a bucket for story images.
-- Create an API token with read/write access to that bucket.
-- Record these values:
-	- `R2_ACCOUNT_ID`
-	- `R2_ACCESS_KEY_ID`
-	- `R2_SECRET_ACCESS_KEY`
-	- `R2_BUCKET`
-- Leave `R2_REGION=auto` unless you have a custom setup.
-- If you prefer a custom endpoint, set `R2_ENDPOINT`; otherwise the backend derives it from `R2_ACCOUNT_ID`.
+- If HF backend has `SUPABASE_DB_URL` and `AUTO_APPLY_SCHEMA=true`, every HF deploy will automatically apply [backend/supabase/schema.sql](backend/supabase/schema.sql).
+- In that mode you do not need to manually copy SQL into the Supabase editor.
+
+### 2. Cloudinary
+
+- Create a product environment.
+- Open API Keys and copy these values:
+	- `CLOUDINARY_CLOUD_NAME`
+	- `CLOUDINARY_API_KEY`
+	- `CLOUDINARY_API_SECRET`
+- No bucket, endpoint, or region setup is needed.
 
 ### 3. Hugging Face Space
 
@@ -51,11 +53,11 @@ This migrates old GitHub repo data into Supabase and R2.
 	- `SESSION_SECRET`
 	- `SUPABASE_URL`
 	- `SUPABASE_SERVICE_ROLE_KEY`
-	- `R2_ACCOUNT_ID`
-	- `R2_ACCESS_KEY_ID`
-	- `R2_SECRET_ACCESS_KEY`
-	- `R2_BUCKET`
-	- `R2_REGION=auto`
+	- `SUPABASE_DB_URL`
+	- `AUTO_APPLY_SCHEMA=true`
+	- `CLOUDINARY_CLOUD_NAME`
+	- `CLOUDINARY_API_KEY`
+	- `CLOUDINARY_API_SECRET`
 - For migration only, also set:
 	- `GITHUB_STORAGE_TOKEN`
 	- `GITHUB_REPO_NAME=story-timeline-data`
@@ -75,7 +77,7 @@ This migrates old GitHub repo data into Supabase and R2.
 ## Suggested rollout order
 
 1. Create Supabase tables.
-2. Create the R2 bucket and credentials.
+2. Create the Cloudinary environment and credentials.
 3. Update HF backend secrets and redeploy HF.
 4. Run `go run ./cmd/migrate_github_data` once from the backend.
 5. Update Vercel env vars and redeploy the frontend.
