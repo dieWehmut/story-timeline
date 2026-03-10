@@ -13,6 +13,10 @@ const normalizeApiBase = (value: string) => value.trim().replace(/\/$/, '');
 
 export const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE || '');
 
+// Fallback HF Space base — used only as a last-resort retry when the proxy
+// appears to be redirecting back to the frontend domain.
+const HF_SPACE_FALLBACK = 'https://REDACTED.hf.space';
+
 // log the computed base so we can spot misconfiguration in client consoles
 if (typeof window !== 'undefined') {
   // eslint-disable-next-line no-console
@@ -104,6 +108,26 @@ const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise
       const alt = input.replace(API_BASE, '');
       console.warn('API request failed against HF URL, retrying via proxy', input, '->', alt);
       return await doFetch(alt);
+    }
+
+    // If we have no API_BASE (we rely on the same-origin proxy) but the
+    // request failed due to a redirect loop or a low-level network error,
+    // try calling the HF Space directly as a last-resort fallback. This is
+    // useful when the proxy is misconfigured and keeps redirecting to the
+    // frontend host (ERR_TOO_MANY_REDIRECTS).
+    if (
+      !API_BASE &&
+      typeof input === 'string' &&
+      (input.startsWith('/') || input.startsWith(API_BASE)) &&
+      (err instanceof Error && (err.message.includes('redirect') || err.message.includes('Too many redirects') || err instanceof TypeError))
+    ) {
+      const alt = input.startsWith('/') ? HF_SPACE_FALLBACK + input : input.replace(API_BASE, HF_SPACE_FALLBACK);
+      try {
+        console.warn('API request failed via proxy, retrying direct to HF space', input, '->', alt);
+        return await doFetch(alt);
+      } catch (innerErr) {
+        // continue to throw original error below if direct retry also fails
+      }
     }
     throw err;
   }
