@@ -41,8 +41,23 @@ jobs:
           echo "DB host/port/dbname:"
           echo "${DB_URL}" | sed -E 's#.*@([^/]+/[^?]+).*#\1#'
 
-          echo "DB user:"
-          echo "${DB_URL}" | sed -E 's#postgres://([^:]+):.*#\1#'
+          # Print non-secret user info: length and sha256 (safe to log)
+          USER_PART=$(echo "${DB_URL}" | sed -E 's#postgres://([^:]+):.*#\1#')
+          if [ -z "${USER_PART}" ]; then
+            echo "DB user: (not found)"
+          else
+            echo "DB user length: $(echo -n "${USER_PART}" | wc -c)"
+            echo "DB user sha256: $(echo -n "${USER_PART}" | sha256sum | cut -d' ' -f1)"
+          fi
+
+          # Which secret was selected (no secret value printed)
+          if [ -n "${SUPABASE_MIGRATION_DB_URL}" ]; then
+            echo "Selected secret: SUPABASE_MIGRATION_DB_URL"
+          elif [ -n "${SUPABASE_DB_URL}" ]; then
+            echo "Selected secret: SUPABASE_DB_URL"
+          else
+            echo "Selected secret: none"
+          fi
       - name: Apply Supabase schema
         env:
           SUPABASE_MIGRATION_DB_URL: ${{ secrets.SUPABASE_MIGRATION_DB_URL }}
