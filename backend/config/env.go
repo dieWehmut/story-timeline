@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"os"
+	"strings"
+)
 
 type Env struct {
 	Port                string
@@ -22,10 +25,21 @@ type Env struct {
 }
 
 func LoadEnv() Env {
+	frontendBase := getEnv("FRONTEND_BASE_URL", "http://localhost:5173")
+
+	// If SECURE_COOKIES is explicitly set, use that. Otherwise infer from frontend URL scheme.
+	secureCookiesEnv := os.Getenv("SECURE_COOKIES")
+	secureCookies := false
+	if secureCookiesEnv != "" {
+		secureCookies = getEnv("SECURE_COOKIES", "false") == "true"
+	} else {
+		secureCookies = strings.HasPrefix(strings.ToLower(frontendBase), "https://")
+	}
+
 	return Env{
 		Port:                getEnv("PORT", "7860"),
 		FrontendOrigin:      getEnv("FRONTEND_ORIGIN", "http://localhost:5173"),
-		FrontendBaseURL:     getEnv("FRONTEND_BASE_URL", "http://localhost:5173"),
+		FrontendBaseURL:     frontendBase,
 		GitHubClientID:      os.Getenv("GITHUB_CLIENT_ID"),
 		GitHubClientSecret:  os.Getenv("GITHUB_CLIENT_SECRET"),
 		GitHubCallbackURL:   getEnv("GITHUB_CALLBACK_URL", "http://localhost:7860/api/auth/github/callback"),
@@ -38,7 +52,7 @@ func LoadEnv() Env {
 		CloudinaryAPIKey:    os.Getenv("CLOUDINARY_API_KEY"),
 		CloudinaryAPISecret: os.Getenv("CLOUDINARY_API_SECRET"),
 		SessionSecret:       getEnv("SESSION_SECRET", "change-me"),
-		SecureCookies:       getEnv("SECURE_COOKIES", "false") == "true",
+		SecureCookies:       secureCookies,
 	}
 }
 
