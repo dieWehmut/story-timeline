@@ -119,11 +119,23 @@ func proxyToHF(w http.ResponseWriter, r *http.Request, options proxyOptions) {
 		return
 	}
 
+	// determine where the proxy should send the request
 	targetBaseURL := strings.TrimRight(firstNonEmpty(
 		os.Getenv("HF_SPACE_BASE_URL"),
 		os.Getenv("HUGGINGFACE_SPACE_URL"),
 		defaultHFSpaceBaseURL,
 	), "/")
+	// compute public base for the current request so we can detect loops
+	publicURL := publicBaseURL(r)
+	if publicURL != "" && strings.HasPrefix(targetBaseURL, publicURL) {
+		// configuration is wrong: the proxy would forward to itself and cause
+		// infinite rewrites.  This error is easier to diagnose than chasing a
+		// redirect loop in the browser.
+		log.Printf("proxy misconfigured: targetBaseURL %q matches public URL %q", targetBaseURL, publicURL)
+		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "proxy misconfigured: HF_SPACE_BASE_URL should not point to the frontend domain"})
+		return
+	}
+
 	targetPath := options.TargetPath
 	if targetPath == "" {
 		targetPath = "/"
