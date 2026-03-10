@@ -9,7 +9,9 @@ import type {
   UpdateImagePayload,
 } from '../types/image';
 
-export const API_BASE = import.meta.env.VITE_API_BASE || '';
+const normalizeApiBase = (value: string) => value.trim().replace(/\/$/, '');
+
+export const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE || '');
 
 const withApiBase = (value: string) => {
   if (!value || value.startsWith('http://') || value.startsWith('https://')) {
@@ -52,7 +54,7 @@ const extractErrorMessage = async (response: Response) => {
 
   const text = await response.text();
   if (text.includes('<!DOCTYPE html') || text.includes('<html')) {
-    return '后端返回了 HTML 页面，请检查 VITE_API_BASE 或 Hugging Face Space 是否正常运行';
+    return '后端返回了 HTML 页面，请检查 VITE_API_BASE 或 Vercel API 代理是否正常运行';
   }
 
   return text || 'Request failed';

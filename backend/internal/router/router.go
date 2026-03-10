@@ -24,6 +24,17 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 	r.Use(middleware.Logger())
 	r.Use(middleware.CORS(allowedOrigins))
 
+	statusJSON := func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	}
+
+	rootJSON := func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"service": "story-timeline backend",
+			"status":  "ok",
+		})
+	}
+
 	api := r.Group("/api")
 	{
 		auth := api.Group("/auth")
@@ -70,9 +81,11 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 		api.POST("/health/ping", deps.HealthController.Ping)
 	}
 
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-	})
+	r.GET("/", rootJSON)
+	r.HEAD("/", rootJSON)
+
+	r.GET("/ping", statusJSON)
+	r.HEAD("/ping", statusJSON)
 
 	r.GET("/healthz", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")

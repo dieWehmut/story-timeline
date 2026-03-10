@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/ping",
+      "destination": "/api/proxy?target=/ping"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/proxy?target=/api/:path*"
+    }
+  ]
+}
