@@ -56,10 +56,25 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	cleanQuery := q.Encode()
 
 	// Some endpoints (currently only the image creation route) require a
-	// trailing slash.  The rewrite rule strips it, which causes the Hugging
-	// Face server to return 404.  Add it back for POST /api/images.
+	// trailing slash when talking directly to the Hugging Face space.  The
+	// Vercel rewrite rules strip the trailing slash, which makes the space
+	// return 404.  We only need to append the slash when the proxy is
+	// forwarding to the *external* HF URL – not when the target base URL is
+	// the same as the public frontend domain.  If the two are identical we
+	// are accidentally proxying to ourselves and the slash hack will cause a
+	// redirect loop (see: ERR_TOO_MANY_REDIRECTS).
 	if targetPath == "/api/images" && r.Method == http.MethodPost {
-		targetPath = "/api/images/"
+		// compute base URL so we can decide whether to apply the hack
+		targetBaseURL := strings.TrimRight(firstNonEmpty(
+			os.Getenv("HF_SPACE_BASE_URL"),
+			os.Getenv("HUGGINGFACE_SPACE_URL"),
+			defaultHFSpaceBaseURL,
+		), "/")
+		publicURL := publicBaseURL(r)
+		if publicURL == "" || !strings.HasPrefix(targetBaseURL, publicURL) {
+			// only add when the request will actually go out to Hugging Face
+			targetPath = "/api/images/"
+		}
 	}
 
 	options := proxyOptions{
