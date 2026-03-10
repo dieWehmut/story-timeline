@@ -20,12 +20,19 @@ jobs:
 
       - name: Apply Supabase schema
         env:
+          SUPABASE_MIGRATION_DB_URL: ${{ secrets.SUPABASE_MIGRATION_DB_URL }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           PGSSLMODE: require
         run: |
-          if [ -z "${SUPABASE_DB_URL}" ]; then
-            echo "ERROR: SUPABASE_DB_URL secret is not set" >&2
+          DB_URL="${SUPABASE_MIGRATION_DB_URL}"
+          if [ -z "${DB_URL}" ]; then
+            DB_URL="${SUPABASE_DB_URL}"
+          fi
+
+          if [ -z "${DB_URL}" ]; then
+            echo "ERROR: SUPABASE_MIGRATION_DB_URL or SUPABASE_DB_URL secret must be set" >&2
             exit 1
           fi
           echo "Applying Supabase schema from backend/supabase/schema.sql"
-          psql "${SUPABASE_DB_URL}" -f backend/supabase/schema.sql
+          echo "Tip: prefer SUPABASE_MIGRATION_DB_URL with Supabase pooler/IPv4 connection string for GitHub Actions"
+          psql "${DB_URL}" -v ON_ERROR_STOP=1 -f backend/supabase/schema.sql

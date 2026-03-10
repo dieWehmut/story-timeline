@@ -26,24 +26,30 @@ The backend now uses:
 - `SESSION_SECRET`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `SUPABASE_DB_URL` : direct Postgres connection string for automatic schema apply
-- `AUTO_APPLY_SCHEMA` : defaults to `true`
+- `SUPABASE_DB_URL` : Postgres connection string used only if you intentionally enable runtime schema apply
+- `AUTO_APPLY_SCHEMA` : defaults to `false`
 - `CLOUDINARY_CLOUD_NAME`
 - `CLOUDINARY_API_KEY`
 - `CLOUDINARY_API_SECRET`
 
 ### Supabase schema
 
-The backend can automatically apply [supabase/schema.sql](supabase/schema.sql) during startup.
+The backend can automatically apply [supabase/schema.sql](supabase/schema.sql) during startup, but this is not recommended on IPv4-only platforms.
 
-Required for automatic execution:
+Required only if you explicitly enable runtime schema apply:
 
 - `SUPABASE_DB_URL`
 - `AUTO_APPLY_SCHEMA=true`
 
 If `AUTO_APPLY_SCHEMA=true` and `SUPABASE_DB_URL` is missing, startup will fail fast.
 
-If you want to manage schema separately, set `AUTO_APPLY_SCHEMA=false`.
+Recommended setup:
+
+- Keep `AUTO_APPLY_SCHEMA=false` on HF.
+- Apply schema through GitHub Actions using `SUPABASE_MIGRATION_DB_URL`.
+- Use the Supabase shared pooler / session pooler connection string for GitHub Actions, because the direct `db.<project-ref>.supabase.co:5432` endpoint is IPv6-only unless you purchase the dedicated IPv4 add-on.
+
+For GitHub Actions schema sync, prefer a separate `SUPABASE_MIGRATION_DB_URL` secret that uses the Supabase shared pooler / session pooler connection string instead of the direct `db.<project-ref>.supabase.co:5432` host.
 
 ### Storage layout
 

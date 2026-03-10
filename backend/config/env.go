@@ -33,7 +33,7 @@ func LoadEnv() Env {
 		SupabaseURL:         os.Getenv("SUPABASE_URL"),
 		SupabaseServiceKey:  os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
 		SupabaseDBURL:       os.Getenv("SUPABASE_DB_URL"),
-		AutoApplySchema:     getEnv("AUTO_APPLY_SCHEMA", "true") == "true",
+		AutoApplySchema:     getEnv("AUTO_APPLY_SCHEMA", "false") == "true",
 		CloudinaryCloudName: os.Getenv("CLOUDINARY_CLOUD_NAME"),
 		CloudinaryAPIKey:    os.Getenv("CLOUDINARY_API_KEY"),
 		CloudinaryAPISecret: os.Getenv("CLOUDINARY_API_SECRET"),
