@@ -61,7 +61,7 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 			images.DELETE("/:ownerLogin/:imageID/comments/:commentID", middleware.RequireAuth(deps.AuthService), deps.ImageController.DeleteComment)
 
 			// Create
-			images.POST("/", middleware.RequireAuth(deps.AuthService), deps.ImageController.Create)
+			images.POST("", middleware.RequireAuth(deps.AuthService), deps.ImageController.Create)
 		}
 
 		// Update/delete use a separate prefix to avoid wildcard conflict with /:ownerLogin routes
