@@ -68,7 +68,7 @@ func (img Image) AllImagePaths() []string {
 	if img.ImagePath != "" {
 		return []string{img.ImagePath}
 	}
-	return nil
+	return []string{}
 }
 
 type ImageIndex struct {
@@ -109,7 +109,7 @@ func (comment Comment) AllImagePaths() []string {
 	if comment.ImagePath != "" {
 		return []string{comment.ImagePath}
 	}
-	return nil
+	return []string{}
 }
 
 // CommentFile is persisted as comments/{postOwnerLogin}/{postID}.json in the commenter's repo.

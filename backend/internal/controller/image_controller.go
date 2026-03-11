@@ -277,6 +277,7 @@ func (controller *ImageController) Create(c *gin.Context) {
 
 	image, err := controller.imageService.Create(c.Request.Context(), session.AccessToken, session.User, c.Request.FormValue("description"), tags, timeMode, startAt, endAt, files)
 	if err != nil {
+		_ = c.Error(err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
@@ -319,6 +320,7 @@ func (controller *ImageController) Update(c *gin.Context) {
 	ownerLogin := session.User.Login
 	image, err := controller.imageService.Update(c.Request.Context(), session.AccessToken, ownerLogin, imageID, c.Request.FormValue("description"), tags, timeMode, startAt, endAt, files)
 	if err != nil {
+		_ = c.Error(err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
@@ -497,6 +499,7 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 
 	comment, err := controller.interactionService.AddComment(c.Request.Context(), session.AccessToken, session.User, ownerLogin, postID, text, imageData)
 	if err != nil {
+		_ = c.Error(err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
