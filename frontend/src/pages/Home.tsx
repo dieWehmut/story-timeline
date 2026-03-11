@@ -6,7 +6,6 @@ import { Header } from '../layouts/Header';
 import { ImageCard } from '../layouts/ImageCard';
 import { FloatingActions } from '../layouts/FloatingActions';
 import { TimeColumn } from '../layouts/TimeColumn';
-import { TagBar } from '../layouts/TagBar';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
 import type { TimelineMonth } from '../types/image';
@@ -109,6 +108,13 @@ export default function Home({
     onTimelineClose();
   };
 
+  const handleTagSelect = (tag: string | null) => {
+    images.setTagFilter(tag);
+    if (selectedItemId !== null) {
+      setSelectedItemId(null);
+    }
+  };
+
   return (
     <div className="relative min-h-screen overflow-x-hidden">
       <Header
@@ -126,9 +132,12 @@ export default function Home({
         }}
         onLogin={auth.login}
         onLogout={auth.logout}
+        onTagSelect={handleTagSelect}
         onThemeToggle={onThemeToggle}
         onTimelineToggle={onTimelineToggle}
         onUpload={(payload) => images.createImage(payload, auth.user ? { login: auth.user.login, avatarUrl: auth.user.avatarUrl } : undefined)}
+        tagFilter={images.tagFilter}
+        tagSummary={images.tagSummary}
         theme={theme}
         timelineOpen={timelineOpen}
         uploadBusy={images.submitting}
@@ -148,12 +157,6 @@ export default function Home({
       />
 
       <main className="relative mx-auto flex w-full max-w-xl flex-col px-0 pb-36 pt-28 md:px-0 md:pt-36">
-        <TagBar
-          onSelect={images.setTagFilter}
-          selectedTag={images.tagFilter}
-          tags={images.tagSummary}
-        />
-
         {images.error ? (
           <div className="mb-6 border border-rose-400/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
             {images.error}
@@ -190,6 +193,7 @@ export default function Home({
                       onLikeChange={images.updateLike}
                       onOpenDetail={() => setSelectedItemId(item.id)}
                       onSave={images.updateImage}
+                      onTagClick={(tag) => handleTagSelect(tag)}
                       roleLabel={item.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
                       tagCounts={images.tagCountMap}
                     />
@@ -216,6 +220,7 @@ export default function Home({
           onDelete={images.deleteImage}
           onLikeChange={images.updateLike}
           onSave={images.updateImage}
+          onTagClick={(tag) => handleTagSelect(tag)}
           roleLabel={selectedItem.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
           tagCounts={images.tagCountMap}
         />

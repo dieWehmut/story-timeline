@@ -2,13 +2,15 @@ interface TagBarProps {
   tags: { tag: string; count: number }[];
   selectedTag: string | null;
   onSelect: (tag: string | null) => void;
+  className?: string;
 }
 
-export function TagBar({ tags, selectedTag, onSelect }: TagBarProps) {
+export function TagBar({ tags, selectedTag, onSelect, className }: TagBarProps) {
   if (tags.length === 0) return null;
+  const wrapperClass = `mx-auto w-full max-w-6xl px-2 ${className ?? ''}`.trim();
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-2 pt-2">
+    <div className={wrapperClass}>
       <div className="flex flex-wrap gap-2">
         <button
           className={`tag-chip rounded-full border border-cyan-400/25 px-2.5 py-1 text-xs transition ${
@@ -17,7 +19,7 @@ export function TagBar({ tags, selectedTag, onSelect }: TagBarProps) {
           onClick={() => onSelect(null)}
           type="button"
         >
-          全部
+          All
         </button>
         {tags.map((entry) => {
           const isActive = selectedTag?.toLowerCase() === entry.tag.toLowerCase();

@@ -15,6 +15,7 @@ interface ImageCardProps {
   busy: boolean;
   canInteract: boolean;
   onAvatarClick?: (login: string) => void;
+  onTagClick?: (tag: string) => void;
   onDelete: (id: string) => Promise<void>;
   onSave: (payload: UpdateImagePayload) => Promise<void>;
   onLikeChange?: (id: string, likeCount: number, liked: boolean) => void;
@@ -142,6 +143,7 @@ export function ImageCard({
   fallbackAuthorLogin,
   item,
   onAvatarClick,
+  onTagClick,
   onCommentCountChange,
   onDelete,
   onLikeChange,
@@ -354,13 +356,21 @@ export function ImageCard({
             onClick={() => onOpenDetail?.()}
           >
             {tags.length > 0 ? (
-              <div className="pt-2 flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 pt-2">
                 {tags.map((tag) => {
                   const count = tagCounts?.[tag.trim().toLowerCase()] ?? 0;
                   return (
-                    <span className="tag-chip rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200" key={tag}>
+                    <button
+                      className="tag-chip rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200 transition hover:text-[var(--text-main)]"
+                      key={tag}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTagClick?.(tag);
+                      }}
+                      type="button"
+                    >
                       #{tag} ({count})
-                    </span>
+                    </button>
                   );
                 })}
               </div>

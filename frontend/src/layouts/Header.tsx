@@ -2,6 +2,8 @@
 import { ThemeButton } from './ThemeButton';
 import { AuthButton } from './AuthButton';
 import { UploadButton } from './UploadButton';
+import { TagBar } from './TagBar';
+import { UserBar } from './UserBar';
 import type { AuthUser, CreateImagePayload, FeedUser, TimelineMonth } from '../types/image';
 
 interface HeaderProps {
@@ -16,9 +18,12 @@ interface HeaderProps {
   onFilterUser: (login: string | null) => void;
   onLogin: () => void;
   onLogout: () => Promise<void>;
+  onTagSelect: (tag: string | null) => void;
   onThemeToggle: () => void;
   onTimelineToggle: () => void;
   onUpload: (payload: CreateImagePayload) => Promise<void>;
+  tagFilter: string | null;
+  tagSummary: { tag: string; count: number }[];
   theme: 'dark' | 'light';
   timelineOpen: boolean;
   uploadBusy: boolean;
@@ -36,9 +41,12 @@ export function Header({
   onFilterUser,
   onLogin,
   onLogout,
+  onTagSelect,
   onThemeToggle,
   onTimelineToggle,
   onUpload,
+  tagFilter,
+  tagSummary,
   theme,
   timelineOpen,
   uploadBusy,
@@ -91,47 +99,16 @@ export function Header({
         </div>
       </div>
 
-      {/* Feed user avatars row */}
-      {!isDetailView && feedUsers.length > 1 ? (
-        <div className="mx-auto mt-2 flex w-full max-w-6xl items-center gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-          <button
-            className={`all-chip shrink-0 rounded-full border border-transparent px-3 py-1 text-xs font-medium transition ${
-              filterUser === null
-                ? 'all-chip-active'
-                : 'text-soft hover:text-[var(--text-main)]'
-            }`}
-            onClick={() => onFilterUser(null)}
-            type="button"
-          >
-            All
-          </button>
-          {feedUsers.map((user) => {
-            const isActive = filterUser === user.login;
-            return (
-              <button
-                className={`flex shrink-0 items-center gap-1 transition-all duration-200 ${
-                  isActive
-                    ? 'scale-105'
-                    : filterUser !== null
-                      ? 'opacity-50 hover:opacity-80'
-                      : 'hover:scale-105'
-                }`}
-                key={user.login}
-                onClick={() => onFilterUser(filterUser === user.login ? null : user.login)}
-                title={user.login}
-                type="button"
-              >
-                <img
-                  alt={user.login}
-                  className={`h-6 w-6 rounded-full object-cover ${
-                    isActive ? 'ring-2 ring-blue-400/80 ring-offset-2 ring-offset-transparent' : ''
-                  }`}
-                  src={user.avatarUrl}
-                />
-              </button>
-            );
-          })}
-        </div>
+      {!isDetailView ? (
+        <>
+          <UserBar feedUsers={feedUsers} filterUser={filterUser} onFilterUser={onFilterUser} />
+          <TagBar
+            className="pt-1"
+            onSelect={onTagSelect}
+            selectedTag={tagFilter}
+            tags={tagSummary}
+          />
+        </>
       ) : null}
     </header>
   );

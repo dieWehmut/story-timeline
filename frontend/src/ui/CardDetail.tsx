@@ -153,6 +153,7 @@ interface CardDetailProps {
   canInteract: boolean;
   editable?: boolean;
   currentUserLogin?: string;
+  onTagClick?: (tag: string) => void;
   onDelete?: (id: string) => Promise<void>;
   onSave?: (payload: UpdateImagePayload) => Promise<void>;
   onLikeChange?: (id: string, likeCount: number, liked: boolean) => void;
@@ -167,6 +168,7 @@ export function CardDetail({
   canInteract,
   editable,
   currentUserLogin,
+  onTagClick,
   onDelete,
   onSave,
   onLikeChange,
@@ -512,9 +514,14 @@ export function CardDetail({
                 {tags.map((tag) => {
                   const count = tagCounts?.[tag.trim().toLowerCase()] ?? 0;
                   return (
-                    <span className="tag-chip rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200" key={tag}>
+                    <button
+                      className="tag-chip rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200 transition hover:text-[var(--text-main)]"
+                      key={tag}
+                      onClick={() => onTagClick?.(tag)}
+                      type="button"
+                    >
                       #{tag} ({count})
-                    </span>
+                    </button>
                   );
                 })}
               </div>

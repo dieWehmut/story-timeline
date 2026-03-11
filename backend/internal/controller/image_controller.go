@@ -598,7 +598,7 @@ func readMultipartFilesWithLimit(r *http.Request, maxCount int) ([][]byte, error
 		fileHeaders = r.MultipartForm.File["file"]
 	}
 	if len(fileHeaders) > maxCount {
-		return nil, fmt.Errorf("鏈€澶氫笂浼?%d 寮犲浘鐗?, maxCount)
+		return nil, fmt.Errorf("最多上传 %d 张图片", maxCount)
 	}
 
 	var totalSize int64
@@ -609,7 +609,7 @@ func readMultipartFilesWithLimit(r *http.Request, maxCount int) ([][]byte, error
 		}
 		totalSize += fh.Size
 		if totalSize > maxTotalSize {
-			return nil, fmt.Errorf("甯栧瓙鎬诲ぇ灏忎笉鑳借秴杩?25MB")
+			return nil, fmt.Errorf("帖子总大小不能超过 25MB")
 		}
 
 		f, err := fh.Open()

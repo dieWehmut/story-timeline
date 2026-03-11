@@ -13,12 +13,12 @@ interface TimeColumnProps {
 export function TimeColumn({ activeMonth, months, onJump, onToggleOrder, open, order }: TimeColumnProps) {
   return (
     <aside
-      className={`fixed right-0 top-0 z-40 h-screen w-[5.5rem] overflow-y-auto overflow-x-hidden bg-[var(--page-bg-soft)] px-3 py-8 shadow-[var(--timeline-shadow)] transition-transform duration-300 ease-in-out md:w-24 md:px-4 ${
+      className={`fixed right-0 top-0 z-40 h-screen w-[5.5rem] overflow-y-auto overflow-x-hidden bg-[var(--page-bg-soft)] px-3 py-6 shadow-[var(--timeline-shadow)] transition-transform duration-300 ease-in-out md:w-24 md:px-4 ${
         open ? 'translate-x-0' : 'pointer-events-none translate-x-full'
       }`}
       style={{ scrollbarWidth: 'none' }}
     >
-      <div className="flex justify-center pb-4 text-center">
+      <div className="flex justify-center pb-2 text-center">
         <button
           aria-label="切换时间排序"
           className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--panel-border)] text-[var(--text-main)] transition hover:text-[var(--text-accent)]"
@@ -29,7 +29,7 @@ export function TimeColumn({ activeMonth, months, onJump, onToggleOrder, open, o
           <ArrowDownUp className={order === 'asc' ? 'rotate-180' : ''} size={18} />
         </button>
       </div>
-      <div className="space-y-4 pt-4 text-center">
+      <div className="space-y-3 pt-2 text-center">
         {months.map((month, index) => {
           const previous = months[index - 1];
           const showYear = !previous || previous.year !== month.year;
