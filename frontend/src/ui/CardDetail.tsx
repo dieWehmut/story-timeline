@@ -160,6 +160,7 @@ interface CardDetailProps {
   onLikeChange?: (id: string, likeCount: number, liked: boolean) => void;
   onCommentCountChange?: (id: string, delta: number) => void;
   tagCounts?: Record<string, number>;
+  tagSuggestions?: string[];
 }
 
 export function CardDetail({
@@ -175,6 +176,7 @@ export function CardDetail({
   onLikeChange,
   onCommentCountChange,
   tagCounts,
+  tagSuggestions,
 }: CardDetailProps) {
   const [comments, setComments] = useState<CommentViewItem[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -672,7 +674,9 @@ export function CardDetail({
                                 type="button"
                               >
                                 <Heart className={liked ? 'fill-current' : ''} size={13} />
-                                <span className="text-[10px] leading-none">{c.likeCount ?? 0}</span>
+                                {c.likeCount && c.likeCount > 0 ? (
+                                  <span className="text-[10px] leading-none">{c.likeCount}</span>
+                                ) : null}
                               </button>
                               <button
                                 className="inline-flex items-center gap-1 text-xs hover:text-[var(--text-main)] transition"
@@ -742,7 +746,9 @@ export function CardDetail({
                                         type="button"
                                       >
                                         <Heart className={replyLiked ? 'fill-current' : ''} size={12} />
-                                        <span className="text-[10px] leading-none">{reply.likeCount ?? 0}</span>
+                                        {reply.likeCount && reply.likeCount > 0 ? (
+                                          <span className="text-[10px] leading-none">{reply.likeCount}</span>
+                                        ) : null}
                                       </button>
                                       <button
                                         className="inline-flex items-center gap-1 text-xs hover:text-[var(--text-main)] transition"
@@ -886,6 +892,7 @@ export function CardDetail({
           onClose={() => setEditing(false)}
           onSubmit={handleEditSubmit}
           open={editing}
+          tagSuggestions={tagSuggestions}
         />
       ) : null}
 

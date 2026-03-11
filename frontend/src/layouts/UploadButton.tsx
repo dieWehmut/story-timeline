@@ -6,9 +6,10 @@ import type { CreateImagePayload } from '../types/image';
 interface UploadButtonProps {
   busy: boolean;
   onSubmit: (payload: CreateImagePayload) => Promise<void>;
+  tagSuggestions?: string[];
 }
 
-export function UploadButton({ busy, onSubmit }: UploadButtonProps) {
+export function UploadButton({ busy, onSubmit, tagSuggestions }: UploadButtonProps) {
   const [open, setOpen] = useState(false);
 
   const handleSubmit = async (data: { description: string; tags: string[]; timeMode: 'point' | 'range'; startAt: string; endAt?: string; files: File[] }) => {
@@ -40,6 +41,7 @@ export function UploadButton({ busy, onSubmit }: UploadButtonProps) {
         onClose={() => setOpen(false)}
         onSubmit={handleSubmit}
         open={open}
+        tagSuggestions={tagSuggestions}
       />
     </>
   );

@@ -58,6 +58,31 @@ export default function Home({
     [images.items, images.timeline]
   );
 
+  const tagSuggestions = useMemo(() => {
+    if (!auth.user) return [];
+    const counts = new Map<string, { tag: string; count: number }>();
+    images.items.forEach((item) => {
+      if (item.authorLogin.toLowerCase() !== auth.user!.login.toLowerCase()) return;
+      (item.tags ?? []).forEach((tag) => {
+        const normalized = tag.trim();
+        if (!normalized) return;
+        const key = normalized.toLowerCase();
+        const existing = counts.get(key);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          counts.set(key, { tag: normalized, count: 1 });
+        }
+      });
+    });
+    return [...counts.values()]
+      .sort((left, right) => {
+        if (right.count !== left.count) return right.count - left.count;
+        return left.tag.localeCompare(right.tag, 'zh-Hans-CN');
+      })
+      .map((entry) => entry.tag);
+  }, [auth.user, images.items]);
+
   const selectedItem = useMemo(
     () => (selectedItemId ? images.items.find((i) => i.id === selectedItemId) ?? null : null),
     [images.items, selectedItemId]
@@ -136,6 +161,7 @@ export default function Home({
         onThemeToggle={onThemeToggle}
         onTimelineToggle={onTimelineToggle}
         onUpload={(payload) => images.createImage(payload, auth.user ? { login: auth.user.login, avatarUrl: auth.user.avatarUrl } : undefined)}
+        tagSuggestions={tagSuggestions}
         tagFilter={images.tagFilter}
         tagSummary={images.tagSummary}
         theme={theme}
@@ -196,6 +222,7 @@ export default function Home({
                       onTagClick={(tag) => handleTagSelect(tag)}
                       roleLabel={item.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
                       tagCounts={images.tagCountMap}
+                      tagSuggestions={tagSuggestions}
                     />
                   ))}
                 </div>
@@ -223,6 +250,7 @@ export default function Home({
           onTagClick={(tag) => handleTagSelect(tag)}
           roleLabel={selectedItem.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
           tagCounts={images.tagCountMap}
+          tagSuggestions={tagSuggestions}
         />
       ) : null}
 

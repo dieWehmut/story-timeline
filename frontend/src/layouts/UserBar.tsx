@@ -41,9 +41,7 @@ export function UserBar({ feedUsers, filterUser, onFilterUser }: UserBarProps) {
           >
             <img
               alt={user.login}
-              className={`h-6 w-6 rounded-full object-cover ${
-                isActive ? 'ring-2 ring-blue-400/80 ring-offset-2 ring-offset-transparent' : ''
-              }`}
+              className="h-6 w-6 rounded-full object-cover"
               src={user.avatarUrl}
             />
           </button>

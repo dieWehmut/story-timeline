@@ -7,7 +7,7 @@ interface TagBarProps {
 
 export function TagBar({ tags, selectedTag, onSelect, className }: TagBarProps) {
   if (tags.length === 0) return null;
-  const wrapperClass = `mx-auto w-full max-w-6xl px-2 ${className ?? ''}`.trim();
+  const wrapperClass = `mx-auto w-full max-w-6xl ${className ?? ''}`.trim();
 
   return (
     <div className={wrapperClass}>

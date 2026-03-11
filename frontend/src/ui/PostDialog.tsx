@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Plus, Trash2, X } from 'lucide-react';
+import { ImageViewer } from './ImageViewer';
 import { useToast } from './useToast';
 import { setPostDialogOpen } from '../lib/uiFlags';
 
@@ -10,6 +11,7 @@ interface PostDialogProps {
   mode: 'create' | 'edit';
   initialDescription?: string;
   initialTags?: string[];
+  tagSuggestions?: string[];
   initialTimeMode?: 'point' | 'range';
   initialStartAt?: string;
   initialEndAt?: string;
@@ -96,6 +98,7 @@ export function PostDialog({
   mode,
   initialDescription = '',
   initialTags = [],
+  tagSuggestions = [],
   initialTimeMode = 'point',
   initialStartAt,
   initialEndAt,
@@ -125,8 +128,12 @@ export function PostDialog({
   const prevOpenRef = useRef(false);
   const [animating, setAnimating] = useState(false);
   const [visible, setVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [dragPointer, setDragPointer] = useState<{ x: number; y: number } | null>(null);
+  const [draggingUrl, setDraggingUrl] = useState<string | null>(null);
   const previewsRef = useRef<PreviewItem[]>(previews);
   const { toast } = useToast();
+  const tagSuggestionsKey = tagSuggestions.join(',');
 
   useEffect(() => {
     previewsRef.current = previews;
@@ -178,7 +185,7 @@ export function PostDialog({
         setEndAt(initialEndAt ?? initialStartAt ?? getDefaultDateTime());
       }
       setTagInput('');
-      const mergedHistory = mergeTagHistory(loadTagHistory(), initialTags);
+      const mergedHistory = mergeTagHistory(loadTagHistory(), [...tagSuggestions, ...initialTags]);
       setTagHistory(mergedHistory);
       saveTagHistory(mergedHistory);
       setPreviews((current) => {
@@ -199,7 +206,7 @@ export function PostDialog({
     }
     prevOpenRef.current = open;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialDescription, initialEndAt, initialStartAt, initialTagsKey, initialTimeMode, initialUrlsKey, mode]);
+  }, [open, initialDescription, initialEndAt, initialStartAt, initialTagsKey, tagSuggestionsKey, initialTimeMode, initialUrlsKey, mode]);
 
   useEffect(() => () => {
     revokeFilePreviews(previewsRef.current);
@@ -362,6 +369,11 @@ export function PostDialog({
   const handleDragStart = (index: number, event?: React.DragEvent<HTMLDivElement>) => {
     setDraggingIndex(index);
     setDragOverIndex(index);
+    const nextUrl = previewsRef.current[index]?.url ?? null;
+    setDraggingUrl(nextUrl);
+    if (event) {
+      setDragPointer({ x: event.clientX, y: event.clientY });
+    }
     if (event?.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', String(index));
@@ -398,6 +410,8 @@ export function PostDialog({
     setDraggingIndex(null);
     setDragOverIndex(null);
     setOverDelete(false);
+    setDragPointer(null);
+    setDraggingUrl(null);
   };
 
   const handleTouchMove = useCallback(
@@ -406,6 +420,7 @@ export function PostDialog({
       const touch = event.touches[0];
       if (!touch) return;
       event.preventDefault();
+      setDragPointer({ x: touch.clientX, y: touch.clientY });
 
       const rect = deleteZoneRef.current?.getBoundingClientRect();
       const isOver =
@@ -437,6 +452,8 @@ export function PostDialog({
     setDraggingIndex(null);
     setDragOverIndex(null);
     setOverDelete(false);
+    setDragPointer(null);
+    setDraggingUrl(null);
   }, [overDelete, draggingIndex, removePreview]);
 
   if (!open && !animating) return null;
@@ -444,6 +461,7 @@ export function PostDialog({
   const totalPreviews = previews.length;
   const cols = totalPreviews <= 2 ? 2 : 3;
   const availableTags = tagHistory.filter((tag) => !tags.some((selected) => selected.toLowerCase() === tag.toLowerCase()));
+  const previewUrls = previews.map((item) => item.url);
 
   return (
     <div className={`fixed inset-0 z-50 flex flex-col md:items-center md:justify-center transition-colors duration-250 ${visible ? 'bg-[var(--page-bg)] md:bg-slate-950/65' : 'bg-transparent md:bg-transparent'}`}>
@@ -532,12 +550,31 @@ export function PostDialog({
                 draggable
                 key={`${item.url}-${index}`}
                 onDragEnd={handleDragEnd}
+                onDrag={(event) => {
+                  if (draggingIndex !== null) {
+                    setDragPointer({ x: event.clientX, y: event.clientY });
+                  }
+                }}
                 onDragOver={(event) => handleDragOver(index, event)}
                 onDragStart={(event) => handleDragStart(index, event)}
                 onDrop={(event) => handleDrop(index, event)}
-                onTouchStart={() => handleDragStart(index)}
+                onTouchStart={(event) => {
+                  handleDragStart(index);
+                  const touch = event.touches[0];
+                  if (touch) {
+                    setDragPointer({ x: touch.clientX, y: touch.clientY });
+                  }
+                }}
               >
-                <img alt="" className="absolute inset-0 h-full w-full object-cover" src={item.url} />
+                <img
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                  onClick={() => {
+                    if (draggingIndex !== null) return;
+                    setViewerIndex(index);
+                  }}
+                  src={item.url}
+                />
                 <span className="absolute left-1 top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-black/60 px-1 text-[10px] font-semibold text-white/90">
                   {index + 1}
                 </span>
@@ -632,6 +669,19 @@ export function PostDialog({
           </div>
         ) : null}
       </div>
+
+      {draggingIndex !== null && draggingUrl && dragPointer ? (
+        <div
+          className="pointer-events-none fixed z-[70] h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-lg overflow-hidden bg-slate-900/60 shadow-lg"
+          style={{ left: dragPointer.x, top: dragPointer.y }}
+        >
+          <img alt="" className="h-full w-full object-cover" src={draggingUrl} />
+        </div>
+      ) : null}
+
+      {viewerIndex !== null ? (
+        <ImageViewer initialIndex={viewerIndex} onClose={() => setViewerIndex(null)} urls={previewUrls} />
+      ) : null}
     </div>
   );
 }

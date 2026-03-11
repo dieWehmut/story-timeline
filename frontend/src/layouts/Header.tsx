@@ -22,6 +22,7 @@ interface HeaderProps {
   onThemeToggle: () => void;
   onTimelineToggle: () => void;
   onUpload: (payload: CreateImagePayload) => Promise<void>;
+  tagSuggestions: string[];
   tagFilter: string | null;
   tagSummary: { tag: string; count: number }[];
   theme: 'dark' | 'light';
@@ -45,6 +46,7 @@ export function Header({
   onThemeToggle,
   onTimelineToggle,
   onUpload,
+  tagSuggestions,
   tagFilter,
   tagSummary,
   theme,
@@ -82,7 +84,9 @@ export function Header({
             <>
               <AuthButton loading={authLoading} onLogin={onLogin} onLogout={onLogout} user={authUser} />
               <ThemeButton onToggle={onThemeToggle} theme={theme} />
-              {authUser && canPost ? <UploadButton busy={uploadBusy} onSubmit={onUpload} /> : null}
+              {authUser && canPost ? (
+                <UploadButton busy={uploadBusy} onSubmit={onUpload} tagSuggestions={tagSuggestions} />
+              ) : null}
               <div className={`transition-all duration-300 ${timelineOpen ? 'pointer-events-none scale-75 opacity-0' : 'opacity-100'}`}>
                 <button
                   aria-expanded={timelineOpen}
@@ -103,7 +107,7 @@ export function Header({
         <>
           <UserBar feedUsers={feedUsers} filterUser={filterUser} onFilterUser={onFilterUser} />
           <TagBar
-            className="pt-0 px-0"
+            className="pt-0"
             onSelect={onTagSelect}
             selectedTag={tagFilter}
             tags={tagSummary}

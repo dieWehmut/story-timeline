@@ -23,6 +23,7 @@ interface ImageCardProps {
   onCommentCountChange?: (id: string, delta: number) => void;
   onOpenDetail?: () => void;
   tagCounts?: Record<string, number>;
+  tagSuggestions?: string[];
 }
 
 const toDateTimeInputValue = (value: string) => {
@@ -150,6 +151,7 @@ export function ImageCard({
   onSave,
   roleLabel,
   tagCounts,
+  tagSuggestions,
 }: ImageCardProps) {
   const [editing, setEditing] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
@@ -420,7 +422,7 @@ export function ImageCard({
                       {c.text ? <span className="text-[var(--text-main)]">{c.text}</span> : null}
                       <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-soft">
                         <Heart className={c.liked ? 'fill-current text-rose-300' : ''} size={10} />
-                        {c.likeCount ?? 0}
+                        {c.likeCount && c.likeCount > 0 ? c.likeCount : null}
                       </span>
                       {c.pending ? <LoaderCircle className="ml-1 inline-block animate-spin text-soft" size={12} /> : null}
                       {c.imageUrls && c.imageUrls.length > 0 ? (
@@ -487,6 +489,7 @@ export function ImageCard({
         onClose={() => setEditing(false)}
         onSubmit={handleEditSubmit}
         open={editing}
+        tagSuggestions={tagSuggestions}
       />
 
       {/* Comment bottom sheet */}
