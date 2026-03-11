@@ -285,22 +285,6 @@ export function CardDetail({
     };
   }, [authorLogin, item.id, commentCacheKey]);
 
-  useEffect(() => {
-    setCommentLikeCounts((prev) => {
-      const next = { ...prev };
-      comments.forEach((comment) => {
-        if (next[comment.id] === undefined) {
-          next[comment.id] = 0;
-        }
-      });
-      Object.keys(next).forEach((id) => {
-        if (!comments.some((comment) => comment.id === id)) {
-          delete next[id];
-        }
-      });
-      return next;
-    });
-  }, [comments]);
 
   const handleToggleLike = async () => {
     if (likeBusy || !canInteract) return;

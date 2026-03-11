@@ -7,6 +7,7 @@ const config: CapacitorConfig = {
   webDir: 'dist',
 
   server: {
+    androidScheme: 'https',
     url: 'https://REDACTED.example.com',
     cleartext: false,
     allowNavigation: [
