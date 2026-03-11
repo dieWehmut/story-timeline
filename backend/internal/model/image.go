@@ -87,6 +87,16 @@ type LikeFile struct {
 	Likes []Like `json:"likes"`
 }
 
+// CommentLike represents a like on a comment. Stored in Supabase.
+type CommentLike struct {
+	CommentID string    `json:"commentId"`
+	PostOwner string    `json:"postOwner"`
+	PostID    string    `json:"postId"`
+	Login     string    `json:"login"`
+	AvatarURL string    `json:"avatarUrl"`
+	LikedAt   time.Time `json:"likedAt"`
+}
+
 // Comment represents a single comment on a post. Stored in the commenter's repo.
 type Comment struct {
 	ID         string    `json:"id"`

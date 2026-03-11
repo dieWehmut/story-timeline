@@ -103,7 +103,7 @@ export function Header({
         <>
           <UserBar feedUsers={feedUsers} filterUser={filterUser} onFilterUser={onFilterUser} />
           <TagBar
-            className="pt-1"
+            className="pt-0 px-0"
             onSelect={onTagSelect}
             selectedTag={tagFilter}
             tags={tagSummary}

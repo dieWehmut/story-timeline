@@ -11,12 +11,12 @@ export function UserBar({ feedUsers, filterUser, onFilterUser }: UserBarProps) {
 
   return (
     <div
-      className="mx-auto mt-2 flex w-full max-w-6xl items-center gap-3 overflow-x-auto pb-0.5"
+      className="mx-auto mt-1 flex w-full max-w-6xl items-center justify-start gap-2 overflow-x-auto pb-0.5"
       style={{ scrollbarWidth: 'none' }}
     >
       <button
-        className={`all-chip shrink-0 rounded-full border border-transparent px-3 py-1 text-xs font-medium transition ${
-          filterUser === null ? 'all-chip-active' : 'text-soft hover:text-[var(--text-main)]'
+        className={`tag-chip shrink-0 rounded-full border border-cyan-400/25 px-2.5 py-1 text-xs transition ${
+          filterUser === null ? 'tag-chip-active' : 'text-soft hover:text-[var(--text-main)]'
         }`}
         onClick={() => onFilterUser(null)}
         type="button"

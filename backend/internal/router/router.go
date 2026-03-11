@@ -58,6 +58,7 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 			images.GET("/:ownerLogin/:imageID/comments", deps.ImageController.GetComments)
 			images.POST("/:ownerLogin/:imageID/like", middleware.RequireAuth(deps.AuthService), deps.ImageController.ToggleLike)
 			images.POST("/:ownerLogin/:imageID/comments", middleware.RequireAuth(deps.AuthService), deps.ImageController.AddComment)
+			images.POST("/:ownerLogin/:imageID/comments/:commentID/like", middleware.RequireAuth(deps.AuthService), deps.ImageController.ToggleCommentLike)
 			images.DELETE("/:ownerLogin/:imageID/comments/:commentID", middleware.RequireAuth(deps.AuthService), deps.ImageController.DeleteComment)
 
 			// Create — register both "" and "/" so POST /api/images and POST /api/images/ both

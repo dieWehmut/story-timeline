@@ -226,7 +226,7 @@ export default function Home({
         />
       ) : null}
 
-      <FloatingActions hidden={timelineOpen} />
+      <FloatingActions hidden={timelineOpen || selectedItemId !== null} />
     </div>
   );
 }

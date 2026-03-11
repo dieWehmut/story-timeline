@@ -17,7 +17,7 @@ interface PostDialogProps {
   onSubmit: (data: { description: string; tags: string[]; timeMode: 'point' | 'range'; startAt: string; endAt?: string; files: File[]; removedUrls?: string[] }) => Promise<void>;
 }
 
-const MAX_FILES = 9;
+const MAX_FILES = 15;
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_TOTAL_SIZE = 25 * 1024 * 1024;
 const MAX_TAGS = 12;
@@ -359,12 +359,21 @@ export function PostDialog({
     }
   };
 
-  const handleDragStart = (index: number, event?: React.DragEvent) => {
+  const handleDragStart = (index: number, event?: React.DragEvent<HTMLDivElement>) => {
     setDraggingIndex(index);
     setDragOverIndex(index);
     if (event?.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', String(index));
+      const target = event.currentTarget as HTMLElement;
+      const previewImg = target.querySelector('img') as HTMLImageElement | null;
+      if (previewImg) {
+        const rect = previewImg.getBoundingClientRect();
+        event.dataTransfer.setDragImage(previewImg, rect.width / 2, rect.height / 2);
+      } else {
+        const rect = target.getBoundingClientRect();
+        event.dataTransfer.setDragImage(target, rect.width / 2, rect.height / 2);
+      }
     }
   };
 

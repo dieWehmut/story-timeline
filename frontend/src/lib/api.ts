@@ -53,6 +53,8 @@ const normalizeCommentItem = (item: CommentItem): CommentItem => {
     ...item,
     imageUrl: imageUrls[0],
     imageUrls,
+    likeCount: item.likeCount ?? 0,
+    liked: !!item.liked,
   };
 };
 
@@ -220,6 +222,8 @@ export const api = {
   deleteImage: (id: string) => request<{ ok: boolean }>(`${API_BASE}/api/my/images/${id}`, { method: 'DELETE' }),
   toggleLike: (ownerLogin: string, postID: string) =>
     request<LikeToggleResult>(`${API_BASE}/api/images/${ownerLogin}/${postID}/like`, { method: 'POST' }),
+  toggleCommentLike: (ownerLogin: string, postID: string, commentID: string) =>
+    request<LikeToggleResult>(`${API_BASE}/api/images/${ownerLogin}/${postID}/comments/${commentID}/like`, { method: 'POST' }),
   getComments: async (ownerLogin: string, postID: string) => {
     const items = await request<CommentItem[]>(`${API_BASE}/api/images/${ownerLogin}/${postID}/comments`);
     return items.map(normalizeCommentItem);

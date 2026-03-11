@@ -50,10 +50,63 @@ func (service *InteractionService) ToggleLike(ctx context.Context, _ string, own
 	return service.database.ListLikes(ctx, ownerLogin, postID)
 }
 
+func (service *InteractionService) ToggleCommentLike(ctx context.Context, ownerLogin, postID, commentID string, user model.GitHubUser) (int, bool, error) {
+	likes, err := service.database.ListCommentLikesByComment(ctx, commentID)
+	if err != nil {
+		return 0, false, err
+	}
+
+	alreadyLiked := false
+	for _, like := range likes {
+		if strings.EqualFold(like.Login, user.Login) {
+			alreadyLiked = true
+			break
+		}
+	}
+
+	if alreadyLiked {
+		if err := service.database.DeleteCommentLike(ctx, commentID, user.Login); err != nil {
+			return 0, false, err
+		}
+	} else {
+		if err := service.database.UpsertCommentLike(ctx, model.CommentLike{
+			CommentID: commentID,
+			PostOwner: ownerLogin,
+			PostID:    postID,
+			Login:     user.Login,
+			AvatarURL: user.AvatarURL,
+			LikedAt:   utils.NowBeijing(),
+		}); err != nil {
+			return 0, false, err
+		}
+	}
+
+	likes, err = service.database.ListCommentLikesByComment(ctx, commentID)
+	if err != nil {
+		return 0, false, err
+	}
+	liked := false
+	for _, like := range likes {
+		if strings.EqualFold(like.Login, user.Login) {
+			liked = true
+			break
+		}
+	}
+	return len(likes), liked, nil
+}
+
 func (service *InteractionService) GetLikes(ctx context.Context, _ string, ownerLogin, postID string) *model.LikeFile {
 	likes, err := service.database.ListLikes(ctx, ownerLogin, postID)
 	if err != nil {
 		return &model.LikeFile{}
+	}
+	return likes
+}
+
+func (service *InteractionService) GetCommentLikesByPost(ctx context.Context, postOwner, postID string) []model.CommentLike {
+	likes, err := service.database.ListCommentLikesByPost(ctx, postOwner, postID)
+	if err != nil {
+		return []model.CommentLike{}
 	}
 	return likes
 }

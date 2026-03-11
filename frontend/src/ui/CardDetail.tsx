@@ -4,6 +4,7 @@ import { ImageViewer } from './ImageViewer';
 import { PostDialog } from './PostDialog';
 import { useToast } from './useToast';
 import { api } from '../lib/api';
+import { getCommentCache, setCommentCache } from '../lib/commentCache';
 import { setCommentInputActive } from '../lib/uiFlags';
 import type { CommentItem, ImageItem, UpdateImagePayload } from '../types/image';
 
@@ -188,7 +189,6 @@ export function CardDetail({
   const [likeBusy, setLikeBusy] = useState(false);
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const [replyTarget, setReplyTarget] = useState<{ parentId: string; replyToUserLogin: string } | null>(null);
-  const [commentLikes, setCommentLikes] = useState<Record<string, boolean>>({});
 
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -230,6 +230,7 @@ export function CardDetail({
     item.authorAvatar || (authorLogin !== 'GitHub' ? `https://github.com/${authorLogin}.png?size=64` : '');
   const imageUrls = item.imageUrls ?? [];
   const tags = item.tags ?? [];
+  const commentCacheKey = `${authorLogin}/${item.id}`;
   const actionColumnClass =
     'grid w-20 shrink-0 grid-cols-2 items-center justify-items-start pr-0';
   const actionButtonBaseClass =
@@ -253,11 +254,25 @@ export function CardDetail({
   // Load all comments on mount
   useEffect(() => {
     let cancelled = false;
+    const cached = getCommentCache(commentCacheKey);
+    if (cached) {
+      setComments(cached.items);
+      if (!cached.stale) {
+        setCommentsLoading(false);
+        return () => {
+          cancelled = true;
+        };
+      }
+    }
+
     setCommentsLoading(true);
     api
       .getComments(authorLogin, item.id)
       .then((data) => {
-        if (!cancelled) setComments(data);
+        if (!cancelled) {
+          setComments(data);
+          setCommentCache(commentCacheKey, data);
+        }
       })
       .catch(() => {
         if (!cancelled) setComments([]);
@@ -268,7 +283,24 @@ export function CardDetail({
     return () => {
       cancelled = true;
     };
-  }, [authorLogin, item.id]);
+  }, [authorLogin, item.id, commentCacheKey]);
+
+  useEffect(() => {
+    setCommentLikeCounts((prev) => {
+      const next = { ...prev };
+      comments.forEach((comment) => {
+        if (next[comment.id] === undefined) {
+          next[comment.id] = 0;
+        }
+      });
+      Object.keys(next).forEach((id) => {
+        if (!comments.some((comment) => comment.id === id)) {
+          delete next[id];
+        }
+      });
+      return next;
+    });
+  }, [comments]);
 
   const handleToggleLike = async () => {
     if (likeBusy || !canInteract) return;
@@ -359,11 +391,17 @@ export function CardDetail({
       text: text.trim(),
       imageUrls: files.map((f) => URL.createObjectURL(f)),
       createdAt: new Date().toISOString(),
+      likeCount: 0,
+      liked: false,
       pending: true,
       parentId: replyPayload?.parentId ?? null,
       replyToUserLogin: replyPayload?.replyToUserLogin ?? null,
     };
-    setComments((prev) => [...prev, optimisticComment]);
+    setComments((prev) => {
+      const next = [...prev, optimisticComment];
+      setCommentCache(commentCacheKey, next);
+      return next;
+    });
     onCommentCountChange?.(item.id, 1);
     const submittedText = text.trim();
     const submittedFiles = files.length > 0 ? [...files] : undefined;
@@ -375,9 +413,17 @@ export function CardDetail({
 
     try {
       const newComment = await api.addComment(authorLogin, item.id, submittedText, submittedFiles, replyPayload);
-      setComments((prev) => prev.map((c) => (c.id === optimisticComment.id ? newComment : c)));
+      setComments((prev) => {
+        const next = prev.map((c) => (c.id === optimisticComment.id ? newComment : c));
+        setCommentCache(commentCacheKey, next);
+        return next;
+      });
     } catch (e) {
-      setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
+      setComments((prev) => {
+        const next = prev.filter((c) => c.id !== optimisticComment.id);
+        setCommentCache(commentCacheKey, next);
+        return next;
+      });
       onCommentCountChange?.(item.id, -1);
       setError(e instanceof Error ? e.message : '评论失败');
     } finally {
@@ -389,7 +435,11 @@ export function CardDetail({
     if (deletingCommentId) return;
     setDeletingCommentId(comment.id);
     // Optimistically remove
-    setComments((prev) => prev.filter((c) => c.id !== comment.id));
+    setComments((prev) => {
+      const next = prev.filter((c) => c.id !== comment.id);
+      setCommentCache(commentCacheKey, next);
+      return next;
+    });
     onCommentCountChange?.(item.id, -1);
     try {
       const commenter = comment.authorLogin !== currentUserLogin ? comment.authorLogin : undefined;
@@ -400,6 +450,7 @@ export function CardDetail({
         const restored = [...prev, comment].sort(
           (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
+        setCommentCache(commentCacheKey, restored);
         return restored;
       });
       onCommentCountChange?.(item.id, 1);
@@ -414,8 +465,39 @@ export function CardDetail({
     commentInputRef.current?.focus();
   };
 
-  const toggleCommentLike = (commentId: string) => {
-    setCommentLikes((prev) => ({ ...prev, [commentId]: !prev[commentId] }));
+  const toggleCommentLike = async (commentId: string) => {
+    if (!canInteract) return;
+    const target = comments.find((comment) => comment.id === commentId);
+    if (!target) return;
+
+    const optimisticLiked = !target.liked;
+    const optimisticCount = Math.max(0, (target.likeCount ?? 0) + (optimisticLiked ? 1 : -1));
+    setComments((prev) => {
+      const next = prev.map((comment) =>
+        comment.id === commentId ? { ...comment, liked: optimisticLiked, likeCount: optimisticCount } : comment
+      );
+      setCommentCache(commentCacheKey, next);
+      return next;
+    });
+
+    try {
+      const result = await api.toggleCommentLike(authorLogin, item.id, commentId);
+      setComments((prev) => {
+        const next = prev.map((comment) =>
+          comment.id === commentId ? { ...comment, liked: result.liked, likeCount: result.likeCount } : comment
+        );
+        setCommentCache(commentCacheKey, next);
+        return next;
+      });
+    } catch {
+      setComments((prev) => {
+        const next = prev.map((comment) =>
+          comment.id === commentId ? { ...comment, liked: target.liked, likeCount: target.likeCount } : comment
+        );
+        setCommentCache(commentCacheKey, next);
+        return next;
+      });
+    }
   };
 
   const isCardOwner = currentUserLogin ? authorLogin.toLowerCase() === currentUserLogin.toLowerCase() : false;
@@ -568,7 +650,7 @@ export function CardDetail({
                       c.authorLogin.toLowerCase() === currentUserLogin.toLowerCase() || isCardOwner
                     );
                     const replies = repliesByParent.get(c.id) ?? [];
-                    const liked = !!commentLikes[c.id];
+                    const liked = !!c.liked;
                     return (
                       <div className="px-4 py-3" key={c.id}>
                         <div className="flex gap-3">
@@ -606,6 +688,7 @@ export function CardDetail({
                                 type="button"
                               >
                                 <Heart className={liked ? 'fill-current' : ''} size={13} />
+                                <span className="text-[10px] leading-none">{c.likeCount ?? 0}</span>
                               </button>
                               <button
                                 className="inline-flex items-center gap-1 text-xs hover:text-[var(--text-main)] transition"
@@ -632,64 +715,72 @@ export function CardDetail({
                         </div>
 
                         {replies.length > 0 ? (
-                          <div className="mt-2 space-y-2 pl-10">
+                          <div className="mt-2 space-y-2 pl-8">
                             {replies.map((reply) => {
                               const replyTarget = getReplyTargetLabel(reply);
                               const line = replyTarget
                                 ? `${reply.authorLogin} 回复 ${replyTarget}: ${reply.text ?? ''}`.trim()
                                 : `${reply.authorLogin}: ${reply.text ?? ''}`.trim();
-                              const replyLiked = !!commentLikes[reply.id];
+                              const replyLiked = !!reply.liked;
                               const canDeleteReply = currentUserLogin && (
                                 reply.authorLogin.toLowerCase() === currentUserLogin.toLowerCase() || isCardOwner
                               );
                               return (
-                                <div className="flex flex-col gap-1" key={reply.id}>
-                                  <div className="flex flex-wrap items-center gap-x-2 text-xs text-soft">
-                                    <span className="text-sm text-[var(--text-main)]">{line}</span>
-                                    <span>{toCommentTime(reply.createdAt)}</span>
-                                    {reply.pending ? <LoaderCircle className="animate-spin" size={12} /> : null}
-                                  </div>
-                                  {reply.imageUrls && reply.imageUrls.length > 0 ? (
-                                    <div className="mt-1 grid max-w-56 grid-cols-3 gap-1">
-                                      {reply.imageUrls.map((url, index) => (
-                                        <img
-                                          alt="评论图片"
-                                          className="h-16 w-full cursor-pointer rounded object-cover"
-                                          key={`${reply.id}-${url}`}
-                                          onClick={() => setViewingCommentImage({ urls: reply.imageUrls!, initialIndex: index })}
-                                          src={url}
-                                        />
-                                      ))}
+                                <div className="flex gap-2" key={reply.id}>
+                                  <img
+                                    alt={reply.authorLogin}
+                                    className="mt-0.5 h-6 w-6 shrink-0 rounded-full object-cover"
+                                    src={`https://github.com/${reply.authorLogin}.png?size=48`}
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-x-2 text-xs text-soft">
+                                      <span className="text-sm text-[var(--text-main)] break-words">{line}</span>
+                                      <span>{toCommentTime(reply.createdAt)}</span>
+                                      {reply.pending ? <LoaderCircle className="animate-spin" size={12} /> : null}
                                     </div>
-                                  ) : null}
-                                  <div className="flex items-center gap-3 text-soft">
-                                    <button
-                                      className={`inline-flex items-center gap-1 text-xs transition ${replyLiked ? 'text-rose-300' : 'hover:text-rose-300'}`}
-                                      onClick={() => toggleCommentLike(reply.id)}
-                                      type="button"
-                                    >
-                                      <Heart className={replyLiked ? 'fill-current' : ''} size={12} />
-                                    </button>
-                                    <button
-                                      className="inline-flex items-center gap-1 text-xs hover:text-[var(--text-main)] transition"
-                                      onClick={() => handleReplyClick(reply)}
-                                      type="button"
-                                    >
-                                      <CornerUpLeft size={12} />
-                                    </button>
-                                    {canDeleteReply ? (
+                                    {reply.imageUrls && reply.imageUrls.length > 0 ? (
+                                      <div className="mt-1 grid max-w-56 grid-cols-3 gap-1">
+                                        {reply.imageUrls.map((url, index) => (
+                                          <img
+                                            alt="评论图片"
+                                            className="h-16 w-full cursor-pointer rounded object-cover"
+                                            key={`${reply.id}-${url}`}
+                                            onClick={() => setViewingCommentImage({ urls: reply.imageUrls!, initialIndex: index })}
+                                            src={url}
+                                          />
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                    <div className="flex items-center gap-3 text-soft">
                                       <button
-                                        aria-label="删除评论"
-                                        className="ml-auto inline-flex h-6 w-6 items-center justify-center text-soft transition hover:text-rose-300"
-                                        disabled={deletingCommentId === reply.id}
-                                        onClick={() => {
-                                          confirm('确定要删除这条评论吗？', () => { void handleDeleteComment(reply); });
-                                        }}
+                                        className={`inline-flex items-center gap-1 text-xs transition ${replyLiked ? 'text-rose-300' : 'hover:text-rose-300'}`}
+                                        onClick={() => toggleCommentLike(reply.id)}
                                         type="button"
                                       >
-                                        {deletingCommentId === reply.id ? <LoaderCircle className="animate-spin" size={12} /> : <Trash2 size={12} />}
+                                        <Heart className={replyLiked ? 'fill-current' : ''} size={12} />
+                                        <span className="text-[10px] leading-none">{reply.likeCount ?? 0}</span>
                                       </button>
-                                    ) : null}
+                                      <button
+                                        className="inline-flex items-center gap-1 text-xs hover:text-[var(--text-main)] transition"
+                                        onClick={() => handleReplyClick(reply)}
+                                        type="button"
+                                      >
+                                        <CornerUpLeft size={12} />
+                                      </button>
+                                      {canDeleteReply ? (
+                                        <button
+                                          aria-label="删除评论"
+                                          className="ml-auto inline-flex h-6 w-6 items-center justify-center text-soft transition hover:text-rose-300"
+                                          disabled={deletingCommentId === reply.id}
+                                          onClick={() => {
+                                            confirm('确定要删除这条评论吗？', () => { void handleDeleteComment(reply); });
+                                          }}
+                                          type="button"
+                                        >
+                                          {deletingCommentId === reply.id ? <LoaderCircle className="animate-spin" size={12} /> : <Trash2 size={12} />}
+                                        </button>
+                                      ) : null}
+                                    </div>
                                   </div>
                                 </div>
                               );

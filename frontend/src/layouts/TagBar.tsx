@@ -14,7 +14,7 @@ export function TagBar({ tags, selectedTag, onSelect, className }: TagBarProps) 
       <div className="flex flex-wrap gap-2">
         <button
           className={`tag-chip rounded-full border border-cyan-400/25 px-2.5 py-1 text-xs transition ${
-            selectedTag === null ? 'bg-cyan-500/20 text-cyan-200' : 'text-soft hover:text-[var(--text-main)]'
+            selectedTag === null ? 'tag-chip-active' : 'text-soft hover:text-[var(--text-main)]'
           }`}
           onClick={() => onSelect(null)}
           type="button"
@@ -26,7 +26,7 @@ export function TagBar({ tags, selectedTag, onSelect, className }: TagBarProps) 
           return (
             <button
               className={`tag-chip rounded-full border border-cyan-400/25 px-2.5 py-1 text-xs transition ${
-                isActive ? 'bg-cyan-500/20 text-cyan-200' : 'text-soft hover:text-[var(--text-main)]'
+                isActive ? 'tag-chip-active' : 'text-soft hover:text-[var(--text-main)]'
               }`}
               key={entry.tag}
               onClick={() => onSelect(isActive ? null : entry.tag)}

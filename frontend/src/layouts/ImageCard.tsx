@@ -5,6 +5,7 @@ import { ImageViewer } from '../ui/ImageViewer';
 import { PostDialog } from '../ui/PostDialog';
 import { useToast } from '../ui/useToast';
 import { api } from '../lib/api';
+import { getCommentCache, setCommentCache } from '../lib/commentCache';
 import type { CommentItem, ImageItem, UpdateImagePayload } from '../types/image';
 
 interface ImageCardProps {
@@ -107,14 +108,12 @@ function ImageGrid({ urls, alt, onImageClick }: { urls: string[]; alt: string; o
 
   if (urls.length === 1) {
     return (
-      <div className="flex justify-center">
+      <div className="w-full">
         <div
-          className="w-2/3 cursor-pointer overflow-hidden bg-slate-950/20"
+          className="relative aspect-square w-full cursor-pointer overflow-hidden bg-slate-950/20"
           onClick={(e) => { e.stopPropagation(); onImageClick(0); }}
         >
-          <div className="relative aspect-square">
-            <img alt={alt} className="absolute inset-0 h-full w-full object-cover" src={urls[0]} />
-          </div>
+          <img alt={alt} className="absolute inset-0 h-full w-full object-cover" src={urls[0]} />
         </div>
       </div>
     );
@@ -177,6 +176,7 @@ export function ImageCard({
     item.authorAvatar || (authorLogin !== 'GitHub' ? `https://github.com/${authorLogin}.png?size=64` : '');
   const imageUrls = item.imageUrls ?? [];
   const tags = item.tags ?? [];
+  const commentCacheKey = `${authorLogin}/${item.id}`;
 
   const handleEditSubmit = async (data: {
     description: string;
@@ -221,11 +221,22 @@ export function ImageCard({
   };
 
   const loadCommentsIfNeeded = () => {
-    if (comments.length === 0 && !commentsLoading) {
+    if (commentsLoading) return;
+    const cached = getCommentCache(commentCacheKey);
+    if (cached) {
+      setComments(cached.items);
+      if (!cached.stale) {
+        return;
+      }
+    }
+    if (comments.length === 0 || cached?.stale) {
       setCommentsLoading(true);
       api
         .getComments(authorLogin, item.id)
-        .then((data) => { setComments(data); })
+        .then((data) => {
+          setComments(data);
+          setCommentCache(commentCacheKey, data);
+        })
         .catch(() => { setComments([]); })
         .finally(() => { setCommentsLoading(false); });
     }
@@ -246,15 +257,29 @@ export function ImageCard({
       text,
       imageUrls: files ? files.map((f) => URL.createObjectURL(f)) : undefined,
       createdAt: new Date().toISOString(),
+      likeCount: 0,
+      liked: false,
       pending: true,
     };
-    setComments((prev) => [...prev, optimisticComment]);
+    setComments((prev) => {
+      const next = [...prev, optimisticComment];
+      setCommentCache(commentCacheKey, next);
+      return next;
+    });
     onCommentCountChange?.(item.id, 1);
     try {
       const newComment = await api.addComment(authorLogin, item.id, text, files);
-      setComments((prev) => prev.map((c) => (c.id === optimisticComment.id ? newComment : c)));
+      setComments((prev) => {
+        const next = prev.map((c) => (c.id === optimisticComment.id ? newComment : c));
+        setCommentCache(commentCacheKey, next);
+        return next;
+      });
     } catch {
-      setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
+      setComments((prev) => {
+        const next = prev.filter((c) => c.id !== optimisticComment.id);
+        setCommentCache(commentCacheKey, next);
+        return next;
+      });
       onCommentCountChange?.(item.id, -1);
     } finally {
       setCommentBusy(false);
@@ -393,6 +418,10 @@ export function ImageCard({
                         <span className="text-[var(--text-main)]">：</span>
                       )}
                       {c.text ? <span className="text-[var(--text-main)]">{c.text}</span> : null}
+                      <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-soft">
+                        <Heart className={c.liked ? 'fill-current text-rose-300' : ''} size={10} />
+                        {c.likeCount ?? 0}
+                      </span>
                       {c.pending ? <LoaderCircle className="ml-1 inline-block animate-spin text-soft" size={12} /> : null}
                       {c.imageUrls && c.imageUrls.length > 0 ? (
                         <div className="mt-1 grid max-w-40 grid-cols-3 gap-1">

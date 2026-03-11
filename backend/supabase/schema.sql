@@ -50,6 +50,19 @@ alter table public.comments add column if not exists reply_to_user_login text;
 create index if not exists comments_post_parent_idx on public.comments (post_owner, post_id, parent_id, created_at asc);
 create index if not exists comments_parent_idx on public.comments (parent_id);
 
+create table if not exists public.comment_likes (
+  comment_id text not null,
+  post_owner text not null,
+  post_id text not null,
+  login text not null,
+  avatar_url text not null default '',
+  liked_at timestamptz not null,
+  primary key (comment_id, login)
+);
+
+create index if not exists comment_likes_post_idx on public.comment_likes (post_owner, post_id);
+create index if not exists comment_likes_comment_idx on public.comment_likes (comment_id);
+
 create index if not exists images_tags_gin_idx on public.images using gin (tags jsonb_path_ops);
 
 create or replace view public.tag_counts as

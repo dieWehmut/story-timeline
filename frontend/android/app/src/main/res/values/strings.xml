@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">story-timeline</string>
+    <string name="app_name">物語集</string>
     <string name="title_activity_main">story-timeline</string>
     <string name="package_name">storytimeline.me</string>
     <string name="custom_url_scheme">storytimeline.me</string>

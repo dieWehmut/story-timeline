@@ -45,6 +45,15 @@ type likeRecord struct {
 	LikedAt    time.Time `json:"liked_at"`
 }
 
+type commentLikeRecord struct {
+	CommentID string    `json:"comment_id"`
+	PostOwner string    `json:"post_owner"`
+	PostID    string    `json:"post_id"`
+	Login     string    `json:"login"`
+	AvatarURL string    `json:"avatar_url"`
+	LikedAt   time.Time `json:"liked_at"`
+}
+
 type commentRecord struct {
 	ID           string    `json:"id"`
 	PostOwner    string    `json:"post_owner"`
@@ -193,6 +202,77 @@ func (storage *SupabaseStorage) DeleteLike(ctx context.Context, ownerLogin strin
 	params.Set("post_id", "eq."+postID)
 	params.Set("login", "eq."+login)
 	return storage.requestJSON(ctx, http.MethodDelete, "/likes", params, nil, nil, nil)
+}
+
+func (storage *SupabaseStorage) ListCommentLikesByPost(ctx context.Context, postOwner string, postID string) ([]model.CommentLike, error) {
+	params := url.Values{}
+	params.Set("select", "comment_id,post_owner,post_id,login,avatar_url,liked_at")
+	params.Set("post_owner", "eq."+postOwner)
+	params.Set("post_id", "eq."+postID)
+	params.Set("order", "liked_at.asc")
+
+	var records []commentLikeRecord
+	if err := storage.requestJSON(ctx, http.MethodGet, "/comment_likes", params, nil, &records, nil); err != nil {
+		return nil, err
+	}
+
+	likes := make([]model.CommentLike, 0, len(records))
+	for _, record := range records {
+		likes = append(likes, model.CommentLike{
+			CommentID: record.CommentID,
+			PostOwner: record.PostOwner,
+			PostID:    record.PostID,
+			Login:     record.Login,
+			AvatarURL: record.AvatarURL,
+			LikedAt:   record.LikedAt,
+		})
+	}
+	return likes, nil
+}
+
+func (storage *SupabaseStorage) ListCommentLikesByComment(ctx context.Context, commentID string) ([]model.CommentLike, error) {
+	params := url.Values{}
+	params.Set("select", "comment_id,post_owner,post_id,login,avatar_url,liked_at")
+	params.Set("comment_id", "eq."+commentID)
+	params.Set("order", "liked_at.asc")
+
+	var records []commentLikeRecord
+	if err := storage.requestJSON(ctx, http.MethodGet, "/comment_likes", params, nil, &records, nil); err != nil {
+		return nil, err
+	}
+
+	likes := make([]model.CommentLike, 0, len(records))
+	for _, record := range records {
+		likes = append(likes, model.CommentLike{
+			CommentID: record.CommentID,
+			PostOwner: record.PostOwner,
+			PostID:    record.PostID,
+			Login:     record.Login,
+			AvatarURL: record.AvatarURL,
+			LikedAt:   record.LikedAt,
+		})
+	}
+	return likes, nil
+}
+
+func (storage *SupabaseStorage) UpsertCommentLike(ctx context.Context, like model.CommentLike) error {
+	payload := []commentLikeRecord{{
+		CommentID: like.CommentID,
+		PostOwner: like.PostOwner,
+		PostID:    like.PostID,
+		Login:     like.Login,
+		AvatarURL: like.AvatarURL,
+		LikedAt:   like.LikedAt,
+	}}
+	prefer := []string{"resolution=merge-duplicates"}
+	return storage.requestJSON(ctx, http.MethodPost, "/comment_likes", url.Values{"on_conflict": []string{"comment_id,login"}}, payload, nil, prefer)
+}
+
+func (storage *SupabaseStorage) DeleteCommentLike(ctx context.Context, commentID string, login string) error {
+	params := url.Values{}
+	params.Set("comment_id", "eq."+commentID)
+	params.Set("login", "eq."+login)
+	return storage.requestJSON(ctx, http.MethodDelete, "/comment_likes", params, nil, nil, nil)
 }
 
 func (storage *SupabaseStorage) AddComment(ctx context.Context, comment model.Comment) error {

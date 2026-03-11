@@ -83,6 +83,8 @@ export interface CommentItem {
   imageUrl?: string;
   imageUrls?: string[];
   createdAt: string;
+  likeCount: number;
+  liked: boolean;
   parentId?: string | null;
   replyToUserLogin?: string | null;
 }

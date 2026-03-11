@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	maxFiles        = 9
+	maxFiles        = 15
 	maxCommentFiles = 3
 	maxFileSize     = 5 << 20  // 5 MB
 	maxTotalSize    = 25 << 20 // 25 MB
@@ -402,6 +402,30 @@ func (controller *ImageController) ToggleLike(c *gin.Context) {
 	})
 }
 
+// ToggleCommentLike toggles a like on a comment.
+func (controller *ImageController) ToggleCommentLike(c *gin.Context) {
+	ownerLogin := c.Param("ownerLogin")
+	postID := c.Param("imageID")
+	commentID := c.Param("commentID")
+
+	session, ok := middleware.SessionFromContext(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing session"})
+		return
+	}
+
+	likeCount, liked, err := controller.interactionService.ToggleCommentLike(c.Request.Context(), ownerLogin, postID, commentID, session.User)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"likeCount": likeCount,
+		"liked":     liked,
+	})
+}
+
 // GetComments returns comments for a post.
 func (controller *ImageController) GetComments(c *gin.Context) {
 	ownerLogin := c.Param("ownerLogin")
@@ -432,6 +456,19 @@ func (controller *ImageController) GetComments(c *gin.Context) {
 	}
 
 	comments := controller.interactionService.GetAllComments(c.Request.Context(), tokenFromSession(session), ownerLogin, postID, feedLogins)
+	currentLogin := ""
+	if session != nil {
+		currentLogin = session.User.Login
+	}
+	commentLikes := controller.interactionService.GetCommentLikesByPost(c.Request.Context(), ownerLogin, postID)
+	likeCounts := make(map[string]int)
+	likedBy := make(map[string]bool)
+	for _, like := range commentLikes {
+		likeCounts[like.CommentID] += 1
+		if currentLogin != "" && strings.EqualFold(like.Login, currentLogin) {
+			likedBy[like.CommentID] = true
+		}
+	}
 	result := make([]dto.CommentResponse, 0, len(comments))
 	for _, cm := range comments {
 		var imageUrl string
@@ -448,6 +485,8 @@ func (controller *ImageController) GetComments(c *gin.Context) {
 			ImageUrl:    imageUrl,
 			ImageURLs:   imageURLs,
 			CreatedAt:   cm.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
+			LikeCount:   likeCounts[cm.ID],
+			Liked:       likedBy[cm.ID],
 			ParentID:    cm.ParentID,
 			ReplyToUserLogin: cm.ReplyToUserLogin,
 		})
@@ -529,6 +568,8 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 		ImageUrl:    imageUrl,
 		ImageURLs:   imageURLs,
 		CreatedAt:   comment.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
+		LikeCount:   0,
+		Liked:       false,
 		ParentID:    comment.ParentID,
 		ReplyToUserLogin: comment.ReplyToUserLogin,
 	})
