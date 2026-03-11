@@ -60,8 +60,10 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 			images.POST("/:ownerLogin/:imageID/comments", middleware.RequireAuth(deps.AuthService), deps.ImageController.AddComment)
 			images.DELETE("/:ownerLogin/:imageID/comments/:commentID", middleware.RequireAuth(deps.AuthService), deps.ImageController.DeleteComment)
 
-			// Create
+			// Create — register both "" and "/" so POST /api/images and POST /api/images/ both
+			// hit the same handler; avoids redirect loop when proxy forwards to /api/images/.
 			images.POST("", middleware.RequireAuth(deps.AuthService), deps.ImageController.Create)
+			images.POST("/", middleware.RequireAuth(deps.AuthService), deps.ImageController.Create)
 		}
 
 		// Update/delete use a separate prefix to avoid wildcard conflict with /:ownerLogin routes
