@@ -112,13 +112,11 @@ const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise
       return await doFetch(alt);
     }
 
-    // If we have no API_BASE (we rely on the same-origin proxy) but the
-    // request failed due to a redirect loop or a low-level network error,
-    // try calling the HF Space directly as a last-resort fallback. This is
-    // useful when the proxy is misconfigured and keeps redirecting to the
-    // frontend host (ERR_TOO_MANY_REDIRECTS).
+    // When we use same-origin proxy (API_BASE empty), do not fall back to calling
+    // HF directly: the browser would send no HF_TOKEN and get 502. Only retry
+    // direct to HF when we had an explicit API_BASE that looks like proxy and failed.
     if (
-      !API_BASE &&
+      API_BASE &&
       typeof input === 'string' &&
       (input.startsWith('/') || input.startsWith(API_BASE)) &&
       (err instanceof Error && (err.message.includes('redirect') || err.message.includes('Too many redirects') || err instanceof TypeError))
@@ -204,7 +202,11 @@ export const api = {
   getFeedUsers: () => request<FeedUser[]>(`${API_BASE}/api/feed/users`),
   createImage: async (payload: CreateImagePayload) => {
     const body = await buildImageFormData(payload);
-    const imagesEndpoint = API_BASE.includes('.hf.space') ? `${API_BASE}/api/images/` : `${API_BASE}/api/images`;
+    // Use trailing slash when using proxy (API_BASE empty) or direct HF to avoid redirect loops.
+    const imagesEndpoint =
+      API_BASE === '' || API_BASE.includes('.hf.space')
+        ? `${API_BASE}/api/images/`
+        : `${API_BASE}/api/images`;
     return normalizeImageItem(await request<ImageItem>(imagesEndpoint, { method: 'POST', body }));
   },
   updateImage: async (payload: UpdateImagePayload) => {
