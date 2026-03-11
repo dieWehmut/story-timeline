@@ -22,7 +22,6 @@ export const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE ?? '');
 // log the computed base so we can spot misconfiguration in client consoles
 if (typeof window !== 'undefined') {
   // eslint-disable-next-line no-console
-  
 }
 
 const withApiBase = (value: string) => {
@@ -195,6 +194,11 @@ const buildImageFormData = async (payload: CreateImagePayload | UpdateImagePaylo
   return formData;
 };
 
+type CommentPayloadOptions = {
+  parentId?: string | null;
+  replyToUserLogin?: string | null;
+};
+
 export const api = {
   getSession: async () => normalizeSession(await request<AuthSession>(`${API_BASE}/api/auth/session`)),
   logout: () => request<{ ok: boolean }>(`${API_BASE}/api/auth/logout`, { method: 'POST' }),
@@ -220,10 +224,12 @@ export const api = {
     const items = await request<CommentItem[]>(`${API_BASE}/api/images/${ownerLogin}/${postID}/comments`);
     return items.map(normalizeCommentItem);
   },
-  addComment: async (ownerLogin: string, postID: string, text: string, files?: File[]) => {
+  addComment: async (ownerLogin: string, postID: string, text: string, files?: File[], options?: CommentPayloadOptions) => {
     if (files && files.length > 0) {
       const formData = new FormData();
       formData.set('text', text);
+      if (options?.parentId) formData.set('parentId', options.parentId);
+      if (options?.replyToUserLogin) formData.set('replyToUserLogin', options.replyToUserLogin);
       for (const [index, file] of files.entries()) {
         const webpBlob = await fileToWebp(file);
         formData.append('files', webpBlob, `comment-${index + 1}.webp`);
@@ -237,7 +243,11 @@ export const api = {
     const item = await request<CommentItem>(`${API_BASE}/api/images/${ownerLogin}/${postID}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({
+        text,
+        parentId: options?.parentId ?? null,
+        replyToUserLogin: options?.replyToUserLogin ?? null,
+      }),
     });
     return normalizeCommentItem(item);
   },

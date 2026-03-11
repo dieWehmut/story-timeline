@@ -83,6 +83,8 @@ export interface CommentItem {
   imageUrl?: string;
   imageUrls?: string[];
   createdAt: string;
+  parentId?: string | null;
+  replyToUserLogin?: string | null;
 }
 
 export interface LikeToggleResult {

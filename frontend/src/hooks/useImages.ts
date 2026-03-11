@@ -28,6 +28,8 @@ const getMonthKey = (startAt: string) => {
   };
 };
 
+const normalizeTagKey = (value: string) => value.trim().toLowerCase();
+
 type TimeSortOrder = 'desc' | 'asc';
 
 const defaultStats: HealthStats = {
@@ -117,6 +119,7 @@ export const useImages = () => {
   const [items, setItems] = useState<ImageItem[]>(cachedFeed ? sortByDate(cachedFeed, cachedSortOrder) : []);
   const [feedUsers, setFeedUsers] = useState<FeedUser[]>(cachedUsers ?? []);
   const [filterUser, setFilterUser] = useState<string | null>(null);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [stats, setStats] = useState<HealthStats>(cachedStats?.stats ?? defaultStats);
   const [timeOrder, setTimeOrder] = useState<TimeSortOrder>(cachedSortOrder);
   const lastStatsFetchRef = useRef<number>(cachedStats?.timestamp ?? 0);
@@ -193,13 +196,55 @@ export const useImages = () => {
     saveSortOrder(timeOrder);
   }, [timeOrder]);
 
-  // Filter items by selected user
-  const filteredItems = useMemo(() => {
+  const userScopedItems = useMemo(() => {
     if (!filterUser) return items;
     return items.filter(
       (item) => item.authorLogin.toLowerCase() === filterUser.toLowerCase()
     );
   }, [items, filterUser]);
+
+  const { tagSummary, tagCountMap } = useMemo(() => {
+    const counts = new Map<string, { tag: string; count: number }>();
+    userScopedItems.forEach((item) => {
+      (item.tags ?? []).forEach((tag) => {
+        const key = normalizeTagKey(tag);
+        if (!key) return;
+        const existing = counts.get(key);
+        if (existing) {
+          existing.count += 1;
+        } else {
+          counts.set(key, { tag, count: 1 });
+        }
+      });
+    });
+    const summary = [...counts.values()].sort((left, right) => {
+      if (right.count !== left.count) return right.count - left.count;
+      return left.tag.localeCompare(right.tag, 'zh-Hans-CN');
+    });
+    const countMap: Record<string, number> = {};
+    summary.forEach((entry) => {
+      countMap[normalizeTagKey(entry.tag)] = entry.count;
+    });
+    return { tagSummary: summary, tagCountMap: countMap };
+  }, [userScopedItems]);
+
+  useEffect(() => {
+    if (!tagFilter) return;
+    const key = normalizeTagKey(tagFilter);
+    const exists = tagSummary.some((entry) => normalizeTagKey(entry.tag) === key);
+    if (!exists) {
+      setTagFilter(null);
+    }
+  }, [tagFilter, tagSummary]);
+
+  // Filter items by selected user + tag
+  const filteredItems = useMemo(() => {
+    if (!tagFilter) return userScopedItems;
+    const key = normalizeTagKey(tagFilter);
+    return userScopedItems.filter((item) =>
+      (item.tags ?? []).some((tag) => normalizeTagKey(tag) === key)
+    );
+  }, [userScopedItems, tagFilter]);
 
   const timeline = useMemo<TimelineMonth[]>(() => {
     const monthMap = new Map<string, TimelineMonth>();
@@ -215,7 +260,7 @@ export const useImages = () => {
 
       monthMap.set(month.key, {
         ...month,
-        label: `${month.year}年 ${month.month}月`,
+        label: `${month.year}年${month.month}月`,
         count: 1,
       });
     });
@@ -387,6 +432,10 @@ export const useImages = () => {
     feedUsers,
     filterUser,
     setFilterUser,
+    tagFilter,
+    setTagFilter,
+    tagSummary,
+    tagCountMap,
     timeline,
     timeOrder,
     toggleTimeOrder,

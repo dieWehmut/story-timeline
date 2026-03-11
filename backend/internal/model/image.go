@@ -94,6 +94,8 @@ type Comment struct {
 	PostID     string    `json:"postId"`
 	AuthorLogin string   `json:"authorLogin,omitempty"`
 	AuthorAvatar string  `json:"authorAvatar,omitempty"`
+	ParentID   string    `json:"parentId,omitempty"`
+	ReplyToUserLogin string `json:"replyToUserLogin,omitempty"`
 	Text       string    `json:"text"`
 	ImagePath  string    `json:"imagePath,omitempty"`
 	ImagePaths []string  `json:"imagePaths,omitempty"`

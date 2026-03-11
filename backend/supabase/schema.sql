@@ -43,3 +43,35 @@ create table if not exists public.comments (
 
 create index if not exists comments_post_idx on public.comments (post_owner, post_id, created_at asc);
 create index if not exists comments_author_idx on public.comments (author_login);
+
+alter table public.comments add column if not exists parent_id text;
+alter table public.comments add column if not exists reply_to_user_login text;
+
+create index if not exists comments_post_parent_idx on public.comments (post_owner, post_id, parent_id, created_at asc);
+create index if not exists comments_parent_idx on public.comments (parent_id);
+
+create index if not exists images_tags_gin_idx on public.images using gin (tags jsonb_path_ops);
+
+create or replace view public.tag_counts as
+select
+  author_login,
+  tag,
+  count(*)::int as post_count
+from public.images,
+  jsonb_array_elements_text(images.tags) as tag
+group by author_login, tag;
+
+create or replace function public.get_tag_counts(filter_author text default null)
+returns table(tag text, post_count int)
+language sql
+stable
+as $$
+  select
+    tag,
+    count(*)::int as post_count
+  from public.images,
+    jsonb_array_elements_text(images.tags) as tag
+  where filter_author is null or images.author_login = filter_author
+  group by tag
+  order by post_count desc, tag asc;
+$$;

@@ -1,6 +1,7 @@
-﻿import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Plus, Trash2, X } from 'lucide-react';
 import { useToast } from './useToast';
+import { setPostDialogOpen } from '../lib/uiFlags';
 
 interface PostDialogProps {
   open: boolean;
@@ -131,6 +132,14 @@ export function PostDialog({
     previewsRef.current = previews;
   }, [previews]);
 
+  useEffect(() => {
+    if (open) {
+      setPostDialogOpen(true);
+      return () => setPostDialogOpen(false);
+    }
+    return undefined;
+  }, [open]);
+
   const initialUrlsKey = initialImageUrls.join(',');
   const initialTagsKey = initialTags.join(',');
 
@@ -232,14 +241,14 @@ export function PostDialog({
       for (const item of next) {
         if (item.file) {
           if (item.file.size > MAX_FILE_SIZE) {
-            setError(`鍗曞紶鍥剧墖涓嶈兘瓒呰繃 5MB: ${item.file.name}`);
+            setError(`单张图片不能超过 5MB: ${item.file.name}`);
             return;
           }
           totalSize += item.file.size;
         }
       }
       if (totalSize > MAX_TOTAL_SIZE) {
-        setError('甯栧瓙鎬诲ぇ灏忎笉鑳借秴杩?25MB');
+        setError('帖子总大小不能超过 25MB');
         return;
       }
       setError(null);
@@ -275,7 +284,7 @@ export function PostDialog({
       return;
     }
     if (normalized.length > MAX_TAG_LENGTH) {
-      setError(`Tag must be <= ${MAX_TAG_LENGTH} chars.`);
+      setError(`标签不能超过 ${MAX_TAG_LENGTH} 个字符`);
       return;
     }
     if (tags.some((tag) => tag.toLowerCase() === normalized.toLowerCase())) {
@@ -283,7 +292,7 @@ export function PostDialog({
       return;
     }
     if (tags.length >= MAX_TAGS) {
-      setError(`At most ${MAX_TAGS} tags.`);
+      setError(`最多添加 ${MAX_TAGS} 个标签`);
       return;
     }
     setTags((current) => [...current, normalized]);
@@ -300,27 +309,25 @@ export function PostDialog({
     applyTag(tagInput);
   }, [applyTag, tagInput]);
 
-
-
   const removeTag = useCallback((tagToRemove: string) => {
     setTags((current) => current.filter((tag) => tag !== tagToRemove));
   }, []);
 
   const handleSubmit = async () => {
     if (!startAt) {
-      setError('Please select start time.');
+      setError('请选择开始时间');
       return;
     }
     if (timeMode === 'range' && !endAt) {
-      setError('Please select end time.');
+      setError('请选择结束时间');
       return;
     }
     if (timeMode === 'range' && new Date(endAt).getTime() < new Date(startAt).getTime()) {
-      setError('End time cannot be before start time.');
+      setError('结束时间不能早于开始时间');
       return;
     }
     if (!description.trim() && previews.length === 0) {
-      setError('璇疯緭鍏ユ枃瀛楁垨閫夋嫨鍥剧墖');
+      setError('请输入文字或选择图片');
       return;
     }
 
@@ -348,7 +355,7 @@ export function PostDialog({
         postDraftFileCache.delete(DRAFT_KEY);
       }
     } catch (submitError) {
-      toast(submitError instanceof Error ? submitError.message : '鎻愪氦澶辫触', 'error');
+      toast(submitError instanceof Error ? submitError.message : '提交失败', 'error');
     }
   };
 
@@ -434,7 +441,7 @@ export function PostDialog({
       <div className={`flex h-full w-full flex-col bg-[var(--page-bg)] transition-all duration-250 md:h-auto md:max-h-[90vh] md:max-w-lg md:border md:border-[var(--panel-border)] md:bg-[var(--panel-bg)] md:backdrop-blur-xl ${visible ? 'translate-y-0 opacity-100 md:scale-100' : 'translate-y-full opacity-100 md:translate-y-0 md:scale-95 md:opacity-0'}`}>
         <div className="flex shrink-0 items-center justify-between px-4 py-3">
           <button className="text-sm text-soft hover:text-[var(--text-main)] transition" onClick={onClose} type="button">
-            鍙栨秷
+            取消
           </button>
           <button
             className="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
@@ -442,7 +449,7 @@ export function PostDialog({
             onClick={() => void handleSubmit()}
             type="button"
           >
-            {busy ? '鎻愪氦涓?..' : mode === 'create' ? '鍙戣〃' : '淇敼'}
+            {busy ? '提交中...' : mode === 'create' ? '发表' : '修改'}
           </button>
         </div>
 
@@ -451,7 +458,7 @@ export function PostDialog({
             className="min-h-20 w-full resize-none bg-transparent text-base text-[var(--text-main)] outline-none placeholder:text-soft/50"
             id={descriptionId}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="瑷橀寗涓€涓?.."
+            placeholder="写点什么..."
             value={description}
           />
 
@@ -482,7 +489,7 @@ export function PostDialog({
                   removeTag(tags[tags.length - 1]);
                 }
               }}
-              placeholder="Add tags, press Enter"
+              placeholder="添加标签，回车确认"
               value={tagInput}
             />
             {availableTags.length > 0 ? (
@@ -563,14 +570,14 @@ export function PostDialog({
                 onClick={() => setTimeMode('point')}
                 type="button"
               >
-                鏃堕棿鐐?
+                时间点
               </button>
               <button
                 className={`time-mode-btn rounded border border-transparent px-3 py-1.5 transition ${timeMode === 'range' ? 'time-mode-active bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-400/40' : 'bg-white/5 text-soft hover:text-[var(--text-main)]'}`}
                 onClick={() => setTimeMode('range')}
                 type="button"
               >
-                鎸佺画鏃堕棿
+                持续时间
               </button>
             </div>
             <input
@@ -612,18 +619,10 @@ export function PostDialog({
             ref={deleteZoneRef}
           >
             <Trash2 size={18} />
-            <span>Drag here to delete</span>
+            <span>拖到此处删除</span>
           </div>
         ) : null}
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-
-

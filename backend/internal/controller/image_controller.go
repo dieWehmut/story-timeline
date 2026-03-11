@@ -1,4 +1,4 @@
-package controller
+﻿package controller
 
 import (
 	"fmt"
@@ -448,6 +448,8 @@ func (controller *ImageController) GetComments(c *gin.Context) {
 			ImageUrl:    imageUrl,
 			ImageURLs:   imageURLs,
 			CreatedAt:   cm.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
+			ParentID:    cm.ParentID,
+			ReplyToUserLogin: cm.ReplyToUserLogin,
 		})
 	}
 
@@ -466,6 +468,8 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 	}
 
 	var text string
+	var parentID string
+	var replyToUserLogin string
 	var imageData [][]byte
 
 	contentType := c.GetHeader("Content-Type")
@@ -475,6 +479,8 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 			return
 		}
 		text = strings.TrimSpace(c.PostForm("text"))
+		parentID = strings.TrimSpace(c.PostForm("parentId"))
+		replyToUserLogin = strings.TrimSpace(c.PostForm("replyToUserLogin"))
 		files, err := readMultipartFilesWithLimit(c.Request, maxCommentFiles)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -483,13 +489,17 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 		imageData = files
 	} else {
 		var body struct {
-			Text string `json:"text"`
+			Text             string `json:"text"`
+			ParentID         string `json:"parentId"`
+			ReplyToUserLogin string `json:"replyToUserLogin"`
 		}
 		if err := c.ShouldBindJSON(&body); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "请输入评论内容"})
 			return
 		}
 		text = strings.TrimSpace(body.Text)
+		parentID = strings.TrimSpace(body.ParentID)
+		replyToUserLogin = strings.TrimSpace(body.ReplyToUserLogin)
 	}
 
 	if text == "" && len(imageData) == 0 {
@@ -497,7 +507,7 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 		return
 	}
 
-	comment, err := controller.interactionService.AddComment(c.Request.Context(), session.AccessToken, session.User, ownerLogin, postID, text, imageData)
+	comment, err := controller.interactionService.AddComment(c.Request.Context(), session.AccessToken, session.User, ownerLogin, postID, text, imageData, parentID, replyToUserLogin)
 	if err != nil {
 		_ = c.Error(err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -519,6 +529,8 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 		ImageUrl:    imageUrl,
 		ImageURLs:   imageURLs,
 		CreatedAt:   comment.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
+		ParentID:    comment.ParentID,
+		ReplyToUserLogin: comment.ReplyToUserLogin,
 	})
 }
 
@@ -586,7 +598,7 @@ func readMultipartFilesWithLimit(r *http.Request, maxCount int) ([][]byte, error
 		fileHeaders = r.MultipartForm.File["file"]
 	}
 	if len(fileHeaders) > maxCount {
-		return nil, fmt.Errorf("最多上传 %d 张图片", maxCount)
+		return nil, fmt.Errorf("鏈€澶氫笂浼?%d 寮犲浘鐗?, maxCount)
 	}
 
 	var totalSize int64
@@ -597,7 +609,7 @@ func readMultipartFilesWithLimit(r *http.Request, maxCount int) ([][]byte, error
 		}
 		totalSize += fh.Size
 		if totalSize > maxTotalSize {
-			return nil, fmt.Errorf("帖子总大小不能超过 25MB")
+			return nil, fmt.Errorf("甯栧瓙鎬诲ぇ灏忎笉鑳借秴杩?25MB")
 		}
 
 		f, err := fh.Open()
@@ -614,3 +626,5 @@ func readMultipartFilesWithLimit(r *http.Request, maxCount int) ([][]byte, error
 
 	return result, nil
 }
+
+

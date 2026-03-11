@@ -56,4 +56,6 @@ type CommentResponse struct {
 	ImageUrl    string `json:"imageUrl,omitempty"`
 	ImageURLs   []string `json:"imageUrls,omitempty"`
 	CreatedAt   string `json:"createdAt"`
+	ParentID    string `json:"parentId,omitempty"`
+	ReplyToUserLogin string `json:"replyToUserLogin,omitempty"`
 }

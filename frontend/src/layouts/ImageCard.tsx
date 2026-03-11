@@ -20,6 +20,7 @@ interface ImageCardProps {
   onLikeChange?: (id: string, likeCount: number, liked: boolean) => void;
   onCommentCountChange?: (id: string, delta: number) => void;
   onOpenDetail?: () => void;
+  tagCounts?: Record<string, number>;
 }
 
 const toDateTimeInputValue = (value: string) => {
@@ -56,6 +57,17 @@ const toDateKey = (value: Date) => {
   const month = parts.find((part) => part.type === 'month')?.value ?? '';
   const day = parts.find((part) => part.type === 'day')?.value ?? '';
   return `${year}-${month}-${day}`;
+};
+
+const normalizeLogin = (value: string) => value.trim().toLowerCase();
+
+const getReplyTargetLabel = (comment: CommentItem) => {
+  if (!comment.replyToUserLogin) return null;
+  const target = comment.replyToUserLogin;
+  if (normalizeLogin(target) === normalizeLogin(comment.authorLogin)) {
+    return '自己';
+  }
+  return target;
 };
 
 const toDisplayDateTime = (value: string) => {
@@ -136,6 +148,7 @@ export function ImageCard({
   onOpenDetail,
   onSave,
   roleLabel,
+  tagCounts,
 }: ImageCardProps) {
   const [editing, setEditing] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
@@ -153,9 +166,9 @@ export function ImageCard({
   }, [item.commentCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const actionColumnClass =
-    'grid w-20 shrink-0 grid-cols-2 items-center justify-items-start pr-1';
+    'grid w-20 shrink-0 grid-cols-2 items-center justify-items-start pr-0';
   const actionButtonBaseClass =
-    'inline-flex h-8 w-12 items-center justify-start gap-1 pl-1 transition';
+    'inline-flex h-8 w-12 items-center justify-start gap-1 pl-2 transition';
 
   const authorLogin = item.authorLogin || fallbackAuthorLogin || 'GitHub';
   const authorAvatar =
@@ -302,7 +315,7 @@ export function ImageCard({
             {editable ? (
               <>
                 <button
-                  aria-label="修改卡片"
+                  aria-label="编辑卡片"
                   className={`${actionButtonBaseClass} text-soft hover:text-[var(--text-main)]`}
                   onClick={(e) => { e.stopPropagation(); setEditing(true); }}
                   type="button"
@@ -327,7 +340,7 @@ export function ImageCard({
           </div>
         </div>
 
-        {/* Full-width images — not constrained by right action column */}
+        {/* Full-width images */}
         {imageUrls.length > 0 ? (
           <div className="mt-2 cursor-pointer" onClick={() => onOpenDetail?.()}>
             <ImageGrid alt={item.description} onImageClick={setViewerIndex} urls={imageUrls} />
@@ -342,47 +355,54 @@ export function ImageCard({
           >
             {tags.length > 0 ? (
               <div className="pt-2 flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <span className="tag-chip rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200" key={tag}>
-                    #{tag}
-                  </span>
-                ))}
+                {tags.map((tag) => {
+                  const count = tagCounts?.[tag.trim().toLowerCase()] ?? 0;
+                  return (
+                    <span className="tag-chip rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200" key={tag}>
+                      #{tag} ({count})
+                    </span>
+                  );
+                })}
               </div>
             ) : null}
 
             {/* Time */}
             <p className={`${tags.length > 0 ? 'mt-2' : 'pt-2'} text-xs text-soft`}>{toDisplayTime(item)}</p>
 
-            {/* Inline comments preview — clicking propagates to open detail */}
+            {/* Inline comments preview */}
             {comments.length > 0 && !commentsLoading ? (
               <div className="space-y-1 pb-1 pt-2">
-                {comments.slice(0, 5).map((c) => (
-                  <div className="text-xs" key={c.id}>
-                    <span className="font-medium text-[var(--text-main)]">{c.authorLogin}</span>
-                    <span className="text-[var(--text-main)]">：</span>
-                    {c.text ? <span className="text-[var(--text-main)]">{c.text}</span> : null}
-                    {c.pending ? <LoaderCircle className="ml-1 inline-block animate-spin text-soft" size={12} /> : null}
-                    {c.imageUrls && c.imageUrls.length > 0 ? (
-                      <div className="mt-1 grid max-w-40 grid-cols-3 gap-1">
-                        {c.imageUrls.map((url, index) => (
-                          <img
-                            alt="评论图片"
-                            className="block h-12 w-12 cursor-pointer rounded object-cover"
-                            key={`${c.id}-${url}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCommentImageViewer({ urls: c.imageUrls!, initialIndex: index });
-                            }}
-                            src={url}
-                          />
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
-                {comments.length > 5 ? (
-                  <span className="text-base leading-none text-soft">···</span>
-                ) : null}
+                {comments.map((c) => {
+                  const replyTarget = getReplyTargetLabel(c);
+                  return (
+                    <div className="text-xs" key={c.id}>
+                      <span className="font-medium text-[var(--text-main)]">{c.authorLogin}</span>
+                      {replyTarget ? (
+                        <span className="text-[var(--text-main)]"> 回复 {replyTarget}：</span>
+                      ) : (
+                        <span className="text-[var(--text-main)]">：</span>
+                      )}
+                      {c.text ? <span className="text-[var(--text-main)]">{c.text}</span> : null}
+                      {c.pending ? <LoaderCircle className="ml-1 inline-block animate-spin text-soft" size={12} /> : null}
+                      {c.imageUrls && c.imageUrls.length > 0 ? (
+                        <div className="mt-1 grid max-w-40 grid-cols-3 gap-1">
+                          {c.imageUrls.map((url, index) => (
+                            <img
+                              alt="评论图片"
+                              className="block h-12 w-12 cursor-pointer rounded object-cover"
+                              key={`${c.id}-${url}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCommentImageViewer({ urls: c.imageUrls!, initialIndex: index });
+                              }}
+                              src={url}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             ) : null}
           </div>

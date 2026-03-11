@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, useCallback } from 'react';
 import { ImagePlus, LoaderCircle, Send, X } from 'lucide-react';
+import { setCommentInputActive } from '../lib/uiFlags';
 
 // Module-level cache: persists draft files across dialog open/close within a session
 const commentFileCache = new Map<string, File[]>();
@@ -80,6 +81,14 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
   useEffect(() => () => {
     revokePreviewUrls(previewRef.current);
   }, []);
+
+  useEffect(() => {
+    if (open) {
+      setCommentInputActive(true);
+      return () => setCommentInputActive(false);
+    }
+    return undefined;
+  }, [open]);
 
   // Persist draft text to localStorage whenever it changes
   useEffect(() => {

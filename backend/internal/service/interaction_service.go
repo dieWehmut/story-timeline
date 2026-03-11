@@ -62,7 +62,7 @@ func commentImagePath(commenterLogin, postOwner, postID, commentID string, asset
 	return fmt.Sprintf("comments/%s/%s/%s/%s/%d", commenterLogin, postOwner, postID, commentID, assetIndex)
 }
 
-func (service *InteractionService) AddComment(ctx context.Context, _ string, commenter model.GitHubUser, postOwner, postID, text string, imageData [][]byte) (model.Comment, error) {
+func (service *InteractionService) AddComment(ctx context.Context, _ string, commenter model.GitHubUser, postOwner, postID, text string, imageData [][]byte, parentID, replyToUserLogin string) (model.Comment, error) {
 	commentID := utils.NewID()
 	imagePaths := make([]string, 0, len(imageData))
 	for assetIndex, data := range imageData {
@@ -79,6 +79,8 @@ func (service *InteractionService) AddComment(ctx context.Context, _ string, com
 		PostID:       postID,
 		AuthorLogin:  commenter.Login,
 		AuthorAvatar: commenter.AvatarURL,
+		ParentID:     parentID,
+		ReplyToUserLogin: replyToUserLogin,
 		Text:         text,
 		ImagePaths:   imagePaths,
 		CreatedAt:    utils.NowBeijing(),

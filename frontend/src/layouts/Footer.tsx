@@ -52,7 +52,7 @@ export function Footer({ stats }: FooterProps) {
             <span>{formatUptime(uptimeSeconds)}</span>
           </span>
         </div>
-        <p>Copyright © 2025-2026 {stats.githubOwner}</p>
+        <p>Copyright (c) 2025-2026 {stats.githubOwner}</p>
       </div>
     </footer>
   );

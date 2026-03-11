@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react';
 import { ArrowUp } from 'lucide-react';
+import { getUIFlags, subscribeUIFlags } from '../lib/uiFlags';
 
-export function FloatingActions() {
+interface FloatingActionsProps {
+  hidden?: boolean;
+}
+
+export function FloatingActions({ hidden = false }: FloatingActionsProps) {
   const [visible, setVisible] = useState(false);
+  const [uiFlags, setUiFlags] = useState(getUIFlags());
 
   useEffect(() => {
     const handleScroll = () => {
@@ -13,7 +19,9 @@ export function FloatingActions() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  if (!visible) return null;
+  useEffect(() => subscribeUIFlags(setUiFlags), []);
+
+  if (!visible || hidden || uiFlags.postDialogOpen || uiFlags.commentInputActive) return null;
 
   const iconBtnCls =
     'inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition-all duration-300 hover:scale-110 hover:text-[var(--text-accent)] active:scale-95';

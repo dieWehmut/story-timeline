@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useCallback, useId } from 'react';
-import { Heart, ImagePlus, LoaderCircle, MessageCircle, PencilLine, Send, Trash2, X } from 'lucide-react';
+﻿import { useState, useEffect, useRef, useCallback, useId, useMemo } from 'react';
+import { CornerUpLeft, Heart, ImagePlus, LoaderCircle, MessageCircle, PencilLine, Send, Trash2, X } from 'lucide-react';
 import { ImageViewer } from './ImageViewer';
 import { PostDialog } from './PostDialog';
 import { useToast } from './useToast';
 import { api } from '../lib/api';
+import { setCommentInputActive } from '../lib/uiFlags';
 import type { CommentItem, ImageItem, UpdateImagePayload } from '../types/image';
 
 // Module-level cache: persists draft comment files while detail view is closed
@@ -50,6 +51,17 @@ const toDateKey = (value: Date) => {
   const month = parts.find((p) => p.type === 'month')?.value ?? '';
   const day = parts.find((p) => p.type === 'day')?.value ?? '';
   return `${year}-${month}-${day}`;
+};
+
+const normalizeLogin = (value: string) => value.trim().toLowerCase();
+
+const getReplyTargetLabel = (comment: CommentItem) => {
+  if (!comment.replyToUserLogin) return null;
+  const target = comment.replyToUserLogin;
+  if (normalizeLogin(target) === normalizeLogin(comment.authorLogin)) {
+    return '自己';
+  }
+  return target;
 };
 
 const toBeijingText = (value: string) => {
@@ -145,6 +157,7 @@ interface CardDetailProps {
   onSave?: (payload: UpdateImagePayload) => Promise<void>;
   onLikeChange?: (id: string, likeCount: number, liked: boolean) => void;
   onCommentCountChange?: (id: string, delta: number) => void;
+  tagCounts?: Record<string, number>;
 }
 
 export function CardDetail({
@@ -158,6 +171,7 @@ export function CardDetail({
   onSave,
   onLikeChange,
   onCommentCountChange,
+  tagCounts,
 }: CardDetailProps) {
   const [comments, setComments] = useState<CommentViewItem[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -171,10 +185,13 @@ export function CardDetail({
   const [viewingCommentImage, setViewingCommentImage] = useState<{ urls: string[]; initialIndex: number } | null>(null);
   const [likeBusy, setLikeBusy] = useState(false);
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+  const [replyTarget, setReplyTarget] = useState<{ parentId: string; replyToUserLogin: string } | null>(null);
+  const [commentLikes, setCommentLikes] = useState<Record<string, boolean>>({});
 
   const inputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
+  const commentInputFocusedRef = useRef(false);
   const { confirm } = useToast();
   const fileRef = useRef<File[]>([]);
   const previewRef = useRef<string[]>([]);
@@ -212,9 +229,9 @@ export function CardDetail({
   const imageUrls = item.imageUrls ?? [];
   const tags = item.tags ?? [];
   const actionColumnClass =
-    'grid w-20 shrink-0 grid-cols-2 items-center justify-items-start pr-1';
+    'grid w-20 shrink-0 grid-cols-2 items-center justify-items-start pr-0';
   const actionButtonBaseClass =
-    'inline-flex h-8 w-12 items-center justify-start gap-1 pl-1 transition';
+    'inline-flex h-8 w-12 items-center justify-start gap-1 pl-2 transition';
 
   // Lock body scroll while detail is open
   useEffect(() => {
@@ -222,6 +239,13 @@ export function CardDetail({
     return () => {
       document.body.style.overflow = '';
     };
+  }, []);
+
+  useEffect(() => () => {
+    if (commentInputFocusedRef.current) {
+      setCommentInputActive(false);
+      commentInputFocusedRef.current = false;
+    }
   }, []);
 
   // Load all comments on mount
@@ -321,6 +345,10 @@ export function CardDetail({
     if (!text.trim() && files.length === 0) return;
     setCommentBusy(true);
 
+    const replyPayload = replyTarget
+      ? { parentId: replyTarget.parentId, replyToUserLogin: replyTarget.replyToUserLogin }
+      : undefined;
+
     const optimisticComment: CommentViewItem = {
       id: `temp-${Date.now()}`,
       authorLogin: '',
@@ -330,6 +358,8 @@ export function CardDetail({
       imageUrls: files.map((f) => URL.createObjectURL(f)),
       createdAt: new Date().toISOString(),
       pending: true,
+      parentId: replyPayload?.parentId ?? null,
+      replyToUserLogin: replyPayload?.replyToUserLogin ?? null,
     };
     setComments((prev) => [...prev, optimisticComment]);
     onCommentCountChange?.(item.id, 1);
@@ -339,9 +369,10 @@ export function CardDetail({
     replaceCommentFiles([]);
     detailFileCache.delete(item.id);
     setError(null);
+    setReplyTarget(null);
 
     try {
-      const newComment = await api.addComment(authorLogin, item.id, submittedText, submittedFiles);
+      const newComment = await api.addComment(authorLogin, item.id, submittedText, submittedFiles, replyPayload);
       setComments((prev) => prev.map((c) => (c.id === optimisticComment.id ? newComment : c)));
     } catch (e) {
       setComments((prev) => prev.filter((c) => c.id !== optimisticComment.id));
@@ -375,7 +406,35 @@ export function CardDetail({
     }
   };
 
+  const handleReplyClick = (comment: CommentViewItem) => {
+    const parentId = comment.parentId || comment.id;
+    setReplyTarget({ parentId, replyToUserLogin: comment.authorLogin });
+    commentInputRef.current?.focus();
+  };
+
+  const toggleCommentLike = (commentId: string) => {
+    setCommentLikes((prev) => ({ ...prev, [commentId]: !prev[commentId] }));
+  };
+
   const isCardOwner = currentUserLogin ? authorLogin.toLowerCase() === currentUserLogin.toLowerCase() : false;
+
+  const { rootComments, repliesByParent } = useMemo(() => {
+    const rootList: CommentViewItem[] = [];
+    const replyMap = new Map<string, CommentViewItem[]>();
+    const rootIds = new Set<string>();
+    comments.forEach((comment) => {
+      if (!comment.parentId) rootIds.add(comment.id);
+    });
+    comments.forEach((comment) => {
+      if (comment.parentId && rootIds.has(comment.parentId)) {
+        if (!replyMap.has(comment.parentId)) replyMap.set(comment.parentId, []);
+        replyMap.get(comment.parentId)!.push(comment);
+      } else {
+        rootList.push(comment);
+      }
+    });
+    return { rootComments: rootList, repliesByParent: replyMap };
+  }, [comments]);
 
   return (
     <>
@@ -450,11 +509,14 @@ export function CardDetail({
 
             {tags.length > 0 ? (
               <div className="mt-3 flex flex-wrap gap-2 px-4">
-                {tags.map((tag) => (
-                  <span className="tag-chip rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200" key={tag}>
-                    #{tag}
-                  </span>
-                ))}
+                {tags.map((tag) => {
+                  const count = tagCounts?.[tag.trim().toLowerCase()] ?? 0;
+                  return (
+                    <span className="tag-chip rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200" key={tag}>
+                      #{tag} ({count})
+                    </span>
+                  );
+                })}
               </div>
             ) : null}
 
@@ -494,56 +556,140 @@ export function CardDetail({
                 <p className="py-8 text-center text-sm text-soft">暂无评论</p>
               ) : (
                 <div className="divide-y divide-[var(--panel-border)]">
-                  {comments.map((c) => {
+                  {rootComments.map((c) => {
                     const canDelete = currentUserLogin && (
                       c.authorLogin.toLowerCase() === currentUserLogin.toLowerCase() || isCardOwner
                     );
+                    const replies = repliesByParent.get(c.id) ?? [];
+                    const liked = !!commentLikes[c.id];
                     return (
-                    <div className="flex gap-3 px-4 py-3" key={c.id}>
-                      {/* Avatar */}
-                      <img
-                        alt={c.authorLogin}
-                        className="mt-0.5 h-8 w-8 shrink-0 rounded-full object-cover"
-                        src={`https://github.com/${c.authorLogin}.png?size=48`}
-                      />
-                      {/* Content: username + time on top, text below */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-x-2">
-                          <span className="text-sm font-medium text-[var(--text-main)]">{c.authorLogin}</span>
-                          <span className="text-xs text-soft">{toCommentTime(c.createdAt)}</span>
-                          {c.pending ? <LoaderCircle className="animate-spin text-soft" size={12} /> : null}
+                      <div className="px-4 py-3" key={c.id}>
+                        <div className="flex gap-3">
+                          <img
+                            alt={c.authorLogin}
+                            className="mt-0.5 h-8 w-8 shrink-0 rounded-full object-cover"
+                            src={`https://github.com/${c.authorLogin}.png?size=48`}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-baseline gap-x-2">
+                              <span className="text-sm font-medium text-[var(--text-main)]">{c.authorLogin}</span>
+                              <span className="text-xs text-soft">{toCommentTime(c.createdAt)}</span>
+                              {c.pending ? <LoaderCircle className="animate-spin text-soft" size={12} /> : null}
+                            </div>
+                            {c.text ? (
+                              <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--text-main)]">{c.text}</p>
+                            ) : null}
+                            {c.imageUrls && c.imageUrls.length > 0 ? (
+                              <div className="mt-2 grid max-w-56 grid-cols-3 gap-1">
+                                {c.imageUrls.map((url, index) => (
+                                  <img
+                                    alt="评论图片"
+                                    className="h-20 w-full cursor-pointer rounded object-cover"
+                                    key={`${c.id}-${url}`}
+                                    onClick={() => setViewingCommentImage({ urls: c.imageUrls!, initialIndex: index })}
+                                    src={url}
+                                  />
+                                ))}
+                              </div>
+                            ) : null}
+                            <div className="mt-2 flex items-center gap-3 text-soft">
+                              <button
+                                className={`inline-flex items-center gap-1 text-xs transition ${liked ? 'text-rose-300' : 'hover:text-rose-300'}`}
+                                onClick={() => toggleCommentLike(c.id)}
+                                type="button"
+                              >
+                                <Heart className={liked ? 'fill-current' : ''} size={13} />
+                              </button>
+                              <button
+                                className="inline-flex items-center gap-1 text-xs hover:text-[var(--text-main)] transition"
+                                onClick={() => handleReplyClick(c)}
+                                type="button"
+                              >
+                                <CornerUpLeft size={13} />
+                              </button>
+                              {canDelete ? (
+                                <button
+                                  aria-label="删除评论"
+                                  className="ml-auto inline-flex h-7 w-7 items-center justify-center text-soft transition hover:text-rose-300"
+                                  disabled={deletingCommentId === c.id}
+                                  onClick={() => {
+                                    confirm('确定要删除这条评论吗？', () => { void handleDeleteComment(c); });
+                                  }}
+                                  type="button"
+                                >
+                                  {deletingCommentId === c.id ? <LoaderCircle className="animate-spin" size={13} /> : <Trash2 size={13} />}
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
                         </div>
-                        {c.text ? (
-                          <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--text-main)]">{c.text}</p>
-                        ) : null}
-                        {c.imageUrls && c.imageUrls.length > 0 ? (
-                          <div className="mt-2 grid max-w-56 grid-cols-3 gap-1">
-                            {c.imageUrls.map((url, index) => (
-                              <img
-                                alt="评论图片"
-                                className="h-20 w-full cursor-pointer rounded object-cover"
-                                key={`${c.id}-${url}`}
-                                onClick={() => setViewingCommentImage({ urls: c.imageUrls!, initialIndex: index })}
-                                src={url}
-                              />
-                            ))}
+
+                        {replies.length > 0 ? (
+                          <div className="mt-2 space-y-2 pl-10">
+                            {replies.map((reply) => {
+                              const replyTarget = getReplyTargetLabel(reply);
+                              const line = replyTarget
+                                ? `${reply.authorLogin} 回复 ${replyTarget}: ${reply.text ?? ''}`.trim()
+                                : `${reply.authorLogin}: ${reply.text ?? ''}`.trim();
+                              const replyLiked = !!commentLikes[reply.id];
+                              const canDeleteReply = currentUserLogin && (
+                                reply.authorLogin.toLowerCase() === currentUserLogin.toLowerCase() || isCardOwner
+                              );
+                              return (
+                                <div className="flex flex-col gap-1" key={reply.id}>
+                                  <div className="flex flex-wrap items-center gap-x-2 text-xs text-soft">
+                                    <span className="text-sm text-[var(--text-main)]">{line}</span>
+                                    <span>{toCommentTime(reply.createdAt)}</span>
+                                    {reply.pending ? <LoaderCircle className="animate-spin" size={12} /> : null}
+                                  </div>
+                                  {reply.imageUrls && reply.imageUrls.length > 0 ? (
+                                    <div className="mt-1 grid max-w-56 grid-cols-3 gap-1">
+                                      {reply.imageUrls.map((url, index) => (
+                                        <img
+                                          alt="评论图片"
+                                          className="h-16 w-full cursor-pointer rounded object-cover"
+                                          key={`${reply.id}-${url}`}
+                                          onClick={() => setViewingCommentImage({ urls: reply.imageUrls!, initialIndex: index })}
+                                          src={url}
+                                        />
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                  <div className="flex items-center gap-3 text-soft">
+                                    <button
+                                      className={`inline-flex items-center gap-1 text-xs transition ${replyLiked ? 'text-rose-300' : 'hover:text-rose-300'}`}
+                                      onClick={() => toggleCommentLike(reply.id)}
+                                      type="button"
+                                    >
+                                      <Heart className={replyLiked ? 'fill-current' : ''} size={12} />
+                                    </button>
+                                    <button
+                                      className="inline-flex items-center gap-1 text-xs hover:text-[var(--text-main)] transition"
+                                      onClick={() => handleReplyClick(reply)}
+                                      type="button"
+                                    >
+                                      <CornerUpLeft size={12} />
+                                    </button>
+                                    {canDeleteReply ? (
+                                      <button
+                                        aria-label="删除评论"
+                                        className="ml-auto inline-flex h-6 w-6 items-center justify-center text-soft transition hover:text-rose-300"
+                                        disabled={deletingCommentId === reply.id}
+                                        onClick={() => {
+                                          confirm('确定要删除这条评论吗？', () => { void handleDeleteComment(reply); });
+                                        }}
+                                        type="button"
+                                      >
+                                        {deletingCommentId === reply.id ? <LoaderCircle className="animate-spin" size={12} /> : <Trash2 size={12} />}
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : null}
                       </div>
-                      {canDelete ? (
-                        <button
-                          aria-label="删除评论"
-                          className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center text-soft transition hover:text-rose-300"
-                          disabled={deletingCommentId === c.id}
-                          onClick={() => {
-                            confirm('确定要删除这条评论吗？', () => { void handleDeleteComment(c); });
-                          }}
-                          type="button"
-                        >
-                          {deletingCommentId === c.id ? <LoaderCircle className="animate-spin" size={13} /> : <Trash2 size={13} />}
-                        </button>
-                      ) : null}
-                    </div>
                     );
                   })}
                 </div>
@@ -555,6 +701,19 @@ export function CardDetail({
         {/* Comment input bar (sticky at bottom) */}
         {canInteract ? (
           <div className="shrink-0 border-t border-[var(--panel-border)] bg-[var(--page-bg)] px-4 py-2">
+            {replyTarget ? (
+              <div className="mb-2 flex items-center gap-2 text-xs text-soft">
+                <span>回复 {replyTarget.replyToUserLogin}</span>
+                <button
+                  className="inline-flex items-center gap-1 text-xs text-soft hover:text-[var(--text-main)] transition"
+                  onClick={() => setReplyTarget(null)}
+                  type="button"
+                >
+                  <X size={12} />
+                  取消回复
+                </button>
+              </div>
+            ) : null}
             {previews.length > 0 ? (
               <div className="mb-2 grid grid-cols-3 gap-2">
                 {previews.map((preview, index) => (
@@ -595,14 +754,26 @@ export function CardDetail({
                 className="min-w-0 flex-1 border border-white/10 bg-transparent px-3 py-1.5 text-sm text-[var(--text-main)] outline-none transition placeholder:text-soft/50 focus:border-[var(--text-accent)]"
                 disabled={commentBusy}
                 id={inputId}
+                onBlur={() => {
+                  if (commentInputFocusedRef.current) {
+                    setCommentInputActive(false);
+                    commentInputFocusedRef.current = false;
+                  }
+                }}
                 onChange={(e) => setText(e.target.value)}
+                onFocus={() => {
+                  if (!commentInputFocusedRef.current) {
+                    setCommentInputActive(true);
+                    commentInputFocusedRef.current = true;
+                  }
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     void handleAddComment();
                   }
                 }}
-                placeholder="写评论..."
+                placeholder={replyTarget ? `回复 ${replyTarget.replyToUserLogin}...` : '写评论...'}
                 ref={commentInputRef}
                 value={text}
               />
@@ -652,3 +823,4 @@ export function CardDetail({
     </>
   );
 }
+

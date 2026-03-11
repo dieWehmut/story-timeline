@@ -6,6 +6,7 @@ import { Header } from '../layouts/Header';
 import { ImageCard } from '../layouts/ImageCard';
 import { FloatingActions } from '../layouts/FloatingActions';
 import { TimeColumn } from '../layouts/TimeColumn';
+import { TagBar } from '../layouts/TagBar';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
 import type { TimelineMonth } from '../types/image';
@@ -110,8 +111,6 @@ export default function Home({
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
-
-
       <Header
         activeMonth={activeMonth}
         authLoading={auth.loading}
@@ -121,7 +120,10 @@ export default function Home({
         filterUser={images.filterUser}
         isDetailView={selectedItemId !== null}
         onBack={() => setSelectedItemId(null)}
-        onFilterUser={images.setFilterUser}
+        onFilterUser={(login) => {
+          images.setFilterUser(login);
+          images.setTagFilter(null);
+        }}
         onLogin={auth.login}
         onLogout={auth.logout}
         onThemeToggle={onThemeToggle}
@@ -146,6 +148,11 @@ export default function Home({
       />
 
       <main className="relative mx-auto flex w-full max-w-xl flex-col px-0 pb-36 pt-28 md:px-0 md:pt-36">
+        <TagBar
+          onSelect={images.setTagFilter}
+          selectedTag={images.tagFilter}
+          tags={images.tagSummary}
+        />
 
         {images.error ? (
           <div className="mb-6 border border-rose-400/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
@@ -184,6 +191,7 @@ export default function Home({
                       onOpenDetail={() => setSelectedItemId(item.id)}
                       onSave={images.updateImage}
                       roleLabel={item.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
+                      tagCounts={images.tagCountMap}
                     />
                   ))}
                 </div>
@@ -209,10 +217,11 @@ export default function Home({
           onLikeChange={images.updateLike}
           onSave={images.updateImage}
           roleLabel={selectedItem.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
+          tagCounts={images.tagCountMap}
         />
       ) : null}
 
-      <FloatingActions />
+      <FloatingActions hidden={timelineOpen} />
     </div>
   );
 }

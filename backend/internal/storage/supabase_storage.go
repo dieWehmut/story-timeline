@@ -51,6 +51,8 @@ type commentRecord struct {
 	PostID       string    `json:"post_id"`
 	AuthorLogin  string    `json:"author_login"`
 	AuthorAvatar string    `json:"author_avatar"`
+	ParentID     string    `json:"parent_id"`
+	ReplyToUserLogin string `json:"reply_to_user_login"`
 	Text         string    `json:"text"`
 	ImagePaths   []string  `json:"image_paths"`
 	Deleted      bool      `json:"deleted"`
@@ -208,7 +210,7 @@ func (storage *SupabaseStorage) ListComments(ctx context.Context, postOwner stri
 	}
 
 	params := url.Values{}
-	params.Set("select", "id,post_owner,post_id,author_login,author_avatar,text,image_paths,deleted,hidden,created_at")
+	params.Set("select", "id,post_owner,post_id,author_login,author_avatar,parent_id,reply_to_user_login,text,image_paths,deleted,hidden,created_at")
 	params.Set("post_owner", "eq."+postOwner)
 	params.Set("post_id", "eq."+postID)
 	params.Set("author_login", inFilter(authorLogins))
@@ -230,7 +232,7 @@ func (storage *SupabaseStorage) ListComments(ctx context.Context, postOwner stri
 
 func (storage *SupabaseStorage) GetComment(ctx context.Context, commenterLogin string, postOwner string, postID string, commentID string) (model.Comment, error) {
 	params := url.Values{}
-	params.Set("select", "id,post_owner,post_id,author_login,author_avatar,text,image_paths,deleted,hidden,created_at")
+	params.Set("select", "id,post_owner,post_id,author_login,author_avatar,parent_id,reply_to_user_login,text,image_paths,deleted,hidden,created_at")
 	params.Set("author_login", "eq."+commenterLogin)
 	params.Set("post_owner", "eq."+postOwner)
 	params.Set("post_id", "eq."+postID)
@@ -359,6 +361,8 @@ func commentRecordFromModel(comment model.Comment) commentRecord {
 		PostID:       comment.PostID,
 		AuthorLogin:  comment.AuthorLogin,
 		AuthorAvatar: comment.AuthorAvatar,
+		ParentID:     comment.ParentID,
+		ReplyToUserLogin: comment.ReplyToUserLogin,
 		Text:         comment.Text,
 		ImagePaths:   comment.AllImagePaths(),
 		Deleted:      comment.Deleted,
@@ -374,6 +378,8 @@ func (record commentRecord) toModel() model.Comment {
 		PostID:       record.PostID,
 		AuthorLogin:  record.AuthorLogin,
 		AuthorAvatar: record.AuthorAvatar,
+		ParentID:     record.ParentID,
+		ReplyToUserLogin: record.ReplyToUserLogin,
 		Text:         record.Text,
 		ImagePaths:   record.ImagePaths,
 		Deleted:      record.Deleted,

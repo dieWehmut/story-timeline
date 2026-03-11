@@ -44,7 +44,7 @@ export function ImageViewer({ urls, initialIndex = 0, onClose }: ImageViewerProp
     const dx = e.touches[0].clientX - touchRef.current.startX;
     const dy = e.touches[0].clientY - touchRef.current.startY;
     // Only track horizontal swipes
-    if (!touchRef.current.moved && Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 3) {
+    if (!touchRef.current.moved && Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 1) {
       touchRef.current.moved = true;
     }
     if (touchRef.current.moved) {
@@ -54,7 +54,7 @@ export function ImageViewer({ urls, initialIndex = 0, onClose }: ImageViewerProp
   };
 
   const handleTouchEnd = () => {
-    const threshold = Math.min(60, Math.max(20, window.innerWidth * 0.08));
+    const threshold = Math.min(40, Math.max(16, window.innerWidth * 0.05));
     if (touchRef.current?.moved) {
       if (offsetX < -threshold) goNext();
       else if (offsetX > threshold) goPrev();

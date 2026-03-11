@@ -112,10 +112,21 @@
     color: var(--text-accent);
   }
 
+  .all-chip-active {
+    color: #67e8f9;
+    box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.35);
+    background-color: rgba(6, 182, 212, 0.2);
+  }
+
   :root[data-theme='light'] .tag-chip {
     border-color: #111827;
     color: #111827;
     background-color: rgba(17, 24, 39, 0.06);
+  }
+
+  :root[data-theme='light'] .all-chip {
+    color: #111827;
+    border-color: #111827;
   }
 
   :root[data-theme='light'] .all-chip-active {
