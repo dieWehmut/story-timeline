@@ -11,11 +11,13 @@ import type {
 
 const normalizeApiBase = (value: string) => value.trim().replace(/\/$/, '');
 
-// Public HF Space base — when no `VITE_API_BASE` is provided the client will
-// call the public Space directly (no serverless proxy or token required).
+// When VITE_API_BASE is unset we use same-origin (empty string) so requests go
+// to the current host (e.g. Vercel), where serverless proxy forwards to HF with HF_TOKEN.
+// Set VITE_API_BASE to the HF Space URL only when you need the client to call HF directly
+// (e.g. local dev against public space without proxy).
 const HF_SPACE_FALLBACK = 'https://REDACTED.hf.space';
 
-export const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE || HF_SPACE_FALLBACK);
+export const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE ?? '');
 
 // log the computed base so we can spot misconfiguration in client consoles
 if (typeof window !== 'undefined') {
@@ -202,7 +204,8 @@ export const api = {
   getFeedUsers: () => request<FeedUser[]>(`${API_BASE}/api/feed/users`),
   createImage: async (payload: CreateImagePayload) => {
     const body = await buildImageFormData(payload);
-    return normalizeImageItem(await request<ImageItem>(`${API_BASE}/api/images`, { method: 'POST', body }));
+    const imagesEndpoint = API_BASE.includes('.hf.space') ? `${API_BASE}/api/images/` : `${API_BASE}/api/images`;
+    return normalizeImageItem(await request<ImageItem>(imagesEndpoint, { method: 'POST', body }));
   },
   updateImage: async (payload: UpdateImagePayload) => {
     const body = await buildImageFormData(payload);
