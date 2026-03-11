@@ -227,7 +227,7 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
                 value={text}
               />
               <button
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center text-cyan-300 transition hover:text-cyan-200 disabled:opacity-50"
+                className="send-icon inline-flex h-9 w-9 shrink-0 items-center justify-center text-cyan-300 transition hover:text-cyan-200 disabled:opacity-50"
                 disabled={busy || (!text.trim() && files.length === 0)}
                 onClick={() => void handleSubmit()}
                 type="button"

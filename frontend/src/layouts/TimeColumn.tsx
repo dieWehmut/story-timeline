@@ -1,3 +1,4 @@
+import { ArrowDownUp } from 'lucide-react';
 import type { TimelineMonth } from '../types/image';
 
 interface TimeColumnProps {
@@ -5,9 +6,11 @@ interface TimeColumnProps {
   months: TimelineMonth[];
   open: boolean;
   onJump: (month: TimelineMonth) => void;
+  onToggleOrder: () => void;
+  order: 'desc' | 'asc';
 }
 
-export function TimeColumn({ activeMonth, months, onJump, open }: TimeColumnProps) {
+export function TimeColumn({ activeMonth, months, onJump, onToggleOrder, open, order }: TimeColumnProps) {
   return (
     <aside
       className={`fixed right-0 top-0 z-40 h-screen w-[5.5rem] overflow-y-auto overflow-x-hidden bg-[#0f1218] px-3 py-8 shadow-[-16px_0_48px_rgba(0,0,0,0.45)] transition-transform duration-300 ease-in-out md:w-24 md:px-4 ${
@@ -15,6 +18,17 @@ export function TimeColumn({ activeMonth, months, onJump, open }: TimeColumnProp
       }`}
       style={{ scrollbarWidth: 'none' }}
     >
+      <div className="flex justify-center pb-4 text-center">
+        <button
+          aria-label="切换时间排序"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-slate-200 transition hover:text-cyan-300"
+          onClick={onToggleOrder}
+          title={order === 'asc' ? '时间排序：旧到新' : '时间排序：新到旧'}
+          type="button"
+        >
+          <ArrowDownUp className={order === 'asc' ? 'rotate-180' : ''} size={18} />
+        </button>
+      </div>
       <div className="space-y-4 pt-4 text-center">
         {months.map((month, index) => {
           const previous = months[index - 1];

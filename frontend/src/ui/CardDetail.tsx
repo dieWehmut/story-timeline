@@ -67,6 +67,8 @@ const toDisplayTime = (item: ImageItem) => {
   return `${startText} - ${toBeijingText(item.endAt)}`;
 };
 
+type CommentViewItem = CommentItem & { pending?: boolean };
+
 function DetailImageGrid({
   urls,
   alt,
@@ -134,7 +136,7 @@ export function CardDetail({
   onLikeChange,
   onCommentCountChange,
 }: CardDetailProps) {
-  const [comments, setComments] = useState<CommentItem[]>([]);
+  const [comments, setComments] = useState<CommentViewItem[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentBusy, setCommentBusy] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -292,7 +294,7 @@ export function CardDetail({
     if (!text.trim() && files.length === 0) return;
     setCommentBusy(true);
 
-    const optimisticComment: CommentItem = {
+    const optimisticComment: CommentViewItem = {
       id: `temp-${Date.now()}`,
       authorLogin: '',
       postOwner: authorLogin,
@@ -300,6 +302,7 @@ export function CardDetail({
       text: text.trim(),
       imageUrls: files.map((f) => URL.createObjectURL(f)),
       createdAt: new Date().toISOString(),
+      pending: true,
     };
     setComments((prev) => [...prev, optimisticComment]);
     onCommentCountChange?.(item.id, 1);
@@ -408,20 +411,20 @@ export function CardDetail({
               </p>
             ) : null}
 
-            {tags.length > 0 ? (
-              <div className="mt-3 flex flex-wrap gap-2 px-4">
-                {tags.map((tag) => (
-                  <span className="rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200" key={tag}>
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-
             {/* Images */}
             {imageUrls.length > 0 ? (
               <div className="mt-2">
                 <DetailImageGrid alt={item.description} onImageClick={setViewerIndex} urls={imageUrls} />
+              </div>
+            ) : null}
+
+            {tags.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2 px-4">
+                {tags.map((tag) => (
+                  <span className="tag-chip rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200" key={tag}>
+                    #{tag}
+                  </span>
+                ))}
               </div>
             ) : null}
 
@@ -478,6 +481,7 @@ export function CardDetail({
                         <div className="flex flex-wrap items-baseline gap-x-2">
                           <span className="text-sm font-medium text-[var(--text-main)]">{c.authorLogin}</span>
                           <span className="text-xs text-soft">{toCommentTime(c.createdAt)}</span>
+                          {c.pending ? <LoaderCircle className="animate-spin text-soft" size={12} /> : null}
                         </div>
                         {c.text ? (
                           <p className="mt-0.5 whitespace-pre-wrap text-sm text-[var(--text-main)]">{c.text}</p>
@@ -506,7 +510,7 @@ export function CardDetail({
                           }}
                           type="button"
                         >
-                          <Trash2 size={13} />
+                          {deletingCommentId === c.id ? <LoaderCircle className="animate-spin" size={13} /> : <Trash2 size={13} />}
                         </button>
                       ) : null}
                     </div>
@@ -573,7 +577,7 @@ export function CardDetail({
                 value={text}
               />
               <button
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center text-cyan-300 transition hover:text-cyan-200 disabled:opacity-50"
+                className="send-icon inline-flex h-9 w-9 shrink-0 items-center justify-center text-cyan-300 transition hover:text-cyan-200 disabled:opacity-50"
                 disabled={commentBusy || (!text.trim() && files.length === 0)}
                 onClick={() => void handleAddComment()}
                 type="button"

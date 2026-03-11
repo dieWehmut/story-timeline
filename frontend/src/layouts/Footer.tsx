@@ -40,15 +40,15 @@ export function Footer({ stats }: FooterProps) {
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-center gap-0.5 text-center text-xs text-soft">
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-0 text-[var(--text-main)]">
           <span className="inline-flex items-center gap-1" title="累计用户">
-            <User className="text-cyan-300" size={12} />
+            <User className="footer-icon text-cyan-300" size={12} />
             <span>{stats.userCount}</span>
           </span>
           <span className="inline-flex items-center gap-1" title="近 90 秒在线">
-            <Eye className="text-cyan-300" size={12} />
+            <Eye className="footer-icon text-cyan-300" size={12} />
             <span>{stats.onlineUsers}</span>
           </span>
           <span className="inline-flex items-center gap-1">
-            <TimerReset className="text-cyan-300" size={12} />
+            <TimerReset className="footer-icon text-cyan-300" size={12} />
             <span>{formatUptime(uptimeSeconds)}</span>
           </span>
         </div>

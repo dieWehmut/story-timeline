@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Heart, MessageCircle, PencilLine, Trash2 } from 'lucide-react';
+import { Heart, LoaderCircle, MessageCircle, PencilLine, Trash2 } from 'lucide-react';
 import { CommentDialog } from '../ui/CommentDialog';
 import { ImageViewer } from '../ui/ImageViewer';
 import { PostDialog } from '../ui/PostDialog';
@@ -66,6 +66,8 @@ const toDisplayTime = (item: ImageItem) => {
   return `${startText} - ${toBeijingText(item.endAt)}`;
 };
 
+type CommentViewItem = CommentItem & { pending?: boolean };
+
 function ImageGrid({ urls, alt, onImageClick }: { urls: string[]; alt: string; onImageClick: (index: number) => void }) {
   if (urls.length === 0) return null;
 
@@ -116,7 +118,7 @@ export function ImageCard({
 }: ImageCardProps) {
   const [editing, setEditing] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
-  const [comments, setComments] = useState<CommentItem[]>([]);
+  const [comments, setComments] = useState<CommentViewItem[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
   const [commentBusy, setCommentBusy] = useState(false);
@@ -198,7 +200,7 @@ export function ImageCard({
 
   const handleAddComment = async (text: string, files?: File[]) => {
     setCommentBusy(true);
-    const optimisticComment: CommentItem = {
+    const optimisticComment: CommentViewItem = {
       id: `temp-${Date.now()}`,
       authorLogin: '',
       postOwner: authorLogin,
@@ -206,6 +208,7 @@ export function ImageCard({
       text,
       imageUrls: files ? files.map((f) => URL.createObjectURL(f)) : undefined,
       createdAt: new Date().toISOString(),
+      pending: true,
     };
     setComments((prev) => [...prev, optimisticComment]);
     onCommentCountChange?.(item.id, 1);
@@ -269,15 +272,6 @@ export function ImageCard({
               </p>
             ) : null}
 
-            {tags.length > 0 ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <span className="rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200" key={tag}>
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            ) : null}
           </div>
 
           {/* Right: Edit + Delete */}
@@ -320,8 +314,18 @@ export function ImageCard({
             className="min-w-0 flex-1 cursor-pointer px-2"
             onClick={() => onOpenDetail?.()}
           >
+            {tags.length > 0 ? (
+              <div className="pt-2 flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <span className="tag-chip rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200" key={tag}>
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
             {/* Time */}
-            <p className="pt-2 text-xs text-soft">{toDisplayTime(item)}</p>
+            <p className={`${tags.length > 0 ? 'mt-2' : 'pt-2'} text-xs text-soft`}>{toDisplayTime(item)}</p>
 
             {/* Inline comments preview — clicking propagates to open detail */}
             {comments.length > 0 && !commentsLoading ? (
@@ -331,6 +335,7 @@ export function ImageCard({
                     <span className="font-medium text-[var(--text-main)]">{c.authorLogin}</span>
                     <span className="text-[var(--text-main)]">：</span>
                     {c.text ? <span className="text-[var(--text-main)]">{c.text}</span> : null}
+                    {c.pending ? <LoaderCircle className="ml-1 inline-block animate-spin text-soft" size={12} /> : null}
                     {c.imageUrls && c.imageUrls.length > 0 ? (
                       <div className="mt-1 grid max-w-40 grid-cols-3 gap-1">
                         {c.imageUrls.map((url, index) => (

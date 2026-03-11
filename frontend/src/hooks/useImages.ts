@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import type {
   CreateImagePayload,
@@ -28,6 +28,8 @@ const getMonthKey = (startAt: string) => {
   };
 };
 
+type TimeSortOrder = 'desc' | 'asc';
+
 const defaultStats: HealthStats = {
   userCount: 0,
   onlineUsers: 0,
@@ -37,11 +39,15 @@ const defaultStats: HealthStats = {
 
 const CACHE_KEY_FEED = 'story_feed_cache';
 const CACHE_KEY_USERS = 'story_users_cache';
+const CACHE_KEY_STATS = 'story_stats_cache';
+const CACHE_KEY_SORT = 'story_time_order';
+const STATS_CACHE_TTL = 1000 * 120;
 
-const sortByDate = (itemsList: ImageItem[]) =>
-  [...itemsList].sort(
-    (left, right) => new Date(right.startAt).getTime() - new Date(left.startAt).getTime()
-  );
+const sortByDate = (itemsList: ImageItem[], order: TimeSortOrder) =>
+  [...itemsList].sort((left, right) => {
+    const delta = new Date(left.startAt).getTime() - new Date(right.startAt).getTime();
+    return order === 'asc' ? delta : -delta;
+  });
 
 const normalizeCachedItem = (item: ImageItem): ImageItem => ({
   ...item,
@@ -66,6 +72,27 @@ const loadCachedUsers = (): FeedUser[] | null => {
   }
 };
 
+const loadCachedStats = (): { stats: HealthStats; timestamp: number } | null => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY_STATS);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { stats?: HealthStats; timestamp?: number };
+    if (!parsed.stats) return null;
+    return { stats: parsed.stats, timestamp: parsed.timestamp ?? 0 };
+  } catch {
+    return null;
+  }
+};
+
+const loadCachedSortOrder = (): TimeSortOrder => {
+  try {
+    const value = localStorage.getItem(CACHE_KEY_SORT);
+    return value === 'asc' ? 'asc' : 'desc';
+  } catch {
+    return 'desc';
+  }
+};
+
 const saveCacheFeed = (data: ImageItem[]) => {
   try { localStorage.setItem(CACHE_KEY_FEED, JSON.stringify(data)); } catch { /* quota */ }
 };
@@ -74,13 +101,25 @@ const saveCacheUsers = (data: FeedUser[]) => {
   try { localStorage.setItem(CACHE_KEY_USERS, JSON.stringify(data)); } catch { /* quota */ }
 };
 
+const saveCacheStats = (stats: HealthStats) => {
+  try { localStorage.setItem(CACHE_KEY_STATS, JSON.stringify({ stats, timestamp: Date.now() })); } catch { /* quota */ }
+};
+
+const saveSortOrder = (order: TimeSortOrder) => {
+  try { localStorage.setItem(CACHE_KEY_SORT, order); } catch { /* quota */ }
+};
+
 export const useImages = () => {
   const cachedFeed = loadCachedFeed();
   const cachedUsers = loadCachedUsers();
-  const [items, setItems] = useState<ImageItem[]>(cachedFeed ? sortByDate(cachedFeed) : []);
+  const cachedStats = loadCachedStats();
+  const cachedSortOrder = loadCachedSortOrder();
+  const [items, setItems] = useState<ImageItem[]>(cachedFeed ? sortByDate(cachedFeed, cachedSortOrder) : []);
   const [feedUsers, setFeedUsers] = useState<FeedUser[]>(cachedUsers ?? []);
   const [filterUser, setFilterUser] = useState<string | null>(null);
-  const [stats, setStats] = useState<HealthStats>(defaultStats);
+  const [stats, setStats] = useState<HealthStats>(cachedStats?.stats ?? defaultStats);
+  const [timeOrder, setTimeOrder] = useState<TimeSortOrder>(cachedSortOrder);
+  const lastStatsFetchRef = useRef<number>(cachedStats?.timestamp ?? 0);
   const [loading, setLoading] = useState(!cachedFeed);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,9 +129,14 @@ export const useImages = () => {
 
     const bootstrap = async () => {
       try {
+        const shouldFetchStats =
+          !cachedStats || Date.now() - cachedStats.timestamp > STATS_CACHE_TTL;
+        const statsPromise = shouldFetchStats
+          ? api.getStats()
+          : Promise.resolve(cachedStats?.stats ?? defaultStats);
         const [nextItems, nextStats, nextUsers] = await Promise.all([
           api.getFeed(),
-          api.getStats(),
+          statsPromise,
           api.getFeedUsers(),
         ]);
 
@@ -100,12 +144,16 @@ export const useImages = () => {
           return;
         }
 
-        const sorted = sortByDate(nextItems);
+        const sorted = sortByDate(nextItems, timeOrder);
         setItems(sorted);
         setStats(nextStats);
         setFeedUsers(nextUsers);
         saveCacheFeed(sorted);
         saveCacheUsers(nextUsers);
+        if (shouldFetchStats) {
+          lastStatsFetchRef.current = Date.now();
+          saveCacheStats(nextStats);
+        }
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : '加载失败');
@@ -121,14 +169,29 @@ export const useImages = () => {
 
     const pingTimer = window.setInterval(() => {
       void api.pingStats().catch(() => undefined);
-      void api.getStats().then(setStats).catch(() => undefined);
+      if (Date.now() - lastStatsFetchRef.current > STATS_CACHE_TTL) {
+        void api.getStats().then((nextStats) => {
+          setStats(nextStats);
+          lastStatsFetchRef.current = Date.now();
+          saveCacheStats(nextStats);
+        }).catch(() => undefined);
+      }
     }, 30000);
 
     return () => {
       cancelled = true;
       window.clearInterval(pingTimer);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    setItems((currentItems) => {
+      const next = sortByDate(currentItems, timeOrder);
+      saveCacheFeed(next);
+      return next;
+    });
+    saveSortOrder(timeOrder);
+  }, [timeOrder]);
 
   // Filter items by selected user
   const filteredItems = useMemo(() => {
@@ -157,8 +220,10 @@ export const useImages = () => {
       });
     });
 
-    return [...monthMap.values()].sort((left, right) => right.key.localeCompare(left.key));
-  }, [filteredItems]);
+    return [...monthMap.values()].sort((left, right) =>
+      timeOrder === 'asc' ? left.key.localeCompare(right.key) : right.key.localeCompare(left.key)
+    );
+  }, [filteredItems, timeOrder]);
 
   const createImage = async (payload: CreateImagePayload, optimisticUser?: { login: string; avatarUrl: string }) => {
     setSubmitting(true);
@@ -184,7 +249,7 @@ export const useImages = () => {
         commentCount: 0,
         liked: false,
       };
-      setItems((currentItems) => sortByDate([tempItem, ...currentItems]));
+      setItems((currentItems) => sortByDate([tempItem, ...currentItems], timeOrder));
     }
 
     try {
@@ -193,7 +258,8 @@ export const useImages = () => {
         const next = sortByDate(
           optimisticUser
             ? currentItems.map((item) => (item.id === tempId ? created : item))
-            : [created, ...currentItems]
+            : [created, ...currentItems],
+          timeOrder
         );
         saveCacheFeed(next);
         return next;
@@ -233,7 +299,8 @@ export const useImages = () => {
             endAt: payload.endAt,
             updatedAt: new Date().toISOString(),
           };
-        })
+        }),
+        timeOrder
       );
     });
 
@@ -241,7 +308,8 @@ export const useImages = () => {
       const updated = await api.updateImage(payload);
       setItems((currentItems) => {
         const next = sortByDate(
-          currentItems.map((item) => (item.id === updated.id ? updated : item))
+          currentItems.map((item) => (item.id === updated.id ? updated : item)),
+          timeOrder
         );
         saveCacheFeed(next);
         return next;
@@ -250,7 +318,8 @@ export const useImages = () => {
       if (previousItem) {
         setItems((currentItems) => {
           const next = sortByDate(
-            currentItems.map((item) => (item.id === payload.id ? previousItem! : item))
+            currentItems.map((item) => (item.id === payload.id ? previousItem! : item)),
+            timeOrder
           );
           saveCacheFeed(next);
           return next;
@@ -280,7 +349,7 @@ export const useImages = () => {
     } catch (submitError) {
       if (removedItem) {
         setItems((currentItems) => {
-          const next = sortByDate([removedItem!, ...currentItems]);
+          const next = sortByDate([removedItem!, ...currentItems], timeOrder);
           saveCacheFeed(next);
           return next;
         });
@@ -308,6 +377,10 @@ export const useImages = () => {
     );
   };
 
+  const toggleTimeOrder = () => {
+    setTimeOrder((current) => (current === 'desc' ? 'asc' : 'desc'));
+  };
+
   return {
     items: filteredItems,
     allItems: items,
@@ -315,6 +388,8 @@ export const useImages = () => {
     filterUser,
     setFilterUser,
     timeline,
+    timeOrder,
+    toggleTimeOrder,
     stats,
     loading,
     submitting,

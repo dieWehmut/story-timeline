@@ -109,4 +109,19 @@
   .text-accent {
     color: var(--text-accent);
   }
+
+  :root[data-theme='light'] .tag-chip {
+    border-color: #111827;
+    color: #111827;
+    background-color: rgba(17, 24, 39, 0.06);
+  }
+
+  :root[data-theme='light'] .light-border {
+    border-color: #111827;
+  }
+
+  :root[data-theme='light'] .send-icon,
+  :root[data-theme='light'] .footer-icon {
+    color: #111827;
+  }
 }

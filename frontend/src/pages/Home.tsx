@@ -135,7 +135,14 @@ export default function Home({
         <div className="fixed inset-0 z-30" onClick={onTimelineClose} />
       )}
 
-      <TimeColumn activeMonth={activeMonth} months={images.timeline} onJump={jumpToMonth} open={timelineOpen} />
+      <TimeColumn
+        activeMonth={activeMonth}
+        months={images.timeline}
+        onJump={jumpToMonth}
+        onToggleOrder={images.toggleTimeOrder}
+        open={timelineOpen}
+        order={images.timeOrder}
+      />
 
       <main className="relative mx-auto flex w-full max-w-xl flex-col px-0 pb-36 pt-28 md:px-0 md:pt-36">
 

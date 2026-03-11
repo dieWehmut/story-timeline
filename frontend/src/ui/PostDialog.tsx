@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Plus, Trash2, X } from 'lucide-react';
+import { useToast } from './useToast';
 
 interface PostDialogProps {
   open: boolean;
@@ -84,12 +85,14 @@ export function PostDialog({
   );
   const [error, setError] = useState<string | null>(null);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [overDelete, setOverDelete] = useState(false);
   const deleteZoneRef = useRef<HTMLDivElement>(null);
   const prevOpenRef = useRef(false);
   const [animating, setAnimating] = useState(false);
   const [visible, setVisible] = useState(false);
   const previewsRef = useRef<PreviewItem[]>(previews);
+  const { toast } = useToast();
 
   useEffect(() => {
     previewsRef.current = previews;
@@ -139,6 +142,7 @@ export function PostDialog({
       });
       setError(null);
       setDraggingIndex(null);
+      setDragOverIndex(null);
       setOverDelete(false);
     } else if (!open && prevOpenRef.current && mode === 'create') {
       const draftFiles = previewsRef.current.filter((item) => item.type === 'file').map((item) => item.file!);
@@ -208,6 +212,16 @@ export function PostDialog({
     [previews]
   );
 
+  const movePreview = useCallback((fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    setPreviews((current) => {
+      const next = [...current];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }, []);
+
   const removePreview = useCallback((index: number) => {
     setPreviews((current) => {
       const item = current[index];
@@ -263,11 +277,13 @@ export function PostDialog({
       return;
     }
 
+    const files = previews.filter((item) => item.type === 'file').map((item) => item.file!);
+    const removedUrls = initialImageUrls.filter(
+      (url) => !previews.some((item) => item.type === 'url' && item.url === url)
+    );
+    setError(null);
+    onClose();
     try {
-      const files = previews.filter((item) => item.type === 'file').map((item) => item.file!);
-      const removedUrls = initialImageUrls.filter(
-        (url) => !previews.some((item) => item.type === 'url' && item.url === url)
-      );
       await onSubmit({
         description: description.trim(),
         tags,
@@ -282,12 +298,31 @@ export function PostDialog({
         postDraftFileCache.delete(DRAFT_KEY);
       }
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : '提交失败');
+      toast(submitError instanceof Error ? submitError.message : '提交失败', 'error');
     }
   };
 
-  const handleDragStart = (index: number) => {
+  const handleDragStart = (index: number, event?: React.DragEvent) => {
     setDraggingIndex(index);
+    setDragOverIndex(index);
+    if (event?.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', String(index));
+    }
+  };
+
+  const handleDragOver = (index: number, event: React.DragEvent) => {
+    event.preventDefault();
+    if (draggingIndex === null || draggingIndex === index) return;
+    setDragOverIndex(index);
+  };
+
+  const handleDrop = (index: number, event: React.DragEvent) => {
+    event.preventDefault();
+    if (draggingIndex === null || draggingIndex === index) return;
+    movePreview(draggingIndex, index);
+    setDraggingIndex(index);
+    setDragOverIndex(null);
   };
 
   const handleDragEnd = () => {
@@ -295,22 +330,38 @@ export function PostDialog({
       removePreview(draggingIndex);
     }
     setDraggingIndex(null);
+    setDragOverIndex(null);
     setOverDelete(false);
   };
 
   const handleTouchMove = useCallback(
     (event: React.TouchEvent) => {
-      if (draggingIndex === null || !deleteZoneRef.current) return;
+      if (draggingIndex === null) return;
       const touch = event.touches[0];
-      const rect = deleteZoneRef.current.getBoundingClientRect();
+      if (!touch) return;
+      event.preventDefault();
+
+      const rect = deleteZoneRef.current?.getBoundingClientRect();
       const isOver =
+        !!rect &&
         touch.clientX >= rect.left &&
         touch.clientX <= rect.right &&
         touch.clientY >= rect.top &&
         touch.clientY <= rect.bottom;
       setOverDelete(isOver);
+
+      if (!isOver) {
+        const target = document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement | null;
+        const holder = target?.closest('[data-preview-index]') as HTMLElement | null;
+        const nextIndex = holder ? Number(holder.dataset.previewIndex) : Number.NaN;
+        if (!Number.isNaN(nextIndex) && nextIndex !== draggingIndex) {
+          movePreview(draggingIndex, nextIndex);
+          setDraggingIndex(nextIndex);
+          setDragOverIndex(nextIndex);
+        }
+      }
     },
-    [draggingIndex]
+    [draggingIndex, movePreview]
   );
 
   const handleTouchEnd = useCallback(() => {
@@ -318,6 +369,7 @@ export function PostDialog({
       removePreview(draggingIndex);
     }
     setDraggingIndex(null);
+    setDragOverIndex(null);
     setOverDelete(false);
   }, [overDelete, draggingIndex, removePreview]);
 
@@ -352,11 +404,11 @@ export function PostDialog({
             value={description}
           />
 
-          <div className="mt-3 rounded border border-white/10 px-3 py-2">
+          <div className="light-border mt-3 rounded border border-white/10 px-3 py-2">
             <div className="flex flex-wrap gap-2">
               {tags.map((tag) => (
                 <button
-                  className="inline-flex items-center gap-1 rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200"
+                  className="tag-chip inline-flex items-center gap-1 rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200"
                   key={tag}
                   onClick={() => removeTag(tag)}
                   type="button"
@@ -392,14 +444,22 @@ export function PostDialog({
           >
             {previews.map((item, index) => (
               <div
-                className={`relative aspect-square overflow-hidden bg-slate-950/20 cursor-grab active:cursor-grabbing ${draggingIndex === index ? 'opacity-40' : ''}`}
+                className={`relative aspect-square overflow-hidden bg-slate-950/20 cursor-grab active:cursor-grabbing ${
+                  draggingIndex === index ? 'opacity-40' : ''
+                } ${dragOverIndex === index && draggingIndex !== null ? 'ring-2 ring-cyan-400/60' : ''}`}
+                data-preview-index={index}
                 draggable
                 key={`${item.url}-${index}`}
                 onDragEnd={handleDragEnd}
-                onDragStart={() => handleDragStart(index)}
+                onDragOver={(event) => handleDragOver(index, event)}
+                onDragStart={(event) => handleDragStart(index, event)}
+                onDrop={(event) => handleDrop(index, event)}
                 onTouchStart={() => handleDragStart(index)}
               >
                 <img alt="" className="absolute inset-0 h-full w-full object-cover" src={item.url} />
+                <span className="absolute left-1 top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-black/60 px-1 text-[10px] font-semibold text-white/90">
+                  {index + 1}
+                </span>
                 <button
                   className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white/80 hover:text-white"
                   onClick={() => removePreview(index)}
@@ -449,7 +509,7 @@ export function PostDialog({
               </button>
             </div>
             <input
-              className="w-full border border-white/10 bg-transparent px-3 py-2 text-sm text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)]"
+              className="light-border w-full border border-white/10 bg-transparent px-3 py-2 text-sm text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)]"
               id={startTimeId}
               onChange={(event) => setStartAt(event.target.value)}
               type="datetime-local"
@@ -457,7 +517,7 @@ export function PostDialog({
             />
             {timeMode === 'range' ? (
               <input
-                className="mt-2 w-full border border-white/10 bg-transparent px-3 py-2 text-sm text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)]"
+                className="light-border mt-2 w-full border border-white/10 bg-transparent px-3 py-2 text-sm text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)]"
                 id={endTimeId}
                 onChange={(event) => setEndAt(event.target.value)}
                 type="datetime-local"
