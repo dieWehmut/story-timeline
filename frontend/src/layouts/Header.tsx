@@ -95,9 +95,9 @@ export function Header({
 			{!isDetailView && feedUsers.length > 1 ? (
 				<div className="mx-auto mt-2 flex w-full max-w-6xl items-center gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
 					<button
-						className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition ${
+						className={`all-chip shrink-0 rounded-full px-3 py-1 text-xs font-medium transition ${
 							filterUser === null
-								? 'bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-400/40'
+								? 'all-chip-active bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-400/40'
 								: 'text-soft hover:text-[var(--text-main)]'
 						}`}
 						onClick={() => onFilterUser(null)}

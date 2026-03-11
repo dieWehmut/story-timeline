@@ -15,15 +15,18 @@ export function FloatingActions() {
 
   if (!visible) return null;
 
+  const iconBtnCls =
+    'inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition-all duration-300 hover:scale-110 hover:text-[var(--text-accent)] active:scale-95';
+
   return (
-    <div className="fixed bottom-4 right-4 z-50 md:bottom-6 md:right-6">
+    <div className="fixed bottom-1 right-1 z-50">
       <button
         aria-label="回到顶部"
-        className="floating-btn inline-flex h-10 w-10 items-center justify-center rounded-full transition hover:scale-105 active:scale-95"
+        className={iconBtnCls}
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         type="button"
       >
-        <ArrowUp size={20} />
+        <ArrowUp size={24} />
       </button>
     </div>
   );

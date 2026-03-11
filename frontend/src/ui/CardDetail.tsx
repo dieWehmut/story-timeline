@@ -30,23 +30,46 @@ const toDateTimeInputValue = (value: string) => {
   return formatter.format(new Date(value)).replace(' ', 'T');
 };
 
-const toBeijingText = (value: string) => {
-  const formatter = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  const parts = formatter.formatToParts(new Date(value));
+const dateOnlyFormatter = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+const timeOnlyFormatter = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+const toDateKey = (value: Date) => {
+  const parts = dateOnlyFormatter.formatToParts(value);
   const year = parts.find((p) => p.type === 'year')?.value ?? '';
   const month = parts.find((p) => p.type === 'month')?.value ?? '';
   const day = parts.find((p) => p.type === 'day')?.value ?? '';
-  const hour = parts.find((p) => p.type === 'hour')?.value ?? '';
-  const minute = parts.find((p) => p.type === 'minute')?.value ?? '';
-  return `${year}-${month}-${day} ${hour}:${minute}`;
+  return `${year}-${month}-${day}`;
+};
+
+const toBeijingText = (value: string) => {
+  const date = new Date(value);
+  const dateKey = toDateKey(date);
+  const todayKey = toDateKey(new Date());
+  const yesterdayKey = toDateKey(new Date(Date.now() - 86400000));
+  const beforeYesterdayKey = toDateKey(new Date(Date.now() - 2 * 86400000));
+  const timeText = timeOnlyFormatter.format(date);
+  let label = dateKey;
+
+  if (dateKey === todayKey) {
+    label = '今天';
+  } else if (dateKey === yesterdayKey) {
+    label = '昨天';
+  } else if (dateKey === beforeYesterdayKey) {
+    label = '前天';
+  }
+
+  return `${label} ${timeText}`;
 };
 
 const toCommentTime = (value: string) => {
@@ -189,7 +212,7 @@ export function CardDetail({
   const imageUrls = item.imageUrls ?? [];
   const tags = item.tags ?? [];
   const actionColumnClass =
-    'grid w-24 shrink-0 grid-cols-2 items-center justify-items-start pr-3';
+    'grid w-20 shrink-0 grid-cols-2 items-center justify-items-start pr-1';
   const actionButtonBaseClass =
     'inline-flex h-8 w-12 items-center justify-start gap-1 pl-1 transition';
 

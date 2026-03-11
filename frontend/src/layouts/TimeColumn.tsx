@@ -13,7 +13,7 @@ interface TimeColumnProps {
 export function TimeColumn({ activeMonth, months, onJump, onToggleOrder, open, order }: TimeColumnProps) {
   return (
     <aside
-      className={`fixed right-0 top-0 z-40 h-screen w-[5.5rem] overflow-y-auto overflow-x-hidden bg-[#0f1218] px-3 py-8 shadow-[-16px_0_48px_rgba(0,0,0,0.45)] transition-transform duration-300 ease-in-out md:w-24 md:px-4 ${
+      className={`fixed right-0 top-0 z-40 h-screen w-[5.5rem] overflow-y-auto overflow-x-hidden bg-[var(--page-bg-soft)] px-3 py-8 shadow-[var(--timeline-shadow)] transition-transform duration-300 ease-in-out md:w-24 md:px-4 ${
         open ? 'translate-x-0' : 'pointer-events-none translate-x-full'
       }`}
       style={{ scrollbarWidth: 'none' }}
@@ -21,7 +21,7 @@ export function TimeColumn({ activeMonth, months, onJump, onToggleOrder, open, o
       <div className="flex justify-center pb-4 text-center">
         <button
           aria-label="切换时间排序"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-slate-200 transition hover:text-cyan-300"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--panel-border)] text-[var(--text-main)] transition hover:text-[var(--text-accent)]"
           onClick={onToggleOrder}
           title={order === 'asc' ? '时间排序：旧到新' : '时间排序：新到旧'}
           type="button"
@@ -39,20 +39,20 @@ export function TimeColumn({ activeMonth, months, onJump, onToggleOrder, open, o
             <div key={month.key}>
               {showYear ? (
                 <p className={`mb-2 text-[0.65rem] font-bold uppercase tracking-widest ${
-                  active ? 'text-cyan-400' : 'text-slate-400'
+                  active ? 'text-[var(--text-accent)]' : 'text-soft'
                 }`}>
                   {month.year}
                 </p>
               ) : null}
               <button
-                className={`flex w-full items-end justify-center gap-1 font-light leading-none transition-all duration-200 hover:text-cyan-300 ${
-                  active ? 'text-cyan-400' : 'text-slate-200'
+                className={`flex w-full items-end justify-center gap-1 font-light leading-none transition-all duration-200 hover:text-[var(--text-accent)] ${
+                  active ? 'text-[var(--text-accent)]' : 'text-[var(--text-main)]'
                 }`}
                 onClick={() => onJump(month)}
                 type="button"
               >
                 <span className="text-4xl tracking-tight">{month.month}</span>
-                <span className="text-base text-slate-400">月</span>
+                <span className="text-base text-soft">月</span>
               </button>
             </div>
           );

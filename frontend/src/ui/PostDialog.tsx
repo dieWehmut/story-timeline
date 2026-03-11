@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Plus, Trash2, X } from 'lucide-react';
 import { useToast } from './useToast';
 
@@ -22,6 +22,8 @@ const MAX_TOTAL_SIZE = 25 * 1024 * 1024;
 const MAX_TAGS = 12;
 const MAX_TAG_LENGTH = 32;
 const DRAFT_KEY = 'draft:post';
+const TAG_HISTORY_KEY = 'story_tag_history';
+const MAX_TAG_HISTORY = 24;
 const postDraftFileCache = new Map<string, File[]>();
 
 const getDefaultDateTime = () => {
@@ -44,6 +46,36 @@ interface PreviewItem {
 }
 
 const normalizeTag = (value: string) => value.trim().replace(/^#/, '').replace(/\s+/g, ' ');
+
+const loadTagHistory = (): string[] => {
+  try {
+    const raw = localStorage.getItem(TAG_HISTORY_KEY);
+    const parsed = raw ? (JSON.parse(raw) as string[]) : [];
+    return Array.isArray(parsed) ? parsed.filter((tag) => typeof tag === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveTagHistory = (tags: string[]) => {
+  try { localStorage.setItem(TAG_HISTORY_KEY, JSON.stringify(tags)); } catch { /* quota */ }
+};
+
+const mergeTagHistory = (current: string[], incoming: string[]) => {
+  const seen = new Set<string>();
+  const next: string[] = [];
+  const pushTag = (tag: string) => {
+    const normalized = normalizeTag(tag);
+    if (!normalized) return;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    next.push(normalized);
+  };
+  incoming.forEach(pushTag);
+  current.forEach(pushTag);
+  return next.slice(0, MAX_TAG_HISTORY);
+};
 
 const buildFilePreviewItems = (files: File[]): PreviewItem[] =>
   files.map((file) => ({ type: 'file' as const, file, url: URL.createObjectURL(file) }));
@@ -77,6 +109,7 @@ export function PostDialog({
   const [description, setDescription] = useState(initialDescription);
   const [tags, setTags] = useState<string[]>(initialTags);
   const [tagInput, setTagInput] = useState('');
+  const [tagHistory, setTagHistory] = useState<string[]>([]);
   const [timeMode, setTimeMode] = useState<'point' | 'range'>(initialTimeMode);
   const [startAt, setStartAt] = useState(initialStartAt ?? getDefaultDateTime());
   const [endAt, setEndAt] = useState(initialEndAt ?? initialStartAt ?? getDefaultDateTime());
@@ -136,6 +169,9 @@ export function PostDialog({
         setEndAt(initialEndAt ?? initialStartAt ?? getDefaultDateTime());
       }
       setTagInput('');
+      const mergedHistory = mergeTagHistory(loadTagHistory(), initialTags);
+      setTagHistory(mergedHistory);
+      saveTagHistory(mergedHistory);
       setPreviews((current) => {
         revokeFilePreviews(current);
         return [...initialImageUrls.map((url) => ({ type: 'url' as const, url })), ...buildFilePreviewItems(draftFiles)];
@@ -196,14 +232,14 @@ export function PostDialog({
       for (const item of next) {
         if (item.file) {
           if (item.file.size > MAX_FILE_SIZE) {
-            setError(`单张图片不能超过 5MB: ${item.file.name}`);
+            setError(`鍗曞紶鍥剧墖涓嶈兘瓒呰繃 5MB: ${item.file.name}`);
             return;
           }
           totalSize += item.file.size;
         }
       }
       if (totalSize > MAX_TOTAL_SIZE) {
-        setError('帖子总大小不能超过 25MB');
+        setError('甯栧瓙鎬诲ぇ灏忎笉鑳借秴杩?25MB');
         return;
       }
       setError(null);
@@ -232,14 +268,14 @@ export function PostDialog({
     });
   }, []);
 
-  const commitTagInput = useCallback(() => {
-    const normalized = normalizeTag(tagInput);
+  const applyTag = useCallback((value: string) => {
+    const normalized = normalizeTag(value);
     if (!normalized) {
       setTagInput('');
       return;
     }
     if (normalized.length > MAX_TAG_LENGTH) {
-      setError(`标签不能超过 ${MAX_TAG_LENGTH} 个字符`);
+      setError(`Tag must be <= ${MAX_TAG_LENGTH} chars.`);
       return;
     }
     if (tags.some((tag) => tag.toLowerCase() === normalized.toLowerCase())) {
@@ -247,13 +283,24 @@ export function PostDialog({
       return;
     }
     if (tags.length >= MAX_TAGS) {
-      setError(`最多添加 ${MAX_TAGS} 个标签`);
+      setError(`At most ${MAX_TAGS} tags.`);
       return;
     }
     setTags((current) => [...current, normalized]);
     setTagInput('');
     setError(null);
-  }, [tagInput, tags]);
+    setTagHistory((current) => {
+      const next = mergeTagHistory(current, [normalized]);
+      saveTagHistory(next);
+      return next;
+    });
+  }, [tags]);
+
+  const commitTagInput = useCallback(() => {
+    applyTag(tagInput);
+  }, [applyTag, tagInput]);
+
+
 
   const removeTag = useCallback((tagToRemove: string) => {
     setTags((current) => current.filter((tag) => tag !== tagToRemove));
@@ -261,19 +308,19 @@ export function PostDialog({
 
   const handleSubmit = async () => {
     if (!startAt) {
-      setError('请填写开始时间');
+      setError('Please select start time.');
       return;
     }
     if (timeMode === 'range' && !endAt) {
-      setError('请填写结束时间');
+      setError('Please select end time.');
       return;
     }
     if (timeMode === 'range' && new Date(endAt).getTime() < new Date(startAt).getTime()) {
-      setError('结束时间不能早于开始时间');
+      setError('End time cannot be before start time.');
       return;
     }
     if (!description.trim() && previews.length === 0) {
-      setError('请输入文字或选择图片');
+      setError('璇疯緭鍏ユ枃瀛楁垨閫夋嫨鍥剧墖');
       return;
     }
 
@@ -293,12 +340,15 @@ export function PostDialog({
         files,
         removedUrls: removedUrls.length > 0 ? removedUrls : undefined,
       });
+      const updatedHistory = mergeTagHistory(loadTagHistory(), tags);
+      setTagHistory(updatedHistory);
+      saveTagHistory(updatedHistory);
       if (mode === 'create') {
         localStorage.removeItem(DRAFT_KEY);
         postDraftFileCache.delete(DRAFT_KEY);
       }
     } catch (submitError) {
-      toast(submitError instanceof Error ? submitError.message : '提交失败', 'error');
+      toast(submitError instanceof Error ? submitError.message : '鎻愪氦澶辫触', 'error');
     }
   };
 
@@ -377,13 +427,14 @@ export function PostDialog({
 
   const totalPreviews = previews.length;
   const cols = totalPreviews <= 2 ? 2 : 3;
+  const availableTags = tagHistory.filter((tag) => !tags.some((selected) => selected.toLowerCase() === tag.toLowerCase()));
 
   return (
     <div className={`fixed inset-0 z-50 flex flex-col md:items-center md:justify-center transition-colors duration-250 ${visible ? 'bg-[var(--page-bg)] md:bg-slate-950/65' : 'bg-transparent md:bg-transparent'}`}>
       <div className={`flex h-full w-full flex-col bg-[var(--page-bg)] transition-all duration-250 md:h-auto md:max-h-[90vh] md:max-w-lg md:border md:border-[var(--panel-border)] md:bg-[var(--panel-bg)] md:backdrop-blur-xl ${visible ? 'translate-y-0 opacity-100 md:scale-100' : 'translate-y-full opacity-100 md:translate-y-0 md:scale-95 md:opacity-0'}`}>
         <div className="flex shrink-0 items-center justify-between px-4 py-3">
           <button className="text-sm text-soft hover:text-[var(--text-main)] transition" onClick={onClose} type="button">
-            取消
+            鍙栨秷
           </button>
           <button
             className="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
@@ -391,7 +442,7 @@ export function PostDialog({
             onClick={() => void handleSubmit()}
             type="button"
           >
-            {busy ? '提交中...' : mode === 'create' ? '发表' : '修改'}
+            {busy ? '鎻愪氦涓?..' : mode === 'create' ? '鍙戣〃' : '淇敼'}
           </button>
         </div>
 
@@ -400,7 +451,7 @@ export function PostDialog({
             className="min-h-20 w-full resize-none bg-transparent text-base text-[var(--text-main)] outline-none placeholder:text-soft/50"
             id={descriptionId}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="記錄一下..."
+            placeholder="瑷橀寗涓€涓?.."
             value={description}
           />
 
@@ -431,9 +482,23 @@ export function PostDialog({
                   removeTag(tags[tags.length - 1]);
                 }
               }}
-              placeholder="添加标签，回车确认"
+              placeholder="Add tags, press Enter"
               value={tagInput}
             />
+            {availableTags.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {availableTags.slice(0, MAX_TAG_HISTORY).map((tag) => (
+                  <button
+                    className="tag-chip inline-flex items-center gap-1 rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-xs text-cyan-200"
+                    key={`history-${tag}`}
+                    onClick={() => applyTag(tag)}
+                    type="button"
+                  >
+                    <span>#{tag}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div
@@ -494,18 +559,18 @@ export function PostDialog({
           <div className="mt-4">
             <div className="mb-3 flex gap-2 text-sm">
               <button
-                className={`rounded px-3 py-1.5 transition ${timeMode === 'point' ? 'bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-400/40' : 'bg-white/5 text-soft hover:text-[var(--text-main)]'}`}
+                className={`time-mode-btn rounded border border-transparent px-3 py-1.5 transition ${timeMode === 'point' ? 'time-mode-active bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-400/40' : 'bg-white/5 text-soft hover:text-[var(--text-main)]'}`}
                 onClick={() => setTimeMode('point')}
                 type="button"
               >
-                时间点
+                鏃堕棿鐐?
               </button>
               <button
-                className={`rounded px-3 py-1.5 transition ${timeMode === 'range' ? 'bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-400/40' : 'bg-white/5 text-soft hover:text-[var(--text-main)]'}`}
+                className={`time-mode-btn rounded border border-transparent px-3 py-1.5 transition ${timeMode === 'range' ? 'time-mode-active bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-400/40' : 'bg-white/5 text-soft hover:text-[var(--text-main)]'}`}
                 onClick={() => setTimeMode('range')}
                 type="button"
               >
-                持续时间
+                鎸佺画鏃堕棿
               </button>
             </div>
             <input
@@ -547,10 +612,18 @@ export function PostDialog({
             ref={deleteZoneRef}
           >
             <Trash2 size={18} />
-            <span>拖动到此处删除</span>
+            <span>Drag here to delete</span>
           </div>
         ) : null}
       </div>
     </div>
   );
 }
+
+
+
+
+
+
+
+

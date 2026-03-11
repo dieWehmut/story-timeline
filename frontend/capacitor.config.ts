@@ -1,0 +1,20 @@
+import type { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  appId: 'com.diewehmut.app',
+  appName: '故事集',
+
+  webDir: 'dist',
+
+  server: {
+    url: 'https://REDACTED.example.com',
+    cleartext: false,
+    allowNavigation: [
+      "story-timeline.hc-dsw-nexus.me",
+      "github.com",
+      "api.github.com"
+    ]
+  }
+};
+
+export default config;
