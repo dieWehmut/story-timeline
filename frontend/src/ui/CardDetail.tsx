@@ -188,6 +188,10 @@ export function CardDetail({
     item.authorAvatar || (authorLogin !== 'GitHub' ? `https://github.com/${authorLogin}.png?size=64` : '');
   const imageUrls = item.imageUrls ?? [];
   const tags = item.tags ?? [];
+  const actionColumnClass =
+    'grid w-24 shrink-0 grid-cols-2 items-center justify-items-start pr-3';
+  const actionButtonBaseClass =
+    'inline-flex h-8 w-12 items-center justify-start gap-1 pl-1 transition';
 
   // Lock body scroll while detail is open
   useEffect(() => {
@@ -381,10 +385,10 @@ export function CardDetail({
               </div>
               {/* Right: edit/delete (top), like/comment (bottom) — but here only top row */}
               {editable ? (
-                <div className="flex w-16 shrink-0 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
+                <div className={`${actionColumnClass} opacity-100 transition md:opacity-0 md:group-hover:opacity-100`}>
                   <button
                     aria-label="修改卡片"
-                    className="inline-flex h-8 w-8 items-center justify-center text-soft transition hover:text-[var(--text-main)]"
+                    className={`${actionButtonBaseClass} text-soft hover:text-[var(--text-main)]`}
                     onClick={() => setEditing(true)}
                     type="button"
                   >
@@ -392,7 +396,7 @@ export function CardDetail({
                   </button>
                   <button
                     aria-label="删除卡片"
-                    className="inline-flex h-8 w-8 items-center justify-center text-rose-300 transition hover:text-rose-200"
+                    className={`${actionButtonBaseClass} text-rose-300 hover:text-rose-200`}
                     onClick={handleDeleteItem}
                     type="button"
                   >
@@ -400,7 +404,10 @@ export function CardDetail({
                   </button>
                 </div>
               ) : (
-                <div className="w-16 shrink-0" />
+                <div className={actionColumnClass}>
+                  <div className="h-8 w-12" />
+                  <div className="h-8 w-12" />
+                </div>
               )}
             </div>
 
@@ -433,9 +440,9 @@ export function CardDetail({
               <div className="min-w-0 flex-1 px-2 pt-3">
                 <p className="text-xs text-soft">{toDisplayTime(item)}</p>
               </div>
-              <div className="flex shrink-0 gap-2">
+              <div className={`${actionColumnClass} items-end pb-1`}>
                 <button
-                  className={`flex items-center gap-1 py-1 transition ${item.liked ? 'text-rose-400' : 'text-soft hover:text-rose-300'}`}
+                  className={`${actionButtonBaseClass} ${item.liked ? 'text-rose-400' : 'text-soft hover:text-rose-300'}`}
                   disabled={!canInteract || likeBusy}
                   onClick={() => void handleToggleLike()}
                   type="button"
@@ -444,7 +451,7 @@ export function CardDetail({
                   {item.likeCount > 0 ? <span className="text-[10px] leading-none">{item.likeCount}</span> : null}
                 </button>
                 <button
-                  className="flex items-center gap-1 py-1 text-soft transition hover:text-[var(--text-main)]"
+                  className={`${actionButtonBaseClass} text-soft hover:text-[var(--text-main)]`}
                   onClick={() => commentInputRef.current?.focus()}
                   type="button"
                 >

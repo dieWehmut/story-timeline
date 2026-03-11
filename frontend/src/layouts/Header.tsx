@@ -109,7 +109,7 @@ export function Header({
 						<button
 							className={`flex shrink-0 items-center gap-1 transition-all duration-200 ${
 								filterUser === user.login
-									? 'scale-105 rounded-full bg-cyan-500/10 px-1.5 py-0.5 ring-1 ring-cyan-400/40'
+									? 'scale-105 rounded-full bg-cyan-500/10 px-1.5 py-0.5'
 									: filterUser !== null
 										? 'opacity-50 hover:opacity-80'
 										: 'hover:scale-105'
@@ -121,7 +121,9 @@ export function Header({
 						>
 							<img
 								alt={user.login}
-								className="h-6 w-6 rounded-full object-cover"
+								className={`h-6 w-6 rounded-full object-cover ${
+									filterUser === user.login ? 'ring-2 ring-blue-400/80 ring-offset-2 ring-offset-transparent' : ''
+								}`}
 								src={user.avatarUrl}
 							/>
 							

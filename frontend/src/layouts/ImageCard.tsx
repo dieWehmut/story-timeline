@@ -131,8 +131,10 @@ export function ImageCard({
     if (item.commentCount > 0) loadCommentsIfNeeded();
   }, [item.commentCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const iconButtonClass =
-    'inline-flex h-8 w-8 items-center justify-center text-soft transition hover:text-[var(--text-main)]';
+  const actionColumnClass =
+    'grid w-24 shrink-0 grid-cols-2 items-center justify-items-start pr-3';
+  const actionButtonBaseClass =
+    'inline-flex h-8 w-12 items-center justify-start gap-1 pl-1 transition';
 
   const authorLogin = item.authorLogin || fallbackAuthorLogin || 'GitHub';
   const authorAvatar =
@@ -275,12 +277,12 @@ export function ImageCard({
           </div>
 
           {/* Right: Edit + Delete */}
-          <div className="flex w-16 shrink-0 pr-2">
+          <div className={`${actionColumnClass} ${editable ? 'opacity-100 transition md:opacity-0 md:group-hover:opacity-100' : ''}`}>
             {editable ? (
-              <div className="flex opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
+              <>
                 <button
                   aria-label="修改卡片"
-                  className={iconButtonClass}
+                  className={`${actionButtonBaseClass} text-soft hover:text-[var(--text-main)]`}
                   onClick={(e) => { e.stopPropagation(); setEditing(true); }}
                   type="button"
                 >
@@ -288,15 +290,18 @@ export function ImageCard({
                 </button>
                 <button
                   aria-label="删除卡片"
-                  className={`${iconButtonClass} text-rose-300 hover:text-rose-200`}
+                  className={`${actionButtonBaseClass} text-rose-300 hover:text-rose-200`}
                   onClick={(e) => { e.stopPropagation(); handleDelete(); }}
                   type="button"
                 >
                   <Trash2 size={14} />
                 </button>
-              </div>
+              </>
             ) : (
-              <div className="h-8" />
+              <>
+                <div className="h-8 w-12" />
+                <div className="h-8 w-12" />
+              </>
             )}
           </div>
         </div>
@@ -362,9 +367,9 @@ export function ImageCard({
           </div>
 
           {/* Right: Like + Comment */}
-          <div className="flex shrink-0 items-end gap-2 pb-1 pr-2">
+          <div className={`${actionColumnClass} items-end pb-1`}>
             <button
-              className={`flex items-center gap-1 py-1 transition ${item.liked ? 'text-rose-400' : 'text-soft hover:text-rose-300'}`}
+              className={`${actionButtonBaseClass} ${item.liked ? 'text-rose-400' : 'text-soft hover:text-rose-300'}`}
               disabled={!canInteract || likeBusy}
               onClick={(e) => { e.stopPropagation(); void handleToggleLike(); }}
               type="button"
@@ -373,7 +378,7 @@ export function ImageCard({
               {item.likeCount > 0 ? <span className="text-[10px] leading-none">{item.likeCount}</span> : null}
             </button>
             <button
-              className="flex items-center gap-1 py-1 text-soft transition hover:text-[var(--text-main)]"
+              className={`${actionButtonBaseClass} text-soft hover:text-[var(--text-main)]`}
               onClick={(e) => { e.stopPropagation(); handleOpenComment(); }}
               type="button"
             >

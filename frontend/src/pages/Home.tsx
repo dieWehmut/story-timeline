@@ -4,6 +4,7 @@ import { CardDetail } from '../ui/CardDetail';
 import { Footer } from '../layouts/Footer';
 import { Header } from '../layouts/Header';
 import { ImageCard } from '../layouts/ImageCard';
+import { FloatingActions } from '../layouts/FloatingActions';
 import { TimeColumn } from '../layouts/TimeColumn';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
@@ -210,6 +211,8 @@ export default function Home({
           roleLabel={selectedItem.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
         />
       ) : null}
+
+      <FloatingActions />
     </div>
   );
 }
