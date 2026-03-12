@@ -199,7 +199,7 @@
   .image-card-reveal {
     opacity: 0;
     transform: translateY(14px);
-    transition: opacity 420ms ease, transform 420ms ease;
+    transition: opacity 260ms ease, transform 260ms ease;
   }
 
   .image-card-reveal.is-visible {

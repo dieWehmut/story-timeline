@@ -13,12 +13,11 @@ interface TimeColumnProps {
 export function TimeColumn({ activeMonth, months, onJump, onToggleOrder, open, order }: TimeColumnProps) {
   return (
     <aside
-      className={`fixed right-0 top-0 z-[60] h-screen w-[5.5rem] overflow-y-auto overflow-x-hidden bg-[var(--page-bg-soft)] px-3 py-6 shadow-[var(--timeline-shadow)] transition-transform duration-300 ease-in-out md:w-24 md:px-4 ${
+      className={`fixed right-0 top-0 z-[60] flex h-screen w-[5.5rem] flex-col overflow-x-hidden bg-[var(--page-bg-soft)] px-3 py-6 shadow-[var(--timeline-shadow)] transition-transform duration-300 ease-in-out md:w-24 md:px-4 ${
         open ? 'translate-x-0' : 'pointer-events-none translate-x-full'
       }`}
-      style={{ scrollbarWidth: 'none' }}
     >
-      <div className="sticky top-0 z-10 -mx-3 flex justify-center bg-[var(--page-bg-soft)] px-3 pb-2 pt-1 text-center md:-mx-4 md:px-4">
+      <div className="shrink-0 -mx-3 flex justify-center bg-[var(--page-bg-soft)] px-3 pb-2 pt-1 text-center md:-mx-4 md:px-4">
         <button
           aria-label="切换时间排序"
           className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--panel-border)] text-[var(--text-main)] transition hover:text-[var(--text-accent)]"
@@ -29,7 +28,7 @@ export function TimeColumn({ activeMonth, months, onJump, onToggleOrder, open, o
           <ArrowDownUp className={order === 'asc' ? 'rotate-180' : ''} size={18} />
         </button>
       </div>
-      <div className="space-y-3 pt-2 text-center">
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pt-2 text-center" style={{ scrollbarWidth: 'none' }}>
         {months.map((month, index) => {
           const previous = months[index - 1];
           const showYear = !previous || previous.year !== month.year;

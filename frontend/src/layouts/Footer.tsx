@@ -59,7 +59,7 @@ export function Footer({ stats }: FooterProps) {
             href={`https://github.com/${stats.githubOwner}`}
             rel="noopener noreferrer"
             target="_blank"
-            className="underline decoration-transparent underline-offset-4 transition hover:decoration-current"
+            className="underline underline-offset-4 decoration-current"
           >
             {stats.githubOwner}.
           </a>

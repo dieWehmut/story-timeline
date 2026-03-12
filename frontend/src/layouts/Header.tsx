@@ -28,6 +28,7 @@ interface HeaderProps {
   theme: 'dark' | 'light';
   timelineOpen: boolean;
   uploadBusy: boolean;
+  showUploadButton?: boolean;
 }
 
 export function Header({
@@ -51,6 +52,7 @@ export function Header({
   theme,
   timelineOpen,
   uploadBusy,
+  showUploadButton = true,
 }: HeaderProps) {
   return (
     <header className="fixed left-0 right-0 top-0 z-40 px-2 pt-2 md:px-3 md:pt-3">
@@ -84,7 +86,7 @@ export function Header({
               <HomeButton />
               <AuthButton authenticated={authAuthenticated} loading={authLoading} onLogin={onLogin} onLogout={onLogout} user={authUser} />
               <ThemeButton onToggle={onThemeToggle} theme={theme} />
-              {authUser && canPost ? <UploadButton busy={uploadBusy} /> : null}
+              {authUser && canPost && showUploadButton ? <UploadButton busy={uploadBusy} /> : null}
               <div className={`transition-all duration-300 ${timelineOpen ? 'pointer-events-none scale-75 opacity-0' : 'opacity-100'}`}>
                 <button
                   aria-expanded={timelineOpen}

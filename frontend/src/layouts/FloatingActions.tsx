@@ -11,12 +11,19 @@ export function FloatingActions({ hidden = false }: FloatingActionsProps) {
   const [uiFlags, setUiFlags] = useState(getUIFlags());
 
   useEffect(() => {
+    const getScrollTop = () =>
+      window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+
     const handleScroll = () => {
-      setVisible(window.scrollY > 40);
+      setVisible(getScrollTop() > 40);
     };
     handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    document.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('scroll', handleScroll);
+    };
   }, []);
 
   useEffect(() => subscribeUIFlags(setUiFlags), []);
@@ -27,7 +34,7 @@ export function FloatingActions({ hidden = false }: FloatingActionsProps) {
     'inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition-all duration-300 hover:scale-110 hover:text-[var(--text-accent)] active:scale-95';
 
   return (
-    <div className="fixed bottom-2 right-2 z-50">
+    <div className="fixed bottom-2 right-2 z-[80]">
       <button
         aria-label="回到顶部"
         className={iconBtnCls}

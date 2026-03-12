@@ -1,4 +1,4 @@
-import { BookOpen, Download, Github, Image as ImageIcon, LogIn, LogOut, UserRound } from 'lucide-react';
+import { BookOpen, Download, Github, Image as ImageIcon, LogIn, LogOut } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ThemeButton } from '../layouts/ThemeButton';
 import { useAuth } from '../hooks/useAuth';
@@ -72,16 +72,7 @@ export default function Home({ auth, images, theme, onThemeToggle }: HomeProps) 
       <header className="px-4 pt-4">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
           <div className="flex items-center gap-3">
-            {auth.loading ? (
-              <button
-                className="inline-flex items-center gap-2 rounded-full border border-[var(--panel-border)] px-3 py-1.5 text-sm text-soft"
-                disabled
-                type="button"
-              >
-                <UserRound size={16} />
-                载入中
-              </button>
-            ) : auth.user ? (
+            {auth.user ? (
               <>
                 <span className="text-sm font-medium text-[var(--text-main)]">{auth.user.login}</span>
                 <button
@@ -124,3 +115,5 @@ export default function Home({ auth, images, theme, onThemeToggle }: HomeProps) 
     </div>
   );
 }
+
+

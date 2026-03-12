@@ -105,14 +105,12 @@ function DetailImageGrid({
 
   if (urls.length === 1) {
     return (
-      <div className="flex justify-center px-4">
+      <div className="w-full">
         <div
-          className="w-2/3 cursor-pointer overflow-hidden bg-slate-950/20"
+          className="relative aspect-square w-full cursor-pointer overflow-hidden bg-slate-950/20"
           onClick={() => onImageClick(0)}
         >
-          <div className="relative aspect-square">
-            <img alt={alt} className="absolute inset-0 h-full w-full object-cover" src={urls[0]} />
-          </div>
+          <img alt={alt} className="absolute inset-0 h-full w-full object-cover" src={urls[0]} />
         </div>
       </div>
     );
@@ -120,7 +118,7 @@ function DetailImageGrid({
 
   const cols = urls.length <= 2 ? 2 : 3;
   return (
-    <div className={`grid gap-0.5 px-4 ${cols === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+    <div className={`grid gap-0.5 ${cols === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
       {urls.map((url, i) => (
         <div
           className="relative aspect-square cursor-pointer overflow-hidden bg-slate-950/20"
@@ -538,7 +536,7 @@ export function CardDetail({
 
             {/* Images */}
             {imageUrls.length > 0 ? (
-              <div className="mt-2">
+              <div className="mt-2 px-2">
                 <DetailImageGrid alt={item.description} onImageClick={setViewerIndex} urls={imageUrls} />
               </div>
             ) : null}

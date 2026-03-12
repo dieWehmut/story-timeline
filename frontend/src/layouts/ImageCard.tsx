@@ -357,7 +357,7 @@ export function ImageCard({
 
         {/* Full-width images */}
         {imageUrls.length > 0 ? (
-          <div className="mt-2 cursor-pointer" onClick={() => onOpenDetail?.()}>
+          <div className="mt-2 cursor-pointer px-2" onClick={() => onOpenDetail?.()}>
             <ImageGrid alt={item.description} onImageClick={setViewerIndex} urls={imageUrls} />
           </div>
         ) : null}

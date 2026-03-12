@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { LoaderCircle } from 'lucide-react';
+import { Image as ImageIcon, LoaderCircle } from 'lucide-react';
 import { CardDetail } from '../ui/CardDetail';
 import { Header } from '../layouts/Header';
 import { ImageCard } from '../layouts/ImageCard';
 import { FloatingActions } from '../layouts/FloatingActions';
 import { TimeColumn } from '../layouts/TimeColumn';
+import { UploadButton } from '../layouts/UploadButton';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { TimelineMonth } from '../types/image';
 
 interface StoryProps {
@@ -49,10 +50,26 @@ export default function Story({
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const selectedUser = searchParams.get('user');
   const selectedTag = searchParams.get('tag');
   const activeUser = selectedUser && selectedUser !== 'all' ? selectedUser : null;
   const activeTag = selectedTag && selectedTag !== 'all' ? selectedTag : null;
+  const isUserScoped = !!activeUser;
+
+  const scopedAllItems = useMemo(() => {
+    if (!activeUser) return images.allItems;
+    const normalized = activeUser.toLowerCase();
+    return images.allItems.filter((item) => item.authorLogin.toLowerCase() === normalized);
+  }, [activeUser, images.allItems]);
+
+  const recordCount = scopedAllItems.length;
+  const albumCount = scopedAllItems.reduce((sum, item) => sum + (item.imageUrls?.length ?? 0), 0);
+
+  const albumOwner = activeUser || auth.user?.login || images.stats.githubOwner || 'GitHub';
+  const albumHref = `/album?user=${encodeURIComponent(albumOwner)}`;
+  const recordDisabled = isUserScoped || !auth.canPost || images.submitting;
+  const showQuickActions = selectedItemId === null;
 
   const monthGroups = useMemo(
     () =>
@@ -171,6 +188,7 @@ export default function Story({
         theme={theme}
         timelineOpen={timelineOpen}
         uploadBusy={images.submitting}
+        showUploadButton={!showQuickActions}
       />
 
       {timelineOpen && (
@@ -187,6 +205,34 @@ export default function Story({
       />
 
       <main className="relative mx-auto flex w-full max-w-xl flex-col px-0 pb-36 pt-28 md:px-0 md:pt-36">
+        {showQuickActions ? (
+          <div className="grid w-full grid-cols-2 border-y border-[var(--panel-border)]">
+            <UploadButton
+              busy={images.submitting}
+              className="border-r border-[var(--panel-border)]"
+              disabled={recordDisabled}
+              label="記錄"
+              showIcon={!isUserScoped}
+              subLabel={isUserScoped ? `\u603b ${recordCount} \u5e16` : undefined}
+              variant="card"
+            />
+            <button
+              className={`group flex w-full flex-col items-center justify-center gap-1 px-4 py-3 text-sm text-[var(--text-main)] transition ${
+                isUserScoped ? '' : 'hover:text-[var(--text-accent)]'
+              }`}
+              onClick={() => navigate(albumHref)}
+              type="button"
+            >
+              {!isUserScoped ? (
+                <ImageIcon className="text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={20} />
+              ) : null}
+              <span className="leading-none">{'相冊'}</span>
+              {isUserScoped ? (
+                <span className="text-xs text-soft">{`${albumCount} \u9879`}</span>
+              ) : null}
+            </button>
+          </div>
+        ) : null}
         {images.error ? (
           <div className="mb-6 border border-rose-400/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
             {images.error}
