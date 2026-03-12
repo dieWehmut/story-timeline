@@ -165,4 +165,49 @@
   :root[data-theme='light'] .footer-icon {
     color: #111827;
   }
+
+  :root[data-theme='light'] .home-nav-icon {
+    color: #111827;
+  }
+
+  :root[data-theme='light'] .group:hover .home-nav-icon {
+    color: #111827;
+  }
+
+  :root[data-theme='light'] .album-tab {
+    color: #111827;
+  }
+
+  :root[data-theme='light'] .album-tab-inactive {
+    color: #111827;
+  }
+
+  :root[data-theme='light'] .album-tab-inactive:hover {
+    color: #111827;
+  }
+
+  :root[data-theme='light'] .album-tab-active {
+    background-color: #111827;
+    color: #f9fafb;
+  }
+
+  .page-transition {
+    animation: page-fade 260ms ease-out both;
+    will-change: opacity;
+  }
+}
+
+@keyframes page-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition {
+    animation: none;
+  }
 }

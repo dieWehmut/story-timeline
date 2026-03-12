@@ -1,6 +1,7 @@
 ﻿import { ArrowLeft, CalendarRange } from 'lucide-react';
 import { ThemeButton } from './ThemeButton';
 import { AuthButton } from './AuthButton';
+import { HomeButton } from './HomeButton';
 import { UploadButton } from './UploadButton';
 import { TagBar } from './TagBar';
 import { UserBar } from './UserBar';
@@ -78,6 +79,7 @@ export function Header({
             <ThemeButton onToggle={onThemeToggle} theme={theme} />
           ) : (
             <>
+              <HomeButton />
               <AuthButton loading={authLoading} onLogin={onLogin} onLogout={onLogout} user={authUser} />
               <ThemeButton onToggle={onThemeToggle} theme={theme} />
               {authUser && canPost ? <UploadButton busy={uploadBusy} /> : null}

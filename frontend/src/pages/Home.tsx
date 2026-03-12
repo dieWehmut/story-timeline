@@ -26,7 +26,7 @@ function NavCard({ icon: Icon, label, to, href, external }: NavCardProps) {
   if (to) {
     return (
       <Link className={baseClass} to={to}>
-        <Icon className="text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={26} />
+        <Icon className="home-nav-icon text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={26} />
         <span className="text-sm">{label}</span>
       </Link>
     );
@@ -39,7 +39,7 @@ function NavCard({ icon: Icon, label, to, href, external }: NavCardProps) {
       rel={external ? 'noopener noreferrer' : undefined}
       target={external ? '_blank' : undefined}
     >
-      <Icon className="text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={26} />
+      <Icon className="home-nav-icon text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={26} />
       <span className="text-sm">{label}</span>
     </a>
   );
@@ -92,16 +92,16 @@ export default function Home({ auth, images, theme, onThemeToggle }: HomeProps) 
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-col items-center px-4 pt-16 text-center">
-        <h1 className="font-serif text-4xl font-semibold tracking-wide text-[var(--text-main)] md:text-5xl">物语集</h1>
+        <h1 className="font-serif text-4xl font-semibold tracking-wide text-[var(--text-main)] md:text-5xl">物語集</h1>
         <p className="mt-3 text-sm text-soft">
-          注册用户数统计：{images.stats.userCount}
+          用户數：{images.stats.userCount}
         </p>
 
         <div className="mt-10 grid w-full max-w-xl grid-cols-2 gap-4">
           <NavCard icon={BookOpen} label="物语" to="/story" />
           <NavCard icon={ImageIcon} label="相册" to="/album" />
-          <NavCard icon={Github} label="代码仓库 GitHub" href={repoUrl} external />
-          <NavCard icon={Download} label="Android 下载" href={androidUrl} external />
+          <NavCard icon={Github} label="代码仓库" href={repoUrl} external />
+          <NavCard icon={Download} label="Android" href={androidUrl} external />
         </div>
       </main>
     </div>

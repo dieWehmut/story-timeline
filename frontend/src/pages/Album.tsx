@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image as ImageIcon, Layers, Video } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlbumHeader } from '../layouts/AlbumHeader';
+import { TimeColumn } from '../layouts/TimeColumn';
 import { useImages } from '../hooks/useImages';
-import type { ImageItem } from '../types/image';
+import { ImageViewer } from '../ui/ImageViewer';
+import type { ImageItem, TimelineMonth } from '../types/image';
 
 interface AlbumProps {
   images: ReturnType<typeof useImages>;
@@ -88,19 +90,47 @@ function AlbumCardItem({ card, onClick }: { card: AlbumCard; onClick: () => void
   );
 }
 
-function MediaTimeline({ groups, emptyLabel }: { groups: MediaGroup[]; emptyLabel: string }) {
+function MediaTimeline({
+  groups,
+  emptyLabel,
+  onSectionRef,
+  onPhotoClick,
+}: {
+  groups: MediaGroup[];
+  emptyLabel: string;
+  onSectionRef?: (monthKey: string, node: HTMLElement | null) => void;
+  onPhotoClick?: (entryId: string) => void;
+}) {
   if (groups.length === 0) {
     return <p className="py-12 text-center text-sm text-soft">{emptyLabel}</p>;
   }
 
   return (
     <div className="space-y-6">
-      {groups.map((group) => (
-        <section key={group.date}>
+      {groups.map((group) => {
+        const monthKey = group.date.slice(0, 7);
+        return (
+          <section
+            data-month-key={monthKey}
+            key={group.date}
+            ref={(node) => onSectionRef?.(monthKey, node)}
+          >
           <p className="mb-2 text-sm font-medium text-[var(--text-main)]">{group.date}</p>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
             {group.items.map((entry) => (
-              <div className="relative aspect-square overflow-hidden rounded-lg bg-slate-950/20" key={entry.id}>
+              <div
+                className={`relative aspect-square overflow-hidden rounded-lg bg-slate-950/20 ${
+                  entry.type === 'photo' && onPhotoClick ? 'cursor-pointer' : ''
+                }`}
+                key={entry.id}
+                onClick={() => {
+                  if (entry.type === 'photo') {
+                    onPhotoClick?.(entry.id);
+                  }
+                }}
+                role={entry.type === 'photo' && onPhotoClick ? 'button' : undefined}
+                tabIndex={entry.type === 'photo' && onPhotoClick ? 0 : undefined}
+              >
                 {entry.type === 'video' ? (
                   <video className="absolute inset-0 h-full w-full object-cover" controls preload="metadata" src={entry.url} />
                 ) : (
@@ -114,7 +144,8 @@ function MediaTimeline({ groups, emptyLabel }: { groups: MediaGroup[]; emptyLabe
             ))}
           </div>
         </section>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -193,8 +224,37 @@ const groupByDate = (entries: MediaEntry[], order: 'asc' | 'desc') => {
   );
 };
 
+const buildTimelineMonths = (entries: MediaEntry[], order: 'asc' | 'desc'): TimelineMonth[] => {
+  const monthMap = new Map<string, TimelineMonth>();
+  entries.forEach((entry) => {
+    const [yearText, monthText] = entry.dateKey.split('-');
+    const year = Number(yearText);
+    const month = Number(monthText);
+    const key = `${yearText}-${monthText}`;
+    const existing = monthMap.get(key);
+    if (existing) {
+      existing.count += 1;
+      return;
+    }
+    monthMap.set(key, {
+      key,
+      year,
+      month,
+      label: `${year}年${month}月`,
+      count: 1,
+    });
+  });
+  return [...monthMap.values()].sort((left, right) =>
+    order === 'asc' ? left.key.localeCompare(right.key) : right.key.localeCompare(left.key)
+  );
+};
+
 export default function Album({ images, theme, onThemeToggle }: AlbumProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('albums');
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [activeMonth, setActiveMonth] = useState<TimelineMonth | null>(null);
+  const [viewer, setViewer] = useState<{ urls: string[]; index: number } | null>(null);
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const tagParam = searchParams.get('tag');
@@ -205,6 +265,12 @@ export default function Album({ images, theme, onThemeToggle }: AlbumProps) {
       setActiveTab('albums');
     }
   }, [activeTagKey]);
+
+  useEffect(() => {
+    sectionRefs.current = {};
+    setActiveMonth(null);
+    setTimelineOpen(false);
+  }, [activeTab, activeTagKey]);
 
   const { albumCards, photoEntries, videoEntries } = useMemo(
     () => buildMediaEntries(images.allItems),
@@ -237,6 +303,98 @@ export default function Album({ images, theme, onThemeToggle }: AlbumProps) {
     [videoEntries, images.timeOrder]
   );
 
+  const currentTimelineEntries =
+    activeTab === 'albums'
+      ? activeTagKey
+        ? filteredAlbumPhotos
+        : []
+      : activeTab === 'photos'
+        ? photoEntries
+        : videoEntries;
+
+  const timelineMonths = useMemo(
+    () => buildTimelineMonths(currentTimelineEntries, images.timeOrder),
+    [currentTimelineEntries, images.timeOrder]
+  );
+
+  useEffect(() => {
+    if (!timelineMonths.length) {
+      setActiveMonth(null);
+      return;
+    }
+    if (!activeMonth || !timelineMonths.some((month) => month.key === activeMonth.key)) {
+      setActiveMonth(timelineMonths[0]);
+    }
+  }, [activeMonth, timelineMonths]);
+
+  useEffect(() => {
+    const nodes = timelineMonths
+      .map((month) => sectionRefs.current[month.key])
+      .filter(Boolean) as HTMLElement[];
+
+    if (!nodes.length) {
+      return;
+    }
+
+    const syncActiveMonth = () => {
+      const activationOffset = 140;
+      const current =
+        [...nodes]
+          .reverse()
+          .find((node) => node.getBoundingClientRect().top <= activationOffset) ?? nodes[0];
+      const monthKey = current?.getAttribute('data-month-key');
+      const month = timelineMonths.find((entry) => entry.key === monthKey);
+
+      if (month && month.key !== activeMonth?.key) {
+        setActiveMonth(month);
+      }
+    };
+
+    syncActiveMonth();
+
+    const handleScroll = () => {
+      window.requestAnimationFrame(syncActiveMonth);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [activeMonth?.key, timelineMonths]);
+
+  const registerSectionRef = (monthKey: string, node: HTMLElement | null) => {
+    if (!node) return;
+    if (!sectionRefs.current[monthKey]) {
+      sectionRefs.current[monthKey] = node;
+    }
+  };
+
+  const currentPhotoEntries =
+    activeTab === 'albums'
+      ? filteredAlbumPhotos
+      : activeTab === 'photos'
+        ? photoEntries
+        : [];
+
+  const viewerUrls = useMemo(
+    () => currentPhotoEntries.map((entry) => entry.url),
+    [currentPhotoEntries]
+  );
+  const viewerIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    currentPhotoEntries.forEach((entry, index) => {
+      map.set(entry.id, index);
+    });
+    return map;
+  }, [currentPhotoEntries]);
+
+  const handlePhotoClick = (entryId: string) => {
+    const index = viewerIndexMap.get(entryId);
+    if (index === undefined) return;
+    setViewer({ urls: viewerUrls, index });
+  };
+
   const handleTabChange = (tab: TabKey) => {
     setActiveTab(tab);
     if (tab !== 'albums' && activeTagKey) {
@@ -249,6 +407,13 @@ export default function Album({ images, theme, onThemeToggle }: AlbumProps) {
     params.set('tag', tag);
     setSearchParams(params);
     setActiveTab('albums');
+  };
+
+  const jumpToMonth = (month: TimelineMonth) => {
+    const target = sectionRefs.current[month.key];
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveMonth(month);
+    setTimelineOpen(false);
   };
 
   const headerTitle =
@@ -269,17 +434,34 @@ export default function Album({ images, theme, onThemeToggle }: AlbumProps) {
         ? `${photoCount} 照片`
         : `${videoCount} 视频`;
 
+  const tabBaseClass = 'album-tab flex flex-1 items-center justify-center gap-2 rounded-full px-3 py-2 text-sm transition';
+  const tabActiveClass = 'album-tab-active bg-cyan-500/20 text-cyan-200';
+  const tabInactiveClass = 'album-tab-inactive text-soft hover:text-[var(--text-main)]';
+
   return (
     <div className="min-h-screen pb-24">
       <AlbumHeader
         onBack={() => navigate(-1)}
         onThemeToggle={onThemeToggle}
-        onToggleSort={images.toggleTimeOrder}
-        showSort={activeTab !== 'albums' || !!activeTagKey}
-        sortOrder={images.timeOrder}
+        onTimelineToggle={() => setTimelineOpen((open) => !open)}
+        showTimeline={activeTab !== 'albums' || !!activeTagKey}
+        timelineOpen={timelineOpen}
         subtitle={headerSubtitle}
         theme={theme}
         title={headerTitle}
+      />
+
+      {timelineOpen && (
+        <div className="fixed inset-0 z-30" onClick={() => setTimelineOpen(false)} />
+      )}
+
+      <TimeColumn
+        activeMonth={activeMonth}
+        months={timelineMonths}
+        onJump={jumpToMonth}
+        onToggleOrder={images.toggleTimeOrder}
+        open={timelineOpen}
+        order={images.timeOrder}
       />
 
       <main className="mx-auto w-full max-w-5xl px-4 pb-10 pt-24">
@@ -300,22 +482,28 @@ export default function Album({ images, theme, onThemeToggle }: AlbumProps) {
             </div>
           )
         ) : activeTab === 'albums' && activeTagKey ? (
-          <MediaTimeline groups={albumGroups} emptyLabel="该相册暂无照片" />
+          <MediaTimeline
+            groups={albumGroups}
+            emptyLabel="该相册暂无照片"
+            onPhotoClick={handlePhotoClick}
+            onSectionRef={registerSectionRef}
+          />
         ) : activeTab === 'photos' ? (
-          <MediaTimeline groups={photoGroups} emptyLabel="暂无照片" />
+          <MediaTimeline
+            groups={photoGroups}
+            emptyLabel="暂无照片"
+            onPhotoClick={handlePhotoClick}
+            onSectionRef={registerSectionRef}
+          />
         ) : (
-          <MediaTimeline groups={videoGroups} emptyLabel="暂无视频" />
+          <MediaTimeline groups={videoGroups} emptyLabel="暂无视频" onSectionRef={registerSectionRef} />
         )}
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 py-3 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-md items-center justify-between">
           <button
-            className={`flex flex-1 items-center justify-center gap-2 rounded-full px-3 py-2 text-sm transition ${
-              activeTab === 'albums'
-                ? 'bg-cyan-500/20 text-cyan-200'
-                : 'text-soft hover:text-[var(--text-main)]'
-            }`}
+            className={`${tabBaseClass} ${activeTab === 'albums' ? tabActiveClass : tabInactiveClass}`}
             onClick={() => handleTabChange('albums')}
             type="button"
           >
@@ -323,11 +511,7 @@ export default function Album({ images, theme, onThemeToggle }: AlbumProps) {
             相册
           </button>
           <button
-            className={`flex flex-1 items-center justify-center gap-2 rounded-full px-3 py-2 text-sm transition ${
-              activeTab === 'photos'
-                ? 'bg-cyan-500/20 text-cyan-200'
-                : 'text-soft hover:text-[var(--text-main)]'
-            }`}
+            className={`${tabBaseClass} ${activeTab === 'photos' ? tabActiveClass : tabInactiveClass}`}
             onClick={() => handleTabChange('photos')}
             type="button"
           >
@@ -335,11 +519,7 @@ export default function Album({ images, theme, onThemeToggle }: AlbumProps) {
             照片
           </button>
           <button
-            className={`flex flex-1 items-center justify-center gap-2 rounded-full px-3 py-2 text-sm transition ${
-              activeTab === 'videos'
-                ? 'bg-cyan-500/20 text-cyan-200'
-                : 'text-soft hover:text-[var(--text-main)]'
-            }`}
+            className={`${tabBaseClass} ${activeTab === 'videos' ? tabActiveClass : tabInactiveClass}`}
             onClick={() => handleTabChange('videos')}
             type="button"
           >
@@ -348,6 +528,14 @@ export default function Album({ images, theme, onThemeToggle }: AlbumProps) {
           </button>
         </div>
       </nav>
+
+      {viewer ? (
+        <ImageViewer
+          initialIndex={viewer.index}
+          onClose={() => setViewer(null)}
+          urls={viewer.urls}
+        />
+      ) : null}
     </div>
   );
 }

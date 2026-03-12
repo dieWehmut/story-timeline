@@ -12,7 +12,9 @@ export function AppLayout({ footerStats }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen">
-      <Outlet />
+      <div className="page-transition" key={`${location.pathname}${location.search}`}>
+        <Outlet />
+      </div>
       {hideFooter ? null : <Footer stats={footerStats} />}
     </div>
   );

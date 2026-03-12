@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowDownUp } from 'lucide-react';
+import { ArrowLeft, CalendarRange } from 'lucide-react';
 import { HomeButton } from './HomeButton';
 import { ThemeButton } from './ThemeButton';
 
@@ -8,9 +8,9 @@ interface AlbumHeaderProps {
   theme: 'dark' | 'light';
   onBack: () => void;
   onThemeToggle: () => void;
-  onToggleSort?: () => void;
-  sortOrder?: 'asc' | 'desc';
-  showSort?: boolean;
+  onTimelineToggle?: () => void;
+  timelineOpen?: boolean;
+  showTimeline?: boolean;
 }
 
 export function AlbumHeader({
@@ -19,12 +19,10 @@ export function AlbumHeader({
   theme,
   onBack,
   onThemeToggle,
-  onToggleSort,
-  sortOrder,
-  showSort = false,
+  onTimelineToggle,
+  timelineOpen = false,
+  showTimeline = false,
 }: AlbumHeaderProps) {
-  const sortLabel = sortOrder === 'asc' ? '时间升序' : '时间降序';
-
   return (
     <header className="fixed left-0 right-0 top-0 z-40 px-3 pt-3">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
@@ -45,16 +43,20 @@ export function AlbumHeader({
         <div className="flex items-center gap-0">
           <HomeButton />
           <ThemeButton onToggle={onThemeToggle} theme={theme} />
-          {showSort && onToggleSort ? (
-            <button
-              aria-label="切换时间排序"
-              className="inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition-all duration-300 hover:scale-110 hover:text-[var(--text-accent)] active:scale-95"
-              onClick={onToggleSort}
-              title={sortLabel}
-              type="button"
+          {showTimeline && onTimelineToggle ? (
+            <div
+              className={`transition-all duration-300 ${timelineOpen ? 'pointer-events-none scale-75 opacity-0' : 'opacity-100'}`}
             >
-              <ArrowDownUp size={22} />
-            </button>
+              <button
+                aria-expanded={timelineOpen}
+                aria-label="切换时间列"
+                className="inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition-all duration-300 hover:scale-110 hover:text-[var(--text-accent)] active:scale-95"
+                onClick={onTimelineToggle}
+                type="button"
+              >
+                <CalendarRange size={24} />
+              </button>
+            </div>
           ) : null}
         </div>
       </div>
