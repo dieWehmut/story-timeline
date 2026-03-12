@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { api, API_BASE } from '../lib/api';
 import type { AuthSession } from '../types/image';
 
@@ -6,6 +6,7 @@ const defaultSession: AuthSession = {
   authenticated: false,
   loginUrl: `${API_BASE}/api/auth/github/login`,
   googleLoginUrl: `${API_BASE}/api/auth/google/login`,
+  emailLoginUrl: '',
   isAdmin: false,
   canPost: false,
   roleLabel: '游客',
@@ -73,6 +74,18 @@ export const useAuth = () => {
 
   const login = () => loginWith('github');
 
+  const requestEmailLogin = async (email: string) => {
+    try {
+      const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      localStorage.setItem(LOGIN_RETURN_KEY, currentPath);
+    } catch {
+      // ignore storage errors
+    }
+
+    const endpoint = session.emailLoginUrl || `${API_BASE}/api/auth/email/login`;
+    await api.requestEmailLogin(email, endpoint);
+  };
+
   const logout = async () => {
     await api.logout();
     setSession(defaultSession);
@@ -83,6 +96,7 @@ export const useAuth = () => {
     loading,
     login,
     loginWith,
+    requestEmailLogin,
     logout,
   };
 };

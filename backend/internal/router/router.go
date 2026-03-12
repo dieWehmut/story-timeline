@@ -45,6 +45,8 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 			auth.GET("/github/callback", deps.AuthController.GitHubCallback)
 			auth.GET("/google/login", deps.AuthController.GoogleLogin)
 			auth.GET("/google/callback", deps.AuthController.GoogleCallback)
+			auth.POST("/email/login", deps.AuthController.EmailLogin)
+			auth.GET("/email/callback", deps.AuthController.EmailCallback)
 			auth.GET("/session", deps.AuthController.Session)
 			auth.POST("/logout", deps.AuthController.Logout)
 		}

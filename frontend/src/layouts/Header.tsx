@@ -13,6 +13,7 @@ interface HeaderProps {
   authLoading: boolean;
   authLoginUrl?: string;
   authGoogleLoginUrl?: string;
+  authEmailLoginUrl?: string;
   authUser: AuthUser | null;
   canPost: boolean;
   feedUsers: FeedUser[];
@@ -21,6 +22,7 @@ interface HeaderProps {
   onBack?: () => void;
   onFilterUser: (login: string | null) => void;
   onLogin: (provider: 'github' | 'google') => void;
+  onEmailLogin?: (email: string) => Promise<void> | void;
   onLogout: () => Promise<void>;
   onTagSelect: (tag: string | null) => void;
   onThemeToggle: () => void;
@@ -39,6 +41,7 @@ export function Header({
   authLoading,
   authLoginUrl,
   authGoogleLoginUrl,
+  authEmailLoginUrl,
   authUser,
   canPost,
   feedUsers,
@@ -47,6 +50,7 @@ export function Header({
   onBack,
   onFilterUser,
   onLogin,
+  onEmailLogin,
   onLogout,
   onTagSelect,
   onThemeToggle,
@@ -92,7 +96,9 @@ export function Header({
                   loading={authLoading}
                   loginUrl={authLoginUrl}
                   googleLoginUrl={authGoogleLoginUrl}
+                  emailLoginUrl={authEmailLoginUrl}
                   onLogin={onLogin}
+                  onEmailLogin={onEmailLogin}
                   onLogout={onLogout}
                   user={authUser}
                 />
@@ -108,7 +114,9 @@ export function Header({
                   loading={authLoading}
                   loginUrl={authLoginUrl}
                   googleLoginUrl={authGoogleLoginUrl}
+                  emailLoginUrl={authEmailLoginUrl}
                   onLogin={onLogin}
+                  onEmailLogin={onEmailLogin}
                   onLogout={onLogout}
                   user={authUser}
                 />

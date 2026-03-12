@@ -120,3 +120,16 @@ union
 select distinct follower_login as login from public.follows where follower_login <> ''
 union
 select distinct following_login as login from public.follows where following_login <> '';
+
+create table if not exists public.email_logins (
+  token_hash text primary key,
+  email text not null,
+  login text not null,
+  avatar_url text not null default '',
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  consumed_at timestamptz
+);
+
+create index if not exists email_logins_email_idx on public.email_logins (email);
+create index if not exists email_logins_expires_idx on public.email_logins (expires_at desc);

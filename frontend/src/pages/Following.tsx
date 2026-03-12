@@ -111,7 +111,9 @@ export default function Following({ auth, follows, theme, onThemeToggle }: Follo
         open={loginOpen}
         onClose={() => setLoginOpen(false)}
         onSelect={auth.loginWith}
+        onEmailLogin={auth.requestEmailLogin}
         showGoogle={!!auth.googleLoginUrl}
+        showEmail={!!auth.requestEmailLogin}
       />
     </div>
   );

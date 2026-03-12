@@ -37,6 +37,7 @@ const normalizeSession = (session: AuthSession): AuthSession => ({
   ...session,
   loginUrl: withApiBase(session.loginUrl),
   googleLoginUrl: session.googleLoginUrl ? withApiBase(session.googleLoginUrl) : undefined,
+  emailLoginUrl: session.emailLoginUrl ? withApiBase(session.emailLoginUrl) : undefined,
 });
 
 const normalizeImageItem = (item: ImageItem): ImageItem => {
@@ -263,6 +264,12 @@ type CommentPayloadOptions = {
 
 export const api = {
   getSession: async () => normalizeSession(await request<AuthSession>(`${API_BASE}/api/auth/session`)),
+  requestEmailLogin: (email: string, endpoint?: string) =>
+    request<{ ok: boolean }>(endpoint ?? `${API_BASE}/api/auth/email/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }),
   logout: () => request<{ ok: boolean }>(`${API_BASE}/api/auth/logout`, { method: 'POST' }),
   getFeed: async () => (await request<ImageItem[]>(`${API_BASE}/api/feed`)).map(normalizeImageItem),
   getFeedUsers: () => request<FeedUser[]>(`${API_BASE}/api/feed/users`),

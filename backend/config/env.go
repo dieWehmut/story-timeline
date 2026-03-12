@@ -25,6 +25,8 @@ type Env struct {
 	CloudinaryAPISecret string
 	SessionSecret       string
 	SecureCookies       bool
+	ResendAPIKey        string
+	ResendEmailFrom     string
 }
 
 func LoadEnv() Env {
@@ -51,6 +53,8 @@ func LoadEnv() Env {
 		CloudinaryAPISecret: os.Getenv("CLOUDINARY_API_SECRET"),
 		SessionSecret:       getEnv("SESSION_SECRET", "change-me"),
 		SecureCookies:       getEnv("SECURE_COOKIES", "false") == "true",
+		ResendAPIKey:        os.Getenv("RESEND_API_KEY"),
+		ResendEmailFrom:     os.Getenv("RESEND_EMAIL_FROM"),
 	}
 }
 

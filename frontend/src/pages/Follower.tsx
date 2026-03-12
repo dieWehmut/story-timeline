@@ -111,7 +111,9 @@ export default function Follower({ auth, follows, theme, onThemeToggle }: Follow
         open={loginOpen}
         onClose={() => setLoginOpen(false)}
         onSelect={auth.loginWith}
+        onEmailLogin={auth.requestEmailLogin}
         showGoogle={!!auth.googleLoginUrl}
+        showEmail={!!auth.requestEmailLogin}
       />
     </div>
   );

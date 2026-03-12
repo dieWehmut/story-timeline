@@ -31,6 +31,7 @@ func main() {
 
 	authService := service.NewAuthService(githubOAuthClient, googleOAuthClient, graphqlClient, env.SessionSecret, env.SecureCookies, env.GitHubRepoOwner)
 	supabaseStorage := storage.NewSupabaseStorage(env.SupabaseURL, env.SupabaseServiceKey)
+	emailService := service.NewEmailAuthService(supabaseStorage, env.ResendAPIKey, env.ResendEmailFrom)
 	cloudinaryStorage, err := storage.NewCloudinaryStorage(storage.CloudinaryConfig{
 		CloudName: env.CloudinaryCloudName,
 		APIKey:    env.CloudinaryAPIKey,
@@ -52,7 +53,7 @@ func main() {
 	server := &http.Server{
 		Addr: ":" + env.Port,
 		Handler: router.New(router.Dependencies{
-			AuthController:   controller.NewAuthController(authService, userService, env.FrontendBaseURL),
+			AuthController:   controller.NewAuthController(authService, userService, emailService, env.FrontendBaseURL),
 			FollowController: controller.NewFollowController(userService),
 			ImageController:  controller.NewImageController(imageService, userService, authService, interactionService, cloudinaryStorage),
 			HealthController: controller.NewHealthController(env.GitHubRepoOwner, authService, userService),

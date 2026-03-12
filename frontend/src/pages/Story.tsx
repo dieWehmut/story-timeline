@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image as ImageIcon, LoaderCircle } from 'lucide-react';
 import { CardDetail } from '../ui/CardDetail';
 import { Header } from '../layouts/Header';
@@ -210,6 +210,7 @@ export default function Story({
         authAuthenticated={auth.authenticated}
         authLoginUrl={auth.loginUrl}
         authGoogleLoginUrl={auth.googleLoginUrl}
+        authEmailLoginUrl={auth.emailLoginUrl}
         authLoading={auth.loading}
         authUser={auth.user}
         canPost={auth.canPost}
@@ -219,6 +220,7 @@ export default function Story({
         onBack={() => navigate(`/story${location.search}`)}
         onFilterUser={handleUserSelect}
         onLogin={auth.loginWith}
+        onEmailLogin={auth.requestEmailLogin}
         onLogout={auth.logout}
         onTagSelect={handleTagSelect}
         onThemeToggle={onThemeToggle}
@@ -250,29 +252,29 @@ export default function Story({
             className="quick-actions grid w-full grid-cols-2 border-y border-[var(--panel-border)]"
             ref={quickActionsRef}
           >
-            <UploadButton
-              busy={images.submitting}
+              <UploadButton
+                busy={images.submitting}
               className="quick-actions-button border-r border-[var(--panel-border)]"
-              disabled={recordDisabled}
+                disabled={recordDisabled}
               label="記錄"
               showIcon={!isUserScoped}
               subLabel={isUserScoped ? `\u603b ${recordCount} \u5e16` : undefined}
               variant="card"
-            />
-            <button
+              />
+              <button
               className={`quick-actions-button group flex w-full flex-col items-center justify-center gap-1 px-4 py-3 text-sm text-[var(--text-main)] transition ${
                 isUserScoped ? '' : 'hover:text-[var(--text-accent)]'
               }`}
-              onClick={() => navigate(albumHref)}
-              type="button"
-            >
+                onClick={() => navigate(albumHref)}
+                type="button"
+              >
               {!isUserScoped ? (
                 <ImageIcon className="quick-actions-icon text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={20} />
               ) : null}
               <span className="leading-none">{'相册'}</span>
-              {isUserScoped ? (
+            {isUserScoped ? (
                 <span className="quick-actions-sub text-xs text-soft">{`${albumCount} \u9879`}</span>
-              ) : null}
+            ) : null}
             </button>
           </div>
         ) : null}
@@ -346,3 +348,4 @@ export default function Story({
     </div>
   );
 }
+

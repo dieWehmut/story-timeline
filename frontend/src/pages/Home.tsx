@@ -80,8 +80,10 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
   const authLoading = auth.loading;
   const authLoginUrl = auth.loginUrl;
   const authGoogleLoginUrl = auth.googleLoginUrl;
+  const authEmailLoginUrl = auth.emailLoginUrl;
   const authUser = auth.user;
   const onLogin = auth.loginWith;
+  const onEmailLogin = auth.requestEmailLogin;
   const onLogout = auth.logout;
 
   return (
@@ -94,7 +96,9 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
               loading={authLoading}
               loginUrl={authLoginUrl}
               googleLoginUrl={authGoogleLoginUrl}
+              emailLoginUrl={authEmailLoginUrl}
               onLogin={onLogin}
+              onEmailLogin={onEmailLogin}
               onLogout={onLogout}
               user={authUser}
             />

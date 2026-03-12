@@ -39,11 +39,11 @@ type imageRecord struct {
 }
 
 type likeRecord struct {
-	PostOwner  string    `json:"post_owner"`
-	PostID     string    `json:"post_id"`
-	Login      string    `json:"login"`
-	AvatarURL  string    `json:"avatar_url"`
-	LikedAt    time.Time `json:"liked_at"`
+	PostOwner string    `json:"post_owner"`
+	PostID    string    `json:"post_id"`
+	Login     string    `json:"login"`
+	AvatarURL string    `json:"avatar_url"`
+	LikedAt   time.Time `json:"liked_at"`
 }
 
 type commentLikeRecord struct {
@@ -56,18 +56,18 @@ type commentLikeRecord struct {
 }
 
 type commentRecord struct {
-	ID           string    `json:"id"`
-	PostOwner    string    `json:"post_owner"`
-	PostID       string    `json:"post_id"`
-	AuthorLogin  string    `json:"author_login"`
-	AuthorAvatar string    `json:"author_avatar"`
-	ParentID     string    `json:"parent_id"`
-	ReplyToUserLogin string `json:"reply_to_user_login"`
-	Text         string    `json:"text"`
-	ImagePaths   []string  `json:"image_paths"`
-	Deleted      bool      `json:"deleted"`
-	Hidden       bool      `json:"hidden"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID               string    `json:"id"`
+	PostOwner        string    `json:"post_owner"`
+	PostID           string    `json:"post_id"`
+	AuthorLogin      string    `json:"author_login"`
+	AuthorAvatar     string    `json:"author_avatar"`
+	ParentID         string    `json:"parent_id"`
+	ReplyToUserLogin string    `json:"reply_to_user_login"`
+	Text             string    `json:"text"`
+	ImagePaths       []string  `json:"image_paths"`
+	Deleted          bool      `json:"deleted"`
+	Hidden           bool      `json:"hidden"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 type followRecord struct {
@@ -83,6 +83,16 @@ type userRecord struct {
 	AvatarURL  string    `json:"avatar_url"`
 	CreatedAt  time.Time `json:"created_at,omitempty"`
 	UpdatedAt  time.Time `json:"updated_at,omitempty"`
+}
+
+type emailLoginRecord struct {
+	TokenHash  string     `json:"token_hash"`
+	Email      string     `json:"email"`
+	Login      string     `json:"login"`
+	AvatarURL  string     `json:"avatar_url"`
+	CreatedAt  time.Time  `json:"created_at"`
+	ExpiresAt  time.Time  `json:"expires_at"`
+	ConsumedAt *time.Time `json:"consumed_at,omitempty"`
 }
 
 func NewSupabaseStorage(baseURL string, serviceKey string) *SupabaseStorage {
@@ -544,40 +554,64 @@ func (record imageRecord) toModel() model.Image {
 
 func commentRecordFromModel(comment model.Comment) commentRecord {
 	return commentRecord{
-		ID:           comment.ID,
-		PostOwner:    comment.PostOwner,
-		PostID:       comment.PostID,
-		AuthorLogin:  comment.AuthorLogin,
-		AuthorAvatar: comment.AuthorAvatar,
-		ParentID:     comment.ParentID,
+		ID:               comment.ID,
+		PostOwner:        comment.PostOwner,
+		PostID:           comment.PostID,
+		AuthorLogin:      comment.AuthorLogin,
+		AuthorAvatar:     comment.AuthorAvatar,
+		ParentID:         comment.ParentID,
 		ReplyToUserLogin: comment.ReplyToUserLogin,
-		Text:         comment.Text,
-		ImagePaths:   comment.AllImagePaths(),
-		Deleted:      comment.Deleted,
-		Hidden:       comment.Hidden,
-		CreatedAt:    comment.CreatedAt,
+		Text:             comment.Text,
+		ImagePaths:       comment.AllImagePaths(),
+		Deleted:          comment.Deleted,
+		Hidden:           comment.Hidden,
+		CreatedAt:        comment.CreatedAt,
 	}
 }
 
 func (record commentRecord) toModel() model.Comment {
 	comment := model.Comment{
-		ID:           record.ID,
-		PostOwner:    record.PostOwner,
-		PostID:       record.PostID,
-		AuthorLogin:  record.AuthorLogin,
-		AuthorAvatar: record.AuthorAvatar,
-		ParentID:     record.ParentID,
+		ID:               record.ID,
+		PostOwner:        record.PostOwner,
+		PostID:           record.PostID,
+		AuthorLogin:      record.AuthorLogin,
+		AuthorAvatar:     record.AuthorAvatar,
+		ParentID:         record.ParentID,
 		ReplyToUserLogin: record.ReplyToUserLogin,
-		Text:         record.Text,
-		ImagePaths:   record.ImagePaths,
-		Deleted:      record.Deleted,
-		Hidden:       record.Hidden,
-		CreatedAt:    record.CreatedAt,
+		Text:             record.Text,
+		ImagePaths:       record.ImagePaths,
+		Deleted:          record.Deleted,
+		Hidden:           record.Hidden,
+		CreatedAt:        record.CreatedAt,
 	}
 	if len(record.ImagePaths) == 1 {
 		comment.ImagePath = record.ImagePaths[0]
 	}
 	return comment
+}
+
+func emailLoginRecordFromModel(login model.EmailLogin) emailLoginRecord {
+	return emailLoginRecord{
+		TokenHash:  login.TokenHash,
+		Email:      login.Email,
+		Login:      login.Login,
+		AvatarURL:  login.AvatarURL,
+		CreatedAt:  login.CreatedAt,
+		ExpiresAt:  login.ExpiresAt,
+		ConsumedAt: login.ConsumedAt,
+	}
+}
+
+func (record emailLoginRecord) toModel() model.EmailLogin {
+	return model.EmailLogin{
+		TokenHash:  record.TokenHash,
+		Email:      record.Email,
+		Login:      record.Login,
+		AvatarURL:  record.AvatarURL,
+		CreatedAt:  record.CreatedAt,
+		ExpiresAt:  record.ExpiresAt,
+		ConsumedAt: record.ConsumedAt,
+	}
 }
 
 func inFilter(values []string) string {
@@ -648,6 +682,35 @@ func (storage *SupabaseStorage) UpsertUser(ctx context.Context, user model.AuthU
 	return storage.requestJSON(ctx, http.MethodPost, "/users", url.Values{"on_conflict": []string{"login"}}, payload, nil, prefer)
 }
 
+func (storage *SupabaseStorage) CreateEmailLogin(ctx context.Context, login model.EmailLogin) error {
+	payload := []emailLoginRecord{emailLoginRecordFromModel(login)}
+	return storage.requestJSON(ctx, http.MethodPost, "/email_logins", nil, payload, nil, nil)
+}
+
+func (storage *SupabaseStorage) GetEmailLogin(ctx context.Context, tokenHash string) (model.EmailLogin, error) {
+	params := url.Values{}
+	params.Set("select", "token_hash,email,login,avatar_url,created_at,expires_at,consumed_at")
+	params.Set("token_hash", "eq."+tokenHash)
+	params.Set("limit", "1")
+
+	var records []emailLoginRecord
+	if err := storage.requestJSON(ctx, http.MethodGet, "/email_logins", params, nil, &records, nil); err != nil {
+		return model.EmailLogin{}, err
+	}
+	if len(records) == 0 {
+		return model.EmailLogin{}, osErrNotFound(tokenHash)
+	}
+	return records[0].toModel(), nil
+}
+
+func (storage *SupabaseStorage) ConsumeEmailLogin(ctx context.Context, tokenHash string, consumedAt time.Time) error {
+	params := url.Values{}
+	params.Set("token_hash", "eq."+tokenHash)
+	return storage.requestJSON(ctx, http.MethodPatch, "/email_logins", params, map[string]any{
+		"consumed_at": consumedAt,
+	}, nil, nil)
+}
+
 func (storage *SupabaseStorage) CountUsers(ctx context.Context) (int, error) {
 	params := url.Values{}
 	params.Set("select", "login")
@@ -658,7 +721,7 @@ func (storage *SupabaseStorage) ListFollowing(ctx context.Context, followerLogin
 	params := url.Values{}
 	params.Set("select", "following_login")
 	params.Set("follower_login", "eq."+followerLogin)
-	
+
 	var records []followRecord
 	if err := storage.requestJSON(ctx, http.MethodGet, "/follows", params, nil, &records, nil); err != nil {
 		return nil, err
@@ -675,7 +738,7 @@ func (storage *SupabaseStorage) ListFollowers(ctx context.Context, followingLogi
 	params := url.Values{}
 	params.Set("select", "follower_login")
 	params.Set("following_login", "eq."+followingLogin)
-	
+
 	var records []followRecord
 	if err := storage.requestJSON(ctx, http.MethodGet, "/follows", params, nil, &records, nil); err != nil {
 		return nil, err
@@ -698,7 +761,7 @@ func (storage *SupabaseStorage) GetUsersByLogins(ctx context.Context, logins []s
 	params.Set("author_login", inFilter(logins))
 	params.Set("order", "updated_at.desc")
 
-	// We query the images table to get their latest avatar. 
+	// We query the images table to get their latest avatar.
 	// This relies on the fact that any user with content has their avatar recorded.
 	var records []struct {
 		AuthorLogin  string    `json:"author_login"`

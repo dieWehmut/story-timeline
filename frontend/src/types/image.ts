@@ -72,6 +72,7 @@ export interface AuthSession {
   authenticated: boolean;
   loginUrl: string;
   googleLoginUrl?: string;
+  emailLoginUrl?: string;
   isAdmin: boolean;
   canPost: boolean;
   roleLabel: string;
