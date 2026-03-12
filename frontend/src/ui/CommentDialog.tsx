@@ -1,16 +1,26 @@
 import { useEffect, useId, useRef, useState, useCallback } from 'react';
-import { ImagePlus, LoaderCircle, Send, X } from 'lucide-react';
+import { ImagePlus, LoaderCircle, Play, Send, X } from 'lucide-react';
 import { setCommentInputActive } from '../lib/uiFlags';
+import { mediaTypeFromFile } from '../lib/media';
 
 // Module-level cache: persists draft files across dialog open/close within a session
 const commentFileCache = new Map<string, File[]>();
 const MAX_COMMENT_FILES = 3;
+const MAX_COMMENT_VIDEOS = 3;
 const MAX_COMMENT_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_COMMENT_TOTAL_SIZE = 25 * 1024 * 1024;
+const MAX_COMMENT_VIDEO_SIZE = 200 * 1024 * 1024;
 
-const createPreviewUrls = (files: File[]) => files.map((file) => URL.createObjectURL(file));
-const revokePreviewUrls = (urls: string[]) => {
-  urls.forEach((url) => URL.revokeObjectURL(url));
+type PreviewItem = { url: string; type: 'image' | 'video' };
+
+const createPreviewItems = (files: File[]): PreviewItem[] =>
+  files.map((file) => ({
+    url: URL.createObjectURL(file),
+    type: mediaTypeFromFile(file),
+  }));
+
+const revokePreviewUrls = (items: PreviewItem[]) => {
+  items.forEach((item) => URL.revokeObjectURL(item.url));
 };
 
 interface CommentDialogProps {
@@ -26,18 +36,18 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
   const inputId = useId();
   const [text, setText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
+  const [previews, setPreviews] = useState<PreviewItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [animating, setAnimating] = useState(false);
   const [visible, setVisible] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevOpenRef = useRef(false);
   const fileRef = useRef<File[]>([]);
-  const previewRef = useRef<string[]>([]);
+  const previewRef = useRef<PreviewItem[]>([]);
 
   const replaceFiles = useCallback((nextFiles: File[]) => {
     revokePreviewUrls(previewRef.current);
-    const nextPreviews = createPreviewUrls(nextFiles);
+    const nextPreviews = createPreviewItems(nextFiles);
     setFiles(nextFiles);
     setPreviews(nextPreviews);
   }, []);
@@ -119,20 +129,33 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
     const nextFiles = [...fileRef.current, ...selectedFiles];
 
     if (nextFiles.length > MAX_COMMENT_FILES) {
-      setError(`评论最多上传 ${MAX_COMMENT_FILES} 张图片`);
+      setError(`Up to ${MAX_COMMENT_FILES} files per comment`);
       return;
     }
 
-    let totalSize = 0;
+    const videoCount = nextFiles.filter((file) => mediaTypeFromFile(file) === 'video').length;
+    if (videoCount > MAX_COMMENT_VIDEOS) {
+      setError(`Up to ${MAX_COMMENT_VIDEOS} videos per comment`);
+      return;
+    }
+
+    let imageTotalSize = 0;
     for (const selected of nextFiles) {
+      if (mediaTypeFromFile(selected) === 'video') {
+        if (selected.size > MAX_COMMENT_VIDEO_SIZE) {
+          setError(`Each video must be <= 200MB: ${selected.name}`);
+          return;
+        }
+        continue;
+      }
       if (selected.size > MAX_COMMENT_FILE_SIZE) {
-        setError(`单张图片不能超过 5MB: ${selected.name}`);
+        setError(`Each image must be <= 5MB: ${selected.name}`);
         return;
       }
-      totalSize += selected.size;
+      imageTotalSize += selected.size;
     }
-    if (totalSize > MAX_COMMENT_TOTAL_SIZE) {
-      setError('评论图片总大小不能超过 25MB');
+    if (imageTotalSize > MAX_COMMENT_TOTAL_SIZE) {
+      setError('Total image size must be <= 25MB');
       return;
     }
 
@@ -156,7 +179,7 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
       replaceFiles([]);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : '评论失败');
+      setError(e instanceof Error ? e.message : '璇勮澶辫触');
     }
   };
 
@@ -180,12 +203,27 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
         {/* Error */}
         {error ? <p className="px-4 pt-2 text-xs text-rose-300">{error}</p> : null}
 
-        {/* Image preview */}
+        {/* Media preview */}
         {previews.length > 0 ? (
           <div className="mx-4 mt-2 grid grid-cols-3 gap-2">
             {previews.map((preview, index) => (
-              <div className="relative inline-block" key={`${preview}-${index}`}>
-                <img alt="" className="h-16 w-full rounded object-cover" src={preview} />
+              <div className="relative inline-block" key={`${preview.url}-${index}`}>
+                {preview.type === 'video' ? (
+                  <>
+                    <video
+                      className="h-16 w-full rounded object-cover"
+                      muted
+                      playsInline
+                      preload="metadata"
+                      src={preview.url}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center text-white/80">
+                      <Play size={14} />
+                    </div>
+                  </>
+                ) : (
+                  <img alt="" className="h-16 w-full rounded object-cover" src={preview.url} />
+                )}
                 <button
                   className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white/80 hover:text-white"
                   onClick={() => removeFile(index)}
@@ -197,6 +235,7 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
             ))}
           </div>
         ) : null}
+
 
         {/* Input bar */}
         <div className="flex items-center gap-2 px-3 py-2">
@@ -210,7 +249,7 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
                 <ImagePlus size={18} />
               </button>
               <input
-                accept="image/*"
+                accept="image/*,video/*"
                 className="hidden"
                 multiple
                 onChange={(e) => {
@@ -232,7 +271,7 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
                     void handleSubmit();
                   }
                 }}
-                placeholder="写评论..."
+                placeholder="鍐欒瘎璁?.."
                 value={text}
               />
               <button

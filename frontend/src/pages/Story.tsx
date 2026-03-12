@@ -170,6 +170,7 @@ export default function Story({
       <Header
         activeMonth={activeMonth}
         authAuthenticated={auth.authenticated}
+        authLoginUrl={auth.loginUrl}
         authLoading={auth.loading}
         authUser={auth.user}
         canPost={auth.canPost}
@@ -206,29 +207,29 @@ export default function Story({
 
       <main className="relative mx-auto flex w-full max-w-xl flex-col px-0 pb-36 pt-28 md:px-0 md:pt-36">
         {showQuickActions ? (
-          <div className="grid w-full grid-cols-2 border-y border-[var(--panel-border)]">
+          <div className="quick-actions grid w-full grid-cols-2 border-y border-[var(--panel-border)]">
             <UploadButton
               busy={images.submitting}
-              className="border-r border-[var(--panel-border)]"
+              className="quick-actions-button border-r border-[var(--panel-border)]"
               disabled={recordDisabled}
-              label="記錄"
+              label="瑷橀寗"
               showIcon={!isUserScoped}
               subLabel={isUserScoped ? `\u603b ${recordCount} \u5e16` : undefined}
               variant="card"
             />
             <button
-              className={`group flex w-full flex-col items-center justify-center gap-1 px-4 py-3 text-sm text-[var(--text-main)] transition ${
+              className={`quick-actions-button group flex w-full flex-col items-center justify-center gap-1 px-4 py-3 text-sm text-[var(--text-main)] transition ${
                 isUserScoped ? '' : 'hover:text-[var(--text-accent)]'
               }`}
               onClick={() => navigate(albumHref)}
               type="button"
             >
               {!isUserScoped ? (
-                <ImageIcon className="text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={20} />
+                <ImageIcon className="quick-actions-icon text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={20} />
               ) : null}
-              <span className="leading-none">{'相冊'}</span>
+              <span className="leading-none">{'鐩稿唺'}</span>
               {isUserScoped ? (
-                <span className="text-xs text-soft">{`${albumCount} \u9879`}</span>
+                <span className="quick-actions-sub text-xs text-soft">{`${albumCount} \u9879`}</span>
               ) : null}
             </button>
           </div>
@@ -299,3 +300,4 @@ export default function Story({
     </div>
   );
 }
+

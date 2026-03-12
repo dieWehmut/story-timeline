@@ -8,6 +8,7 @@ import type {
   LikeToggleResult,
   UpdateImagePayload,
 } from '../types/image';
+import { mediaTypeFromFile, normalizeAssetTypes } from './media';
 
 const normalizeApiBase = (value: string) => value.trim().replace(/\/$/, '');
 
@@ -37,15 +38,19 @@ const normalizeSession = (session: AuthSession): AuthSession => ({
   loginUrl: withApiBase(session.loginUrl),
 });
 
-const normalizeImageItem = (item: ImageItem): ImageItem => ({
-  ...item,
-  tags: item.tags ?? [],
-  timeMode: item.timeMode ?? 'point',
-  startAt: item.startAt ?? item.capturedAt ?? item.createdAt,
-  endAt: item.timeMode === 'range' ? item.endAt : undefined,
-  capturedAt: item.capturedAt ?? item.startAt ?? item.createdAt,
-  imageUrls: (item.imageUrls ?? []).map(withApiBase),
-});
+const normalizeImageItem = (item: ImageItem): ImageItem => {
+  const imageUrls = (item.imageUrls ?? []).map(withApiBase);
+  return {
+    ...item,
+    tags: item.tags ?? [],
+    timeMode: item.timeMode ?? 'point',
+    startAt: item.startAt ?? item.capturedAt ?? item.createdAt,
+    endAt: item.timeMode === 'range' ? item.endAt : undefined,
+    capturedAt: item.capturedAt ?? item.startAt ?? item.createdAt,
+    imageUrls,
+    assetTypes: normalizeAssetTypes(imageUrls, item.assetTypes),
+  };
+};
 
 const normalizeCommentItem = (item: CommentItem): CommentItem => {
   const imageUrls = (item.imageUrls ?? (item.imageUrl ? [item.imageUrl] : [])).map(withApiBase);
@@ -53,6 +58,7 @@ const normalizeCommentItem = (item: CommentItem): CommentItem => {
     ...item,
     imageUrl: imageUrls[0],
     imageUrls,
+    assetTypes: normalizeAssetTypes(imageUrls, item.assetTypes),
     likeCount: item.likeCount ?? 0,
     liked: !!item.liked,
   };
@@ -188,6 +194,10 @@ const buildImageFormData = async (payload: CreateImagePayload | UpdateImagePaylo
 
   const files = 'files' in payload ? (payload.files ?? []) : [];
   for (const file of files) {
+    if (mediaTypeFromFile(file) === 'video') {
+      formData.append('files', file, file.name || 'video');
+      continue;
+    }
     const webpBlob = await fileToWebp(file);
     const fileName = file.name.replace(/\.[^.]+$/, '') || 'image';
     formData.append('files', webpBlob, `${fileName}.webp`);
@@ -235,6 +245,10 @@ export const api = {
       if (options?.parentId) formData.set('parentId', options.parentId);
       if (options?.replyToUserLogin) formData.set('replyToUserLogin', options.replyToUserLogin);
       for (const [index, file] of files.entries()) {
+        if (mediaTypeFromFile(file) === 'video') {
+          formData.append('files', file, file.name || `comment-${index + 1}`);
+          continue;
+        }
         const webpBlob = await fileToWebp(file);
         formData.append('files', webpBlob, `comment-${index + 1}.webp`);
       }

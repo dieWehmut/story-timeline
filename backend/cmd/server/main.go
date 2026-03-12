@@ -56,9 +56,10 @@ func main() {
 			AuthService:      authService,
 		}, config.AllowedOrigins(env)),
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		// Support large uploads (videos <= 200MB).
+		ReadTimeout:  10 * time.Minute,
+		WriteTimeout: 10 * time.Minute,
+		IdleTimeout:  2 * time.Minute,
 	}
 
 	log.Printf("github.com/dieWehmut/story-timeline/backend listening on %s", server.Addr)

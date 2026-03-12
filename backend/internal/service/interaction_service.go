@@ -3,6 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
+	"mime"
+	"mime/multipart"
+	"path/filepath"
 	"strings"
 
 	"github.com/dieWehmut/story-timeline/backend/internal/model"
@@ -123,14 +126,35 @@ func commentImagePath(commenterLogin, postOwner, postID, commentID string, asset
 	return fmt.Sprintf("comments/%s/%s/%s/%s/%d", commenterLogin, postOwner, postID, commentID, assetIndex)
 }
 
-func (service *InteractionService) AddComment(ctx context.Context, _ string, commenter model.GitHubUser, postOwner, postID, text string, imageData [][]byte, parentID, replyToUserLogin string) (model.Comment, error) {
+func commentVideoPath(commenterLogin, postOwner, postID, commentID string, assetIndex int) string {
+	return fmt.Sprintf("comment-videos/%s/%s/%s/%s/%d", commenterLogin, postOwner, postID, commentID, assetIndex)
+}
+
+func (service *InteractionService) AddComment(ctx context.Context, _ string, commenter model.GitHubUser, postOwner, postID, text string, files []*multipart.FileHeader, parentID, replyToUserLogin string) (model.Comment, error) {
 	commentID := utils.NewID()
-	imagePaths := make([]string, 0, len(imageData))
-	for assetIndex, data := range imageData {
+	imagePaths := make([]string, 0, len(files))
+	for assetIndex, fh := range files {
+		mediaType := mediaTypeFromFileHeader(fh)
 		objectKey := commentImagePath(commenter.Login, postOwner, postID, commentID, assetIndex)
-		if err := service.assets.PutObject(ctx, objectKey, data, "image/webp"); err != nil {
+		if mediaType == "video" {
+			objectKey = commentVideoPath(commenter.Login, postOwner, postID, commentID, assetIndex)
+		}
+
+		contentType := strings.TrimSpace(fh.Header.Get("Content-Type"))
+		if contentType == "" {
+			contentType = mime.TypeByExtension(strings.ToLower(filepath.Ext(fh.Filename)))
+		}
+
+		f, err := fh.Open()
+		if err != nil {
 			return model.Comment{}, err
 		}
+		uploadErr := service.assets.PutObjectReader(ctx, objectKey, f, contentType)
+		_ = f.Close()
+		if uploadErr != nil {
+			return model.Comment{}, uploadErr
+		}
+
 		imagePaths = append(imagePaths, objectKey)
 	}
 
@@ -224,4 +248,20 @@ func (service *InteractionService) ReadCommentImage(ctx context.Context, comment
 	}
 
 	return service.assets.GetObject(ctx, paths[assetIndex])
+}
+
+func (service *InteractionService) CommentAssetURL(ctx context.Context, commenterLogin, postOwner, postID, commentID string, assetIndex int) (string, error) {
+	comment, err := service.database.GetComment(ctx, commenterLogin, postOwner, postID, commentID)
+	if err != nil {
+		return "", err
+	}
+
+	paths := comment.AllImagePaths()
+	if assetIndex < 0 || assetIndex >= len(paths) {
+		return "", fmt.Errorf("asset index %d out of range", assetIndex)
+	}
+	if service.assets == nil {
+		return "", fmt.Errorf("asset storage unavailable")
+	}
+	return service.assets.URLFor(paths[assetIndex]), nil
 }

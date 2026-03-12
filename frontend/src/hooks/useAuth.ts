@@ -44,8 +44,18 @@ export const useAuth = () => {
   }, []);
 
   const login = () => {
-    const url = session.loginUrl || `${API_BASE}/api/auth/github/login`;
-    window.location.href = url.startsWith('http') ? url : `${API_BASE}${url}`;
+    const raw = session.loginUrl || `${API_BASE}/api/auth/github/login`;
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      window.location.assign(raw);
+      return;
+    }
+    const base = API_BASE || window.location.origin;
+    try {
+      const resolved = new URL(raw, base).toString();
+      window.location.assign(resolved);
+    } catch {
+      window.location.assign(raw);
+    }
   };
 
   const logout = async () => {

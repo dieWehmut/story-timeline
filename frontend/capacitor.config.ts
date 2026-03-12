@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.diewehmut.app',
+  appId: 'com.storytimeline.app',
   appName: '物語集',
 
   webDir: 'dist',

@@ -1,9 +1,11 @@
 ﻿package controller
 
 import (
+	"bytes"
 	"fmt"
-	"io"
+	"mime/multipart"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -21,10 +23,13 @@ import (
 const (
 	maxFiles        = 15
 	maxCommentFiles = 3
-	maxFileSize     = 5 << 20  // 5 MB
-	maxTotalSize    = 25 << 20 // 25 MB
+	maxVideos       = 3
+	maxImageFileSize  = 5 << 20  // 5 MB
+	maxImageTotalSize = 25 << 20 // 25 MB (images only)
+	maxVideoSize      = 200 << 20 // 200 MB
 	maxTags         = 12
 	maxTagLength    = 32
+	assetCacheMaxAgeSeconds = 86400
 )
 
 type ImageController struct {
@@ -45,23 +50,39 @@ func NewImageController(imageService *service.ImageService, userService *service
 	}
 }
 
-func (controller *ImageController) assetURLs(paths []string) []string {
+func assetTypeFromPath(path string) string {
+	trimmed := strings.ToLower(strings.TrimSpace(path))
+	if strings.HasPrefix(trimmed, "videos/") || strings.HasPrefix(trimmed, "comment-videos/") || strings.Contains(trimmed, "/video/upload/") {
+		return "video"
+	}
+	return "image"
+}
+
+func (controller *ImageController) assetURLs(paths []string) ([]string, []string) {
 	urls := make([]string, 0, len(paths))
+	assetTypes := make([]string, 0, len(paths))
 	for _, path := range paths {
 		resolved := strings.TrimSpace(path)
 		if resolved == "" {
 			continue
 		}
+		assetTypes = append(assetTypes, assetTypeFromPath(resolved))
 		if controller.assets != nil {
 			resolved = controller.assets.URLFor(resolved)
 		}
 		urls = append(urls, resolved)
 	}
-	return urls
+	return urls, assetTypes
 }
 
-func (controller *ImageController) commentAssetURLs(comment model.Comment) []string {
+func (controller *ImageController) commentAssetURLs(comment model.Comment) ([]string, []string) {
 	return controller.assetURLs(comment.AllImagePaths())
+}
+
+func setAssetCacheHeaders(c *gin.Context) {
+	c.Header("Cache-Control", fmt.Sprintf("public, max-age=%d", assetCacheMaxAgeSeconds))
+	c.Header("Vary", "Accept-Encoding")
+	c.Header("Accept-Ranges", "bytes")
 }
 
 func parseImageTimes(c *gin.Context) (string, time.Time, time.Time, error) {
@@ -220,7 +241,8 @@ func (controller *ImageController) Feed(c *gin.Context) {
 			ownerLogin = adminLogin
 		}
 		key := strings.ToLower(ownerLogin) + "|" + item.ID
-		resp := dto.NewImageResponse(item, controller.assetURLs(item.AllImagePaths()))
+		assetURLs, assetTypes := controller.assetURLs(item.AllImagePaths())
+		resp := dto.NewImageResponse(item, assetURLs, assetTypes)
 		resp.LikeCount = likeCounts[key]
 		resp.CommentCount = commentCounts[key]
 		if viewerLogin != "" {
@@ -292,7 +314,7 @@ func (controller *ImageController) FeedUsers(c *gin.Context) {
 }
 
 func (controller *ImageController) Create(c *gin.Context) {
-	if err := c.Request.ParseMultipartForm(maxTotalSize + (1 << 20)); err != nil {
+	if err := c.Request.ParseMultipartForm(maxImageTotalSize + (1 << 20)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -328,11 +350,12 @@ func (controller *ImageController) Create(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, dto.NewImageResponse(image, controller.assetURLs(image.AllImagePaths())))
+	assetURLs, assetTypes := controller.assetURLs(image.AllImagePaths())
+	c.JSON(http.StatusCreated, dto.NewImageResponse(image, assetURLs, assetTypes))
 }
 
 func (controller *ImageController) Update(c *gin.Context) {
-	if err := c.Request.ParseMultipartForm(maxTotalSize + (1 << 20)); err != nil {
+	if err := c.Request.ParseMultipartForm(maxImageTotalSize + (1 << 20)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -371,7 +394,8 @@ func (controller *ImageController) Update(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.NewImageResponse(image, controller.assetURLs(image.AllImagePaths())))
+	assetURLs, assetTypes := controller.assetURLs(image.AllImagePaths())
+	c.JSON(http.StatusOK, dto.NewImageResponse(image, assetURLs, assetTypes))
 }
 
 func (controller *ImageController) Delete(c *gin.Context) {
@@ -401,13 +425,25 @@ func (controller *ImageController) Asset(c *gin.Context) {
 		return
 	}
 
+	// Redirect to Cloudinary so the browser/CDN can handle caching + range requests (video playback).
+	if controller.assets != nil {
+		url, urlErr := controller.imageService.AssetURL(c.Request.Context(), ownerLogin, imageID, assetIndex)
+		if urlErr == nil && strings.TrimSpace(url) != "" {
+			setAssetCacheHeaders(c)
+			c.Redirect(http.StatusTemporaryRedirect, url)
+			return
+		}
+	}
+
 	content, contentType, err := controller.imageService.ReadAsset(c.Request.Context(), "", ownerLogin, imageID, assetIndex)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.Data(http.StatusOK, contentType, content)
+	setAssetCacheHeaders(c)
+	c.Header("Content-Type", contentType)
+	http.ServeContent(c.Writer, c.Request, "", time.Time{}, bytes.NewReader(content))
 }
 
 func tokenFromSession(session *model.Session) string {
@@ -518,7 +554,7 @@ func (controller *ImageController) GetComments(c *gin.Context) {
 	result := make([]dto.CommentResponse, 0, len(comments))
 	for _, cm := range comments {
 		var imageUrl string
-		imageURLs := controller.commentAssetURLs(cm.Comment)
+		imageURLs, assetTypes := controller.commentAssetURLs(cm.Comment)
 		if len(imageURLs) > 0 {
 			imageUrl = imageURLs[0]
 		}
@@ -530,6 +566,7 @@ func (controller *ImageController) GetComments(c *gin.Context) {
 			Text:        cm.Text,
 			ImageUrl:    imageUrl,
 			ImageURLs:   imageURLs,
+			AssetTypes:  assetTypes,
 			CreatedAt:   cm.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
 			LikeCount:   likeCounts[cm.ID],
 			Liked:       likedBy[cm.ID],
@@ -555,23 +592,23 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 	var text string
 	var parentID string
 	var replyToUserLogin string
-	var imageData [][]byte
+	var files []*multipart.FileHeader
 
 	contentType := c.GetHeader("Content-Type")
 	if strings.HasPrefix(contentType, "multipart/form-data") {
-		if err := c.Request.ParseMultipartForm(maxTotalSize + (1 << 20)); err != nil {
+		if err := c.Request.ParseMultipartForm(maxImageTotalSize + (1 << 20)); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 		text = strings.TrimSpace(c.PostForm("text"))
 		parentID = strings.TrimSpace(c.PostForm("parentId"))
 		replyToUserLogin = strings.TrimSpace(c.PostForm("replyToUserLogin"))
-		files, err := readMultipartFilesWithLimit(c.Request, maxCommentFiles)
+		selectedFiles, err := readMultipartFilesWithLimit(c.Request, maxCommentFiles)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		imageData = files
+		files = selectedFiles
 	} else {
 		var body struct {
 			Text             string `json:"text"`
@@ -587,12 +624,12 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 		replyToUserLogin = strings.TrimSpace(body.ReplyToUserLogin)
 	}
 
-	if text == "" && len(imageData) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "请输入评论内容或选择图片"})
+	if text == "" && len(files) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请输入评论内容或选择图片/视频"})
 		return
 	}
 
-	comment, err := controller.interactionService.AddComment(c.Request.Context(), session.AccessToken, session.User, ownerLogin, postID, text, imageData, parentID, replyToUserLogin)
+	comment, err := controller.interactionService.AddComment(c.Request.Context(), session.AccessToken, session.User, ownerLogin, postID, text, files, parentID, replyToUserLogin)
 	if err != nil {
 		_ = c.Error(err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -600,7 +637,7 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 	}
 
 	var imageUrl string
-	imageURLs := controller.commentAssetURLs(comment)
+	imageURLs, assetTypes := controller.commentAssetURLs(comment)
 	if len(imageURLs) > 0 {
 		imageUrl = imageURLs[0]
 	}
@@ -613,6 +650,7 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 		Text:        comment.Text,
 		ImageUrl:    imageUrl,
 		ImageURLs:   imageURLs,
+		AssetTypes:  assetTypes,
 		CreatedAt:   comment.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
 		LikeCount:   0,
 		Liked:       false,
@@ -666,52 +704,79 @@ func (controller *ImageController) CommentAsset(c *gin.Context) {
 		assetIndex = parsedIndex
 	}
 
+	// Redirect to Cloudinary for caching + range requests.
+	if controller.assets != nil {
+		url, urlErr := controller.interactionService.CommentAssetURL(c.Request.Context(), commenterLogin, postOwner, postID, commentID, assetIndex)
+		if urlErr == nil && strings.TrimSpace(url) != "" {
+			setAssetCacheHeaders(c)
+			c.Redirect(http.StatusTemporaryRedirect, url)
+			return
+		}
+	}
+
 	content, contentType, err := controller.interactionService.ReadCommentImage(c.Request.Context(), commenterLogin, postOwner, postID, commentID, assetIndex)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.Data(http.StatusOK, contentType, content)
+	setAssetCacheHeaders(c)
+	c.Header("Content-Type", contentType)
+	http.ServeContent(c.Writer, c.Request, "", time.Time{}, bytes.NewReader(content))
 }
 
-func readMultipartFiles(r *http.Request) ([][]byte, error) {
+func readMultipartFiles(r *http.Request) ([]*multipart.FileHeader, error) {
 	return readMultipartFilesWithLimit(r, maxFiles)
 }
 
-func readMultipartFilesWithLimit(r *http.Request, maxCount int) ([][]byte, error) {
+func readMultipartFilesWithLimit(r *http.Request, maxCount int) ([]*multipart.FileHeader, error) {
 	fileHeaders := r.MultipartForm.File["files"]
 	if len(fileHeaders) == 0 {
 		fileHeaders = r.MultipartForm.File["file"]
 	}
 	if len(fileHeaders) > maxCount {
-		return nil, fmt.Errorf("最多上传 %d 张图片", maxCount)
+		return nil, fmt.Errorf("最多上传 %d 个文件", maxCount)
 	}
 
-	var totalSize int64
-	var result [][]byte
+	videoCount := 0
+	var imageTotalSize int64
 	for _, fh := range fileHeaders {
-		if fh.Size > maxFileSize {
+		if isVideoFileHeader(fh) {
+			videoCount += 1
+			if videoCount > maxVideos {
+				return nil, fmt.Errorf("最多上传 %d 个视频", maxVideos)
+			}
+			if fh.Size > maxVideoSize {
+				return nil, fmt.Errorf("单个视频不能超过 200MB: %s", fh.Filename)
+			}
+			continue
+		}
+
+		if fh.Size > maxImageFileSize {
 			return nil, fmt.Errorf("单张图片不能超过 5MB: %s", fh.Filename)
 		}
-		totalSize += fh.Size
-		if totalSize > maxTotalSize {
-			return nil, fmt.Errorf("帖子总大小不能超过 25MB")
+		imageTotalSize += fh.Size
+		if imageTotalSize > maxImageTotalSize {
+			return nil, fmt.Errorf("图片总大小不能超过 25MB")
 		}
-
-		f, err := fh.Open()
-		if err != nil {
-			return nil, err
-		}
-		data, err := io.ReadAll(f)
-		f.Close()
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, data)
 	}
 
-	return result, nil
+	return fileHeaders, nil
 }
 
+func isVideoFileHeader(fh *multipart.FileHeader) bool {
+	contentType := strings.ToLower(strings.TrimSpace(fh.Header.Get("Content-Type")))
+	if strings.HasPrefix(contentType, "video/") {
+		return true
+	}
+	if strings.HasPrefix(contentType, "image/") {
+		return false
+	}
 
+	switch strings.ToLower(filepath.Ext(fh.Filename)) {
+	case ".mp4", ".mov", ".webm", ".m4v", ".avi", ".mkv":
+		return true
+	}
+
+	return false
+}

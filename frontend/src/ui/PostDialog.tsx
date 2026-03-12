@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Play, Plus, Trash2, X } from 'lucide-react';
 import { ImageViewer } from './ImageViewer';
 import { useToast } from './useToast';
 import { setPostDialogOpen } from '../lib/uiFlags';
+import { isVideoUrl, mediaTypeFromFile } from '../lib/media';
+import type { MediaType } from '../types/image';
 
 interface PostDialogProps {
   open: boolean;
@@ -18,12 +20,15 @@ interface PostDialogProps {
   initialStartAt?: string;
   initialEndAt?: string;
   initialImageUrls?: string[];
+  initialAssetTypes?: MediaType[];
   onSubmit: (data: { description: string; tags: string[]; timeMode: 'point' | 'range'; startAt: string; endAt?: string; files: File[]; removedUrls?: string[] }) => Promise<void>;
 }
 
 const MAX_FILES = 15;
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const MAX_TOTAL_SIZE = 25 * 1024 * 1024;
+const MAX_IMAGE_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_IMAGE_TOTAL_SIZE = 25 * 1024 * 1024;
+const MAX_VIDEOS = 3;
+const MAX_VIDEO_SIZE = 200 * 1024 * 1024;
 const MAX_TAGS = 12;
 const MAX_TAG_LENGTH = 32;
 const DRAFT_KEY = 'draft:post';
@@ -48,6 +53,7 @@ interface PreviewItem {
   type: 'file' | 'url';
   file?: File;
   url: string;
+  mediaType: MediaType;
 }
 
 const normalizeTag = (value: string) => value.trim().replace(/^#/, '').replace(/\s+/g, ' ');
@@ -83,7 +89,7 @@ const mergeTagHistory = (current: string[], incoming: string[]) => {
 };
 
 const buildFilePreviewItems = (files: File[]): PreviewItem[] =>
-  files.map((file) => ({ type: 'file' as const, file, url: URL.createObjectURL(file) }));
+  files.map((file) => ({ type: 'file' as const, file, url: URL.createObjectURL(file), mediaType: mediaTypeFromFile(file) }));
 
 const revokeFilePreviews = (items: PreviewItem[]) => {
   items.forEach((item) => {
@@ -107,6 +113,7 @@ export function PostDialog({
   initialStartAt,
   initialEndAt,
   initialImageUrls = [],
+  initialAssetTypes = [],
   onSubmit,
 }: PostDialogProps) {
   const resolvedCloseOnSubmit = closeOnSubmit ?? variant !== 'page';
@@ -124,7 +131,18 @@ export function PostDialog({
   const [startAt, setStartAt] = useState(initialStartAt ?? getDefaultDateTime());
   const [endAt, setEndAt] = useState(initialEndAt ?? initialStartAt ?? getDefaultDateTime());
   const [previews, setPreviews] = useState<PreviewItem[]>(() =>
-    initialImageUrls.map((url) => ({ type: 'url' as const, url }))
+    initialImageUrls.map((url, index) => ({
+      type: 'url' as const,
+      url,
+      mediaType:
+        initialAssetTypes[index] === 'video'
+          ? 'video'
+          : initialAssetTypes[index] === 'image'
+            ? 'image'
+            : isVideoUrl(url)
+              ? 'video'
+              : 'image',
+    }))
   );
   const [error, setError] = useState<string | null>(null);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
@@ -137,6 +155,7 @@ export function PostDialog({
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [dragPointer, setDragPointer] = useState<{ x: number; y: number } | null>(null);
   const [draggingUrl, setDraggingUrl] = useState<string | null>(null);
+  const [draggingType, setDraggingType] = useState<MediaType | null>(null);
   const dragPointerRef = useRef<{ x: number; y: number } | null>(null);
   const dragPointerRaf = useRef<number | null>(null);
   const previewsRef = useRef<PreviewItem[]>(previews);
@@ -157,6 +176,7 @@ export function PostDialog({
 
   const initialUrlsKey = initialImageUrls.join(',');
   const initialTagsKey = initialTags.join(',');
+  const initialAssetTypesKey = initialAssetTypes.join(',');
 
   useEffect(() => {
     if (open && !prevOpenRef.current) {
@@ -198,7 +218,23 @@ export function PostDialog({
       saveTagHistory(mergedHistory);
       setPreviews((current) => {
         revokeFilePreviews(current);
-        return [...initialImageUrls.map((url) => ({ type: 'url' as const, url })), ...buildFilePreviewItems(draftFiles)];
+        return [
+          ...initialImageUrls.map((url, index) => {
+            const declared = initialAssetTypes[index];
+            const mediaType: MediaType =
+              declared === 'video' || declared === 'image'
+                ? declared
+                : isVideoUrl(url)
+                  ? 'video'
+                  : 'image';
+            return {
+              type: 'url' as const,
+              url,
+              mediaType,
+            };
+          }),
+          ...buildFilePreviewItems(draftFiles),
+        ];
       });
       setError(null);
       setDraggingIndex(null);
@@ -214,7 +250,7 @@ export function PostDialog({
     }
     prevOpenRef.current = open;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialDescription, initialEndAt, initialStartAt, initialTagsKey, tagSuggestionsKey, initialTimeMode, initialUrlsKey, mode]);
+  }, [open, initialDescription, initialEndAt, initialStartAt, initialTagsKey, tagSuggestionsKey, initialTimeMode, initialUrlsKey, initialAssetTypesKey, mode]);
 
   useEffect(() => () => {
     revokeFilePreviews(previewsRef.current);
@@ -250,26 +286,56 @@ export function PostDialog({
 
   const addFiles = useCallback(
     (incoming: FileList | null) => {
-      if (!incoming) return;
-      const newItems: PreviewItem[] = Array.from(incoming).map((file) => ({
+      if (!incoming || incoming.length === 0) return;
+
+      const incomingFiles = Array.from(incoming);
+      const slots = Math.max(0, MAX_FILES - previews.length);
+      const acceptedFiles = incomingFiles.slice(0, slots);
+      if (acceptedFiles.length === 0) return;
+
+      const newItems: PreviewItem[] = acceptedFiles.map((file) => ({
         type: 'file' as const,
         file,
         url: URL.createObjectURL(file),
+        mediaType: mediaTypeFromFile(file),
       }));
-      const next = [...previews, ...newItems].slice(0, MAX_FILES);
 
-      let totalSize = 0;
+      const next = [...previews, ...newItems];
+
+      const revokeNew = () => {
+        newItems.forEach((item) => URL.revokeObjectURL(item.url));
+      };
+
+      const videoCount = next.filter((item) => item.mediaType === 'video').length;
+      if (videoCount > MAX_VIDEOS) {
+        revokeNew();
+        setError(`最多上传 ${MAX_VIDEOS} 个视频`);
+        return;
+      }
+
+      let imageTotalSize = 0;
       for (const item of next) {
-        if (item.file) {
-          if (item.file.size > MAX_FILE_SIZE) {
-            setError(`单张图片不能超过 5MB: ${item.file.name}`);
+        if (!item.file) continue;
+        if (item.mediaType === 'video') {
+          if (item.file.size > MAX_VIDEO_SIZE) {
+            revokeNew();
+            setError(`单个视频不能超过 200MB: ${item.file.name}`);
             return;
           }
-          totalSize += item.file.size;
+          continue;
         }
+
+        if (item.file.size > MAX_IMAGE_FILE_SIZE) {
+          revokeNew();
+          setError(`单张图片不能超过 5MB: ${item.file.name}`);
+          return;
+        }
+        imageTotalSize += item.file.size;
       }
-      if (totalSize > MAX_TOTAL_SIZE) {
-        setError('帖子总大小不能超过 25MB');
+
+      if (imageTotalSize > MAX_IMAGE_TOTAL_SIZE) {
+        revokeNew();
+        setError('图片总大小不能超过 25MB');
         return;
       }
       setError(null);
@@ -348,7 +414,7 @@ export function PostDialog({
       return;
     }
     if (!description.trim() && previews.length === 0) {
-      setError('请输入文字或选择图片');
+      setError('请输入文字或选择图片/视频');
       return;
     }
 
@@ -407,6 +473,7 @@ export function PostDialog({
     setDragOverIndex(index);
     const nextUrl = previewsRef.current[index]?.url ?? null;
     setDraggingUrl(nextUrl);
+    setDraggingType(previewsRef.current[index]?.mediaType ?? null);
     if (event) {
       updateDragPointer(event.clientX, event.clientY);
     }
@@ -448,6 +515,7 @@ export function PostDialog({
     setOverDelete(false);
     resetDragPointer();
     setDraggingUrl(null);
+    setDraggingType(null);
   };
 
   const handleTouchMove = useCallback(
@@ -490,6 +558,7 @@ export function PostDialog({
     setOverDelete(false);
     resetDragPointer();
     setDraggingUrl(null);
+    setDraggingType(null);
   }, [overDelete, draggingIndex, removePreview, resetDragPointer]);
 
   if (!open && !animating) return null;
@@ -497,7 +566,7 @@ export function PostDialog({
   const totalPreviews = previews.length;
   const cols = totalPreviews <= 2 ? 2 : 3;
   const availableTags = tagHistory.filter((tag) => !tags.some((selected) => selected.toLowerCase() === tag.toLowerCase()));
-  const previewUrls = previews.map((item) => item.url);
+  const viewerItems = previews.map((item) => ({ url: item.url, type: item.mediaType }));
   const wrapperClass = isPage
     ? 'min-h-screen w-full bg-[var(--page-bg)]'
     : `fixed inset-0 z-50 flex flex-col md:items-center md:justify-center transition-colors duration-250 ${
@@ -595,6 +664,10 @@ export function PostDialog({
                 data-preview-index={index}
                 draggable
                 key={`${item.url}-${index}`}
+                onClick={() => {
+                  if (draggingIndex !== null) return;
+                  setViewerIndex(index);
+                }}
                 onDragEnd={handleDragEnd}
                 onDrag={(event) => {
                   if (draggingIndex !== null) {
@@ -612,21 +685,31 @@ export function PostDialog({
                   }
                 }}
               >
-                <img
-                  alt=""
-                  className="absolute inset-0 h-full w-full object-cover"
-                  onClick={() => {
-                    if (draggingIndex !== null) return;
-                    setViewerIndex(index);
-                  }}
-                  src={item.url}
-                />
+                {item.mediaType === 'video' ? (
+                  <>
+                    <video
+                      className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+                      muted
+                      playsInline
+                      preload="metadata"
+                      src={item.url}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center text-white/80 pointer-events-none">
+                      <Play size={28} />
+                    </div>
+                  </>
+                ) : (
+                  <img alt="" className="absolute inset-0 h-full w-full object-cover" src={item.url} />
+                )}
                 <span className="absolute left-1 top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-black/60 px-1 text-[10px] font-semibold text-white/90">
                   {index + 1}
                 </span>
                 <button
                   className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white/80 hover:text-white"
-                  onClick={() => removePreview(index)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    removePreview(index);
+                  }}
                   type="button"
                 >
                   <X size={14} />
@@ -644,7 +727,7 @@ export function PostDialog({
           </div>
 
           <input
-            accept="image/*"
+            accept="image/*,video/*"
             className="hidden"
             multiple
             onChange={(event) => {
@@ -718,15 +801,24 @@ export function PostDialog({
 
       {draggingIndex !== null && draggingUrl && dragPointer ? (
         <div
-          className="pointer-events-none fixed z-[70] h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-lg overflow-hidden bg-slate-900/60 shadow-lg"
+          className="pointer-events-none fixed z-[70] relative h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-lg overflow-hidden bg-slate-900/60 shadow-lg"
           style={{ left: dragPointer.x, top: dragPointer.y }}
         >
-          <img alt="" className="h-full w-full object-cover" src={draggingUrl} />
+          {draggingType === 'video' ? (
+            <>
+              <video className="h-full w-full object-cover" muted playsInline preload="metadata" src={draggingUrl} />
+              <div className="absolute inset-0 flex items-center justify-center text-white/80">
+                <Play size={18} />
+              </div>
+            </>
+          ) : (
+            <img alt="" className="h-full w-full object-cover" src={draggingUrl} />
+          )}
         </div>
       ) : null}
 
       {viewerIndex !== null ? (
-        <ImageViewer initialIndex={viewerIndex} onClose={() => setViewerIndex(null)} urls={previewUrls} />
+        <ImageViewer initialIndex={viewerIndex} onClose={() => setViewerIndex(null)} items={viewerItems} />
       ) : null}
     </div>
   );

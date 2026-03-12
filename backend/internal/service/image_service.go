@@ -3,6 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
+	"mime"
+	"mime/multipart"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -56,7 +59,7 @@ func (service *ImageService) GetUserItems(ctx context.Context, _ string, login s
 	return items
 }
 
-func (service *ImageService) Create(ctx context.Context, _ string, author model.GitHubUser, description string, tags []string, timeMode string, startAt time.Time, endAt time.Time, files [][]byte) (model.Image, error) {
+func (service *ImageService) Create(ctx context.Context, _ string, author model.GitHubUser, description string, tags []string, timeMode string, startAt time.Time, endAt time.Time, files []*multipart.FileHeader) (model.Image, error) {
 	service.mu.Lock()
 	defer service.mu.Unlock()
 
@@ -78,7 +81,7 @@ func (service *ImageService) Create(ctx context.Context, _ string, author model.
 	}
 	image.NormalizeTimeFields()
 
-	imagePaths, err := service.uploadImageAssets(ctx, author.Login, imageID, files)
+	imagePaths, err := service.uploadAssets(ctx, author.Login, imageID, files)
 	if err != nil {
 		return model.Image{}, err
 	}
@@ -91,7 +94,7 @@ func (service *ImageService) Create(ctx context.Context, _ string, author model.
 	return image, nil
 }
 
-func (service *ImageService) Update(ctx context.Context, _ string, ownerLogin string, id string, description string, tags []string, timeMode string, startAt time.Time, endAt time.Time, files [][]byte) (model.Image, error) {
+func (service *ImageService) Update(ctx context.Context, _ string, ownerLogin string, id string, description string, tags []string, timeMode string, startAt time.Time, endAt time.Time, files []*multipart.FileHeader) (model.Image, error) {
 	service.mu.Lock()
 	defer service.mu.Unlock()
 
@@ -111,7 +114,7 @@ func (service *ImageService) Update(ctx context.Context, _ string, ownerLogin st
 	updated.NormalizeTimeFields()
 
 	if len(files) > 0 {
-		newPaths, uploadErr := service.uploadImageAssets(ctx, ownerLogin, id, files)
+		newPaths, uploadErr := service.uploadAssets(ctx, ownerLogin, id, files)
 		if uploadErr != nil {
 			return model.Image{}, uploadErr
 		}
@@ -164,13 +167,46 @@ func (service *ImageService) ReadAsset(ctx context.Context, _ string, ownerLogin
 	return service.assets.GetObject(ctx, paths[assetIndex])
 }
 
-func (service *ImageService) uploadImageAssets(ctx context.Context, ownerLogin string, imageID string, files [][]byte) ([]string, error) {
+func (service *ImageService) AssetURL(ctx context.Context, ownerLogin string, id string, assetIndex int) (string, error) {
+	item, err := service.database.GetImage(ctx, ownerLogin, id)
+	if err != nil {
+		return "", err
+	}
+
+	paths := item.AllImagePaths()
+	if assetIndex < 0 || assetIndex >= len(paths) {
+		return "", fmt.Errorf("asset index %d out of range", assetIndex)
+	}
+	if service.assets == nil {
+		return "", fmt.Errorf("asset storage unavailable")
+	}
+	return service.assets.URLFor(paths[assetIndex]), nil
+}
+
+func (service *ImageService) uploadAssets(ctx context.Context, ownerLogin string, imageID string, files []*multipart.FileHeader) ([]string, error) {
 	paths := make([]string, 0, len(files))
-	for index, file := range files {
+	for index, fh := range files {
+		mediaType := mediaTypeFromFileHeader(fh)
 		objectKey := imageObjectKey(ownerLogin, imageID, index)
-		if err := service.assets.PutObject(ctx, objectKey, file, "image/webp"); err != nil {
+		if mediaType == "video" {
+			objectKey = videoObjectKey(ownerLogin, imageID, index)
+		}
+
+		contentType := strings.TrimSpace(fh.Header.Get("Content-Type"))
+		if contentType == "" {
+			contentType = mime.TypeByExtension(strings.ToLower(filepath.Ext(fh.Filename)))
+		}
+
+		f, err := fh.Open()
+		if err != nil {
 			return nil, err
 		}
+		uploadErr := service.assets.PutObjectReader(ctx, objectKey, f, contentType)
+		_ = f.Close()
+		if uploadErr != nil {
+			return nil, uploadErr
+		}
+
 		paths = append(paths, objectKey)
 	}
 	return paths, nil
@@ -178,6 +214,27 @@ func (service *ImageService) uploadImageAssets(ctx context.Context, ownerLogin s
 
 func imageObjectKey(ownerLogin string, imageID string, assetIndex int) string {
 	return fmt.Sprintf("images/%s/%s/%d", ownerLogin, imageID, assetIndex)
+}
+
+func videoObjectKey(ownerLogin string, imageID string, assetIndex int) string {
+	return fmt.Sprintf("videos/%s/%s/%d", ownerLogin, imageID, assetIndex)
+}
+
+func mediaTypeFromFileHeader(fh *multipart.FileHeader) string {
+	contentType := strings.ToLower(strings.TrimSpace(fh.Header.Get("Content-Type")))
+	if strings.HasPrefix(contentType, "video/") {
+		return "video"
+	}
+	if strings.HasPrefix(contentType, "image/") {
+		return "image"
+	}
+
+	switch strings.ToLower(filepath.Ext(fh.Filename)) {
+	case ".mp4", ".mov", ".webm", ".m4v", ".avi", ".mkv":
+		return "video"
+	}
+
+	return "image"
 }
 
 func metadataPath(ownerLogin string, imageID string) string {

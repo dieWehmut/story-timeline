@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
+import { mediaTypeFromFile, normalizeAssetTypes } from '../lib/media';
 import type {
   CreateImagePayload,
   FeedUser,
@@ -51,10 +52,15 @@ const sortByDate = (itemsList: ImageItem[], order: TimeSortOrder) =>
     return order === 'asc' ? delta : -delta;
   });
 
-const normalizeCachedItem = (item: ImageItem): ImageItem => ({
-  ...item,
-  tags: item.tags ?? [],
-});
+const normalizeCachedItem = (item: ImageItem): ImageItem => {
+  const imageUrls = item.imageUrls ?? [];
+  return {
+    ...item,
+    tags: item.tags ?? [],
+    imageUrls,
+    assetTypes: normalizeAssetTypes(imageUrls, item.assetTypes),
+  };
+};
 
 const loadCachedFeed = (): ImageItem[] | null => {
   try {
@@ -275,7 +281,11 @@ export const useImages = () => {
     setError(null);
 
     const tempId = `temp-${Date.now()}`;
+    let optimisticUrls: string[] | null = null;
     if (optimisticUser) {
+      optimisticUrls = payload.files.map((file) => URL.createObjectURL(file));
+      const optimisticAssetTypes = payload.files.map((file) => mediaTypeFromFile(file));
+      const urls = optimisticUrls;
       const tempItem: ImageItem = {
         id: tempId,
         authorLogin: optimisticUser.login,
@@ -285,7 +295,8 @@ export const useImages = () => {
         timeMode: payload.timeMode,
         startAt: payload.startAt,
         endAt: payload.endAt,
-        imageUrls: payload.files.map((f) => URL.createObjectURL(f)),
+        imageUrls: urls,
+        assetTypes: optimisticAssetTypes,
         imagePaths: [],
         metadataPath: '',
         createdAt: new Date().toISOString(),
@@ -314,11 +325,20 @@ export const useImages = () => {
         setFeedUsers(users);
         saveCacheUsers(users);
       }).catch(() => undefined);
+      if (optimisticUrls?.length) {
+        const urls = optimisticUrls;
+        // Revoke after React flushes the optimistic item out of the tree.
+        window.setTimeout(() => urls.forEach((url) => URL.revokeObjectURL(url)), 0);
+      }
     } catch (submitError) {
       if (optimisticUser) {
         setItems((currentItems) => currentItems.filter((item) => item.id !== tempId));
       }
       setError(submitError instanceof Error ? submitError.message : '上传失败');
+      if (optimisticUrls?.length) {
+        const urls = optimisticUrls;
+        window.setTimeout(() => urls.forEach((url) => URL.revokeObjectURL(url)), 0);
+      }
       throw submitError;
     } finally {
       setSubmitting(false);

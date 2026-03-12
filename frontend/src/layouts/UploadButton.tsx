@@ -45,11 +45,11 @@ export function UploadButton({
         type="button"
       >
         {showIcon ? (
-          <PencilLine className="text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={20} />
+          <PencilLine className="quick-actions-icon text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={20} />
         ) : null}
         <span className="leading-none">{label}</span>
         {subLabel ? (
-          <span className="text-xs text-soft">{subLabel}</span>
+          <span className="quick-actions-sub text-xs text-soft">{subLabel}</span>
         ) : null}
       </button>
     );

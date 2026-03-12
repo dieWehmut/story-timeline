@@ -129,6 +129,7 @@ export default function Post({ auth, images }: PostProps) {
       closeOnSubmit={false}
       initialDescription={item?.description ?? ''}
       initialEndAt={item?.endAt ? toDateTimeInputValue(item.endAt) : undefined}
+      initialAssetTypes={item?.assetTypes ?? []}
       initialImageUrls={item?.imageUrls ?? []}
       initialStartAt={item?.startAt ? toDateTimeInputValue(item.startAt) : undefined}
       initialTags={item?.tags ?? []}

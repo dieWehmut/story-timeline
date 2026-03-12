@@ -4,6 +4,7 @@ import type { AuthUser } from '../types/image';
 interface AuthButtonProps {
   authenticated: boolean;
   loading: boolean;
+  loginUrl?: string;
   user: AuthUser | null;
   onLogin: () => void;
   onLogout: () => Promise<void>;
@@ -12,18 +13,25 @@ interface AuthButtonProps {
 const iconBtnCls =
   'inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition-all duration-300 hover:scale-110 hover:text-[var(--text-accent)] active:scale-95';
 
-export function AuthButton({ authenticated, loading, onLogin, onLogout, user }: AuthButtonProps) {
+export function AuthButton({ authenticated, loading, loginUrl, onLogin, onLogout, user }: AuthButtonProps) {
   if (!user && !authenticated) {
+    const href = loginUrl?.trim() ?? '';
     return (
-      <button
+      <a
         aria-busy={loading}
         aria-label="GitHub login"
         className={`${iconBtnCls} ${loading ? 'opacity-70' : ''}`}
-        onClick={onLogin}
-        type="button"
+        href={href || '#'}
+        onClick={(event) => {
+          if (!href) {
+            event.preventDefault();
+            onLogin();
+          }
+        }}
+        role="button"
       >
         <UserRound size={24} />
-      </button>
+      </a>
     );
   }
 

@@ -100,7 +100,7 @@ export default function Home({ auth, images, theme, onThemeToggle }: HomeProps) 
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-col items-center px-4 pt-16 text-center">
-        <h1 className="font-serif text-4xl font-semibold tracking-wide text-[var(--text-main)] md:text-5xl">物語集</h1>
+        <h1 className="font-serif text-4xl font-semibold tracking-wide text-[var(--text-main)] md:text-5xl">物语</h1>
         <p className="mt-3 text-sm text-soft">
           用户數：{images.stats.userCount}
         </p>
@@ -108,6 +108,8 @@ export default function Home({ auth, images, theme, onThemeToggle }: HomeProps) 
         <div className="mt-10 grid w-full max-w-xl grid-cols-2 gap-4">
           <NavCard icon={BookOpen} label="物语" to="/story" />
           <NavCard icon={ImageIcon} label="相册" to={albumUrl} disabled={albumDisabled} />
+          
+          
           <NavCard icon={Github} label="代码仓库" href={repoUrl} external />
           <NavCard icon={Download} label="Android" href={androidUrl} external />
         </div>

@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"net/textproto"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,60 +58,96 @@ func NewCloudinaryStorage(cfg CloudinaryConfig) (*CloudinaryStorage, error) {
 		cloudName:  strings.TrimSpace(cfg.CloudName),
 		apiKey:     strings.TrimSpace(cfg.APIKey),
 		apiSecret:  strings.TrimSpace(cfg.APISecret),
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		// Video uploads can be large (<= 200MB). Keep this high to avoid client timeouts.
+		httpClient: &http.Client{Timeout: 15 * time.Minute},
 	}, nil
 }
 
 func (storage *CloudinaryStorage) PutObject(ctx context.Context, publicID string, content []byte, contentType string) error {
+	return storage.PutObjectReader(ctx, publicID, bytes.NewReader(content), contentType)
+}
+
+func (storage *CloudinaryStorage) PutObjectReader(ctx context.Context, publicID string, reader io.Reader, contentType string) error {
+	resourceType := storage.resourceTypeFor(publicID, contentType)
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 	params := map[string]string{
+		"invalidate": "true",
 		"overwrite": "true",
 		"public_id": strings.TrimSpace(publicID),
 		"timestamp": timestamp,
 	}
 
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	for _, key := range []string{"api_key", "overwrite", "public_id", "signature", "timestamp"} {
-		value := ""
-		switch key {
-		case "api_key":
-			value = storage.apiKey
-		case "signature":
-			value = signCloudinaryParams(params, storage.apiSecret)
-		default:
-			value = params[key]
-		}
-		if err := writer.WriteField(key, value); err != nil {
-			return err
-		}
-	}
+	pipeReader, pipeWriter := io.Pipe()
+	writer := multipart.NewWriter(pipeWriter)
+	writeErr := make(chan error, 1)
+	go func() {
+		defer close(writeErr)
+		defer pipeWriter.Close()
 
-	fileWriter, err := writer.CreateFormFile("file", "upload")
-	if err != nil {
-		return err
-	}
-	if _, err := fileWriter.Write(content); err != nil {
-		return err
-	}
-	if err := writer.Close(); err != nil {
-		return err
-	}
+		for _, key := range []string{"api_key", "invalidate", "overwrite", "public_id", "signature", "timestamp"} {
+			value := ""
+			switch key {
+			case "api_key":
+				value = storage.apiKey
+			case "signature":
+				value = signCloudinaryParams(params, storage.apiSecret)
+			default:
+				value = params[key]
+			}
+			if err := writer.WriteField(key, value); err != nil {
+				_ = pipeWriter.CloseWithError(err)
+				writeErr <- err
+				return
+			}
+		}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, storage.uploadEndpoint(), &body)
+		partHeader := make(textproto.MIMEHeader)
+		partHeader.Set("Content-Disposition", `form-data; name="file"; filename="upload"`)
+		if strings.TrimSpace(contentType) != "" {
+			partHeader.Set("Content-Type", strings.TrimSpace(contentType))
+		}
+
+		fileWriter, err := writer.CreatePart(partHeader)
+		if err != nil {
+			_ = pipeWriter.CloseWithError(err)
+			writeErr <- err
+			return
+		}
+
+		if _, err := io.Copy(fileWriter, reader); err != nil {
+			_ = pipeWriter.CloseWithError(err)
+			writeErr <- err
+			return
+		}
+
+		if err := writer.Close(); err != nil {
+			_ = pipeWriter.CloseWithError(err)
+			writeErr <- err
+			return
+		}
+
+		writeErr <- nil
+	}()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, storage.uploadEndpoint(resourceType), pipeReader)
 	if err != nil {
+		_ = pipeWriter.CloseWithError(err)
+		<-writeErr
 		return err
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	if strings.TrimSpace(contentType) != "" {
-		req.Header.Set("X-Content-Type", contentType)
-	}
 
 	resp, err := storage.httpClient.Do(req)
 	if err != nil {
+		_ = pipeWriter.CloseWithError(err)
+		<-writeErr
 		return err
 	}
 	defer resp.Body.Close()
+
+	if err := <-writeErr; err != nil {
+		return err
+	}
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -162,6 +199,7 @@ func (storage *CloudinaryStorage) GetObject(ctx context.Context, publicID string
 }
 
 func (storage *CloudinaryStorage) DeleteObject(ctx context.Context, publicID string) error {
+	resourceType := storage.resourceTypeFor(publicID, "")
 	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 	params := map[string]string{
 		"invalidate": "true",
@@ -176,7 +214,7 @@ func (storage *CloudinaryStorage) DeleteObject(ctx context.Context, publicID str
 	form.Set("signature", signCloudinaryParams(params, storage.apiSecret))
 	form.Set("timestamp", timestamp)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, storage.destroyEndpoint(), strings.NewReader(form.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, storage.destroyEndpoint(resourceType), strings.NewReader(form.Encode()))
 	if err != nil {
 		return err
 	}
@@ -215,15 +253,41 @@ func (storage *CloudinaryStorage) URLFor(publicID string) string {
 	if trimmed == "" {
 		return ""
 	}
-	return fmt.Sprintf("https://res.cloudinary.com/%s/image/upload/%s", storage.cloudName, escapeCloudinaryPath(trimmed))
+	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
+		return trimmed
+	}
+	resourceType := storage.resourceTypeFor(trimmed, "")
+	return fmt.Sprintf("https://res.cloudinary.com/%s/%s/upload/%s", storage.cloudName, resourceType, escapeCloudinaryPath(trimmed))
 }
 
-func (storage *CloudinaryStorage) uploadEndpoint() string {
-	return fmt.Sprintf("https://api.cloudinary.com/v1_1/%s/image/upload", storage.cloudName)
+func (storage *CloudinaryStorage) uploadEndpoint(resourceType string) string {
+	resolved := strings.TrimSpace(resourceType)
+	if resolved != "video" {
+		resolved = "image"
+	}
+	return fmt.Sprintf("https://api.cloudinary.com/v1_1/%s/%s/upload", storage.cloudName, resolved)
 }
 
-func (storage *CloudinaryStorage) destroyEndpoint() string {
-	return fmt.Sprintf("https://api.cloudinary.com/v1_1/%s/image/destroy", storage.cloudName)
+func (storage *CloudinaryStorage) destroyEndpoint(resourceType string) string {
+	resolved := strings.TrimSpace(resourceType)
+	if resolved != "video" {
+		resolved = "image"
+	}
+	return fmt.Sprintf("https://api.cloudinary.com/v1_1/%s/%s/destroy", storage.cloudName, resolved)
+}
+
+func (storage *CloudinaryStorage) resourceTypeFor(publicID string, contentType string) string {
+	lowerID := strings.ToLower(strings.Trim(strings.TrimSpace(publicID), "/"))
+	if strings.HasPrefix(lowerID, "videos/") || strings.HasPrefix(lowerID, "comment-videos/") {
+		return "video"
+	}
+
+	ct := strings.ToLower(strings.TrimSpace(contentType))
+	if strings.HasPrefix(ct, "video/") {
+		return "video"
+	}
+
+	return "image"
 }
 
 func signCloudinaryParams(params map[string]string, apiSecret string) string {

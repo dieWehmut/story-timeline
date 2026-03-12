@@ -11,6 +11,7 @@ interface HeaderProps {
   activeMonth: TimelineMonth | null;
   authAuthenticated: boolean;
   authLoading: boolean;
+  authLoginUrl?: string;
   authUser: AuthUser | null;
   canPost: boolean;
   feedUsers: FeedUser[];
@@ -35,6 +36,7 @@ export function Header({
   activeMonth,
   authAuthenticated,
   authLoading,
+  authLoginUrl,
   authUser,
   canPost,
   feedUsers,
@@ -80,11 +82,31 @@ export function Header({
         </div>
         <div className="flex items-center gap-0">
           {isDetailView ? (
-            <ThemeButton onToggle={onThemeToggle} theme={theme} />
+            <>
+              <HomeButton />
+              {!authAuthenticated ? (
+                <AuthButton
+                  authenticated={authAuthenticated}
+                  loading={authLoading}
+                  loginUrl={authLoginUrl}
+                  onLogin={onLogin}
+                  onLogout={onLogout}
+                  user={authUser}
+                />
+              ) : null}
+              <ThemeButton onToggle={onThemeToggle} theme={theme} />
+            </>
           ) : (
             <>
               <HomeButton />
-              <AuthButton authenticated={authAuthenticated} loading={authLoading} onLogin={onLogin} onLogout={onLogout} user={authUser} />
+              <AuthButton
+                authenticated={authAuthenticated}
+                loading={authLoading}
+                loginUrl={authLoginUrl}
+                onLogin={onLogin}
+                onLogout={onLogout}
+                user={authUser}
+              />
               <ThemeButton onToggle={onThemeToggle} theme={theme} />
               {authUser && canPost && showUploadButton ? <UploadButton busy={uploadBusy} /> : null}
               <div className={`transition-all duration-300 ${timelineOpen ? 'pointer-events-none scale-75 opacity-0' : 'opacity-100'}`}>

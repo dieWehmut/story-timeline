@@ -1,19 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import type { MediaItem } from '../lib/media';
 
 interface ImageViewerProps {
-  urls: string[];
+  items: MediaItem[];
   initialIndex?: number;
   onClose: () => void;
 }
 
-export function ImageViewer({ urls, initialIndex = 0, onClose }: ImageViewerProps) {
+export function ImageViewer({ items, initialIndex = 0, onClose }: ImageViewerProps) {
   const [index, setIndex] = useState(initialIndex);
   const [offsetX, setOffsetX] = useState(0);
   const touchRef = useRef<{ startX: number; startY: number; moved: boolean } | null>(null);
 
   const goPrev = useCallback(() => setIndex((i) => (i > 0 ? i - 1 : i)), []);
-  const goNext = useCallback(() => setIndex((i) => (i < urls.length - 1 ? i + 1 : i)), [urls.length]);
+  const goNext = useCallback(() => setIndex((i) => (i < items.length - 1 ? i + 1 : i)), [items.length]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -79,7 +80,7 @@ export function ImageViewer({ urls, initialIndex = 0, onClose }: ImageViewerProp
         <X size={24} />
       </button>
 
-      {urls.length > 1 && index > 0 ? (
+      {items.length > 1 && index > 0 ? (
         <button
           className="absolute left-2 top-1/2 z-10 -translate-y-1/2 flex h-10 w-10 items-center justify-center text-white/60 hover:text-white transition"
           onClick={(e) => {
@@ -92,7 +93,7 @@ export function ImageViewer({ urls, initialIndex = 0, onClose }: ImageViewerProp
         </button>
       ) : null}
 
-      {urls.length > 1 && index < urls.length - 1 ? (
+      {items.length > 1 && index < items.length - 1 ? (
         <button
           className="absolute right-2 top-1/2 z-10 -translate-y-1/2 flex h-10 w-10 items-center justify-center text-white/60 hover:text-white transition"
           onClick={(e) => {
@@ -105,18 +106,30 @@ export function ImageViewer({ urls, initialIndex = 0, onClose }: ImageViewerProp
         </button>
       ) : null}
 
-      <img
-        alt=""
-        className="max-h-full max-w-full object-contain select-none transition-transform duration-150"
-        draggable={false}
-        onClick={(e) => e.stopPropagation()}
-        src={urls[index]}
-        style={offsetX ? { transform: `translateX(${offsetX}px)`, transition: 'none' } : undefined}
-      />
+      {items[index]?.type === 'video' ? (
+        <video
+          className="max-h-full max-w-full object-contain select-none transition-transform duration-150"
+          autoPlay
+          controls
+          onClick={(e) => e.stopPropagation()}
+          playsInline
+          src={items[index].url}
+          style={offsetX ? { transform: `translateX(${offsetX}px)`, transition: 'none' } : undefined}
+        />
+      ) : (
+        <img
+          alt=""
+          className="max-h-full max-w-full object-contain select-none transition-transform duration-150"
+          draggable={false}
+          onClick={(e) => e.stopPropagation()}
+          src={items[index]?.url ?? ''}
+          style={offsetX ? { transform: `translateX(${offsetX}px)`, transition: 'none' } : undefined}
+        />
+      )}
 
-      {urls.length > 1 ? (
+      {items.length > 1 ? (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-white/60">
-          {index + 1} / {urls.length}
+          {index + 1} / {items.length}
         </div>
       ) : null}
     </div>

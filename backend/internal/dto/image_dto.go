@@ -13,6 +13,7 @@ type ImageResponse struct {
 	EndAt        string   `json:"endAt,omitempty"`
 	CapturedAt   string   `json:"capturedAt,omitempty"`
 	ImageURLs    []string `json:"imageUrls"`
+	AssetTypes   []string `json:"assetTypes,omitempty"`
 	ImagePaths   []string `json:"imagePaths"`
 	MetadataPath string   `json:"metadataPath"`
 	CreatedAt    string   `json:"createdAt"`
@@ -22,7 +23,7 @@ type ImageResponse struct {
 	Liked        bool     `json:"liked"`
 }
 
-func NewImageResponse(image model.Image, assetURLs []string) ImageResponse {
+func NewImageResponse(image model.Image, assetURLs []string, assetTypes []string) ImageResponse {
 	image.NormalizeTimeFields()
 	response := ImageResponse{
 		ID:           image.ID,
@@ -34,6 +35,7 @@ func NewImageResponse(image model.Image, assetURLs []string) ImageResponse {
 		StartAt:      image.StartAt.Format("2006-01-02T15:04:05-07:00"),
 		CapturedAt:   image.StartAt.Format("2006-01-02T15:04:05-07:00"),
 		ImageURLs:    assetURLs,
+		AssetTypes:   assetTypes,
 		ImagePaths:   image.AllImagePaths(),
 		MetadataPath: image.MetadataPath,
 		CreatedAt:    image.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
@@ -55,6 +57,7 @@ type CommentResponse struct {
 	Text        string `json:"text"`
 	ImageUrl    string `json:"imageUrl,omitempty"`
 	ImageURLs   []string `json:"imageUrls,omitempty"`
+	AssetTypes  []string `json:"assetTypes,omitempty"`
 	CreatedAt   string `json:"createdAt"`
 	LikeCount   int    `json:"likeCount"`
 	Liked       bool   `json:"liked"`

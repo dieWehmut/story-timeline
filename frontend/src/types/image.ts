@@ -1,4 +1,5 @@
 export type ImageTimeMode = 'point' | 'range';
+export type MediaType = 'image' | 'video';
 
 export interface ImageItem {
   id: string;
@@ -11,6 +12,7 @@ export interface ImageItem {
   endAt?: string;
   capturedAt?: string;
   imageUrls: string[];
+  assetTypes?: MediaType[];
   imagePaths: string[];
   metadataPath: string;
   createdAt: string;
@@ -82,6 +84,7 @@ export interface CommentItem {
   text: string;
   imageUrl?: string;
   imageUrls?: string[];
+  assetTypes?: MediaType[];
   createdAt: string;
   likeCount: number;
   liked: boolean;

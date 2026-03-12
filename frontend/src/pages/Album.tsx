@@ -6,6 +6,7 @@ import { TimeColumn } from '../layouts/TimeColumn';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
 import { ImageViewer } from '../ui/ImageViewer';
+import type { MediaItem } from '../lib/media';
 import type { ImageItem, TimelineMonth } from '../types/image';
 
 interface AlbumProps {
@@ -255,7 +256,7 @@ export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps
   const [activeTab, setActiveTab] = useState<TabKey>('albums');
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [activeMonth, setActiveMonth] = useState<TimelineMonth | null>(null);
-  const [viewer, setViewer] = useState<{ urls: string[]; index: number } | null>(null);
+  const [viewer, setViewer] = useState<{ items: MediaItem[]; index: number } | null>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -393,8 +394,8 @@ export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps
         ? photoEntries
         : [];
 
-  const viewerUrls = useMemo(
-    () => currentPhotoEntries.map((entry) => entry.url),
+  const viewerItems = useMemo(
+    () => currentPhotoEntries.map((entry) => ({ url: entry.url, type: 'image' as const })),
     [currentPhotoEntries]
   );
   const viewerIndexMap = useMemo(() => {
@@ -408,7 +409,7 @@ export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps
   const handlePhotoClick = (entryId: string) => {
     const index = viewerIndexMap.get(entryId);
     if (index === undefined) return;
-    setViewer({ urls: viewerUrls, index });
+    setViewer({ items: viewerItems, index });
   };
 
   const handleTabChange = (tab: TabKey) => {
@@ -556,7 +557,7 @@ export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps
         <ImageViewer
           initialIndex={viewer.index}
           onClose={() => setViewer(null)}
-          urls={viewer.urls}
+          items={viewer.items}
         />
       ) : null}
     </div>
