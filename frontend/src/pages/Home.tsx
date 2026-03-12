@@ -17,11 +17,25 @@ interface NavCardProps {
   to?: string;
   href?: string;
   external?: boolean;
+  disabled?: boolean;
 }
 
-function NavCard({ icon: Icon, label, to, href, external }: NavCardProps) {
+function NavCard({ icon: Icon, label, to, href, external, disabled }: NavCardProps) {
   const baseClass =
     'group flex h-28 w-full flex-col items-center justify-center gap-2 rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg)] text-[var(--text-main)] shadow-[var(--panel-shadow)] transition hover:-translate-y-0.5 hover:border-[var(--text-accent)]';
+
+  if (disabled) {
+    return (
+      <div
+        aria-disabled="true"
+        className={`${baseClass} cursor-not-allowed opacity-40`}
+        title="请先登录"
+      >
+        <Icon className="home-nav-icon text-cyan-300" size={26} />
+        <span className="text-sm">{label}</span>
+      </div>
+    );
+  }
 
   if (to) {
     return (
@@ -51,6 +65,7 @@ export default function Home({ auth, images, theme, onThemeToggle }: HomeProps) 
   const androidUrl = `${repoUrl}/releases/latest`;
   const albumUser = auth.user?.login || githubOwner;
   const albumUrl = `/album?user=${encodeURIComponent(albumUser)}`;
+  const albumDisabled = !auth.authenticated;
 
   return (
     <div className="min-h-screen pb-28">
@@ -101,7 +116,7 @@ export default function Home({ auth, images, theme, onThemeToggle }: HomeProps) 
 
         <div className="mt-10 grid w-full max-w-xl grid-cols-2 gap-4">
           <NavCard icon={BookOpen} label="物语" to="/story" />
-          <NavCard icon={ImageIcon} label="相册" to={albumUrl} />
+          <NavCard icon={ImageIcon} label="相册" to={albumUrl} disabled={albumDisabled} />
           <NavCard icon={Github} label="代码仓库" href={repoUrl} external />
           <NavCard icon={Download} label="Android" href={androidUrl} external />
         </div>

@@ -152,6 +152,7 @@ export default function Story({
     <div className="relative min-h-screen overflow-x-hidden">
       <Header
         activeMonth={activeMonth}
+        authAuthenticated={auth.authenticated}
         authLoading={auth.loading}
         authUser={auth.user}
         canPost={auth.canPost}

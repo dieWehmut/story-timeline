@@ -13,7 +13,7 @@ interface TimeColumnProps {
 export function TimeColumn({ activeMonth, months, onJump, onToggleOrder, open, order }: TimeColumnProps) {
   return (
     <aside
-      className={`fixed right-0 top-0 z-40 h-screen w-[5.5rem] overflow-y-auto overflow-x-hidden bg-[var(--page-bg-soft)] px-3 py-6 shadow-[var(--timeline-shadow)] transition-transform duration-300 ease-in-out md:w-24 md:px-4 ${
+      className={`fixed right-0 top-0 z-[60] h-screen w-[5.5rem] overflow-y-auto overflow-x-hidden bg-[var(--page-bg-soft)] px-3 py-6 shadow-[var(--timeline-shadow)] transition-transform duration-300 ease-in-out md:w-24 md:px-4 ${
         open ? 'translate-x-0' : 'pointer-events-none translate-x-full'
       }`}
       style={{ scrollbarWidth: 'none' }}

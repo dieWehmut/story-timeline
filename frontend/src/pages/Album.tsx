@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image as ImageIcon, Layers, Video } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlbumHeader } from '../layouts/AlbumHeader';
 import { TimeColumn } from '../layouts/TimeColumn';
+import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
 import { ImageViewer } from '../ui/ImageViewer';
 import type { ImageItem, TimelineMonth } from '../types/image';
 
 interface AlbumProps {
+  auth: ReturnType<typeof useAuth>;
   images: ReturnType<typeof useImages>;
   theme: 'dark' | 'light';
   onThemeToggle: () => void;
@@ -249,7 +251,7 @@ const buildTimelineMonths = (entries: MediaEntry[], order: 'asc' | 'desc'): Time
   );
 };
 
-export default function Album({ images, theme, onThemeToggle }: AlbumProps) {
+export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('albums');
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [activeMonth, setActiveMonth] = useState<TimelineMonth | null>(null);
@@ -261,6 +263,10 @@ export default function Album({ images, theme, onThemeToggle }: AlbumProps) {
   const tagParam = searchParams.get('tag');
   const activeUser = userParam && userParam.trim() ? userParam.trim() : null;
   const activeTagKey = tagParam ? normalizeTag(tagParam) : null;
+
+  if (!auth.loading && !auth.authenticated) {
+    return <Navigate replace to="/" />;
+  }
 
   useEffect(() => {
     if (activeTagKey) {

@@ -72,7 +72,7 @@ function App() {
             />
             <Route
               path="/album"
-              element={<Album images={images} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+              element={<Album auth={auth} images={images} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
             />
             <Route
               path="/post"

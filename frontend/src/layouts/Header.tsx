@@ -9,6 +9,7 @@ import type { AuthUser, FeedUser, TimelineMonth } from '../types/image';
 
 interface HeaderProps {
   activeMonth: TimelineMonth | null;
+  authAuthenticated: boolean;
   authLoading: boolean;
   authUser: AuthUser | null;
   canPost: boolean;
@@ -31,6 +32,7 @@ interface HeaderProps {
 
 export function Header({
   activeMonth,
+  authAuthenticated,
   authLoading,
   authUser,
   canPost,
@@ -80,7 +82,7 @@ export function Header({
           ) : (
             <>
               <HomeButton />
-              <AuthButton loading={authLoading} onLogin={onLogin} onLogout={onLogout} user={authUser} />
+              <AuthButton authenticated={authAuthenticated} loading={authLoading} onLogin={onLogin} onLogout={onLogout} user={authUser} />
               <ThemeButton onToggle={onThemeToggle} theme={theme} />
               {authUser && canPost ? <UploadButton busy={uploadBusy} /> : null}
               <div className={`transition-all duration-300 ${timelineOpen ? 'pointer-events-none scale-75 opacity-0' : 'opacity-100'}`}>
