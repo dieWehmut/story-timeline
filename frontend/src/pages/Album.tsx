@@ -6,6 +6,7 @@ import { TimeColumn } from '../layouts/TimeColumn';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
 import { ImageViewer } from '../ui/ImageViewer';
+import { normalizeAssetTypes } from '../lib/media';
 import type { MediaItem } from '../lib/media';
 import type { ImageItem, TimelineMonth } from '../types/image';
 
@@ -28,18 +29,6 @@ const dateFormatter = new Intl.DateTimeFormat('sv-SE', {
 const toDateKey = (value: string) => dateFormatter.format(new Date(value));
 
 const normalizeTag = (value: string) => value.trim().toLowerCase();
-
-const isVideoUrl = (url: string) => {
-  const clean = url.split('?')[0].toLowerCase();
-  return (
-    clean.endsWith('.mp4') ||
-    clean.endsWith('.mov') ||
-    clean.endsWith('.webm') ||
-    clean.endsWith('.m4v') ||
-    clean.endsWith('.avi') ||
-    clean.endsWith('.mkv')
-  );
-};
 
 type MediaEntry = {
   id: string;
@@ -163,9 +152,10 @@ const buildMediaEntries = (items: ImageItem[]) => {
     const dateKey = toDateKey(item.startAt);
     const tagKeys = (item.tags ?? []).map(normalizeTag).filter(Boolean);
     const urls = item.imageUrls ?? [];
+    const types = normalizeAssetTypes(urls, item.assetTypes);
 
     urls.forEach((url, index) => {
-      const type = isVideoUrl(url) ? 'video' : 'photo';
+      const type = types[index] === 'video' ? 'video' : 'photo';
       const entry: MediaEntry = {
         id: `${item.id}-${index}`,
         url,
@@ -182,7 +172,7 @@ const buildMediaEntries = (items: ImageItem[]) => {
       }
     });
 
-    const photoUrls = urls.filter((url) => !isVideoUrl(url));
+    const photoUrls = urls.filter((_, index) => types[index] !== 'video');
     (item.tags ?? []).forEach((tag) => {
       const key = normalizeTag(tag);
       if (!key) return;

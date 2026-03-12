@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
-import { ToastContext } from './ToastContext';
+import { ToastContext } from '../utils/ToastContext';
 
 interface ToastItem {
   id: number;

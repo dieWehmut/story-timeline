@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Play, Plus, Trash2, X } from 'lucide-react';
 import { ImageViewer } from './ImageViewer';
-import { useToast } from './useToast';
+import { useToast } from '../utils/useToast';
 import { setPostDialogOpen } from '../lib/uiFlags';
 import { isVideoUrl, mediaTypeFromFile } from '../lib/media';
 import type { MediaType } from '../types/image';

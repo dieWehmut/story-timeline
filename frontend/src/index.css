@@ -195,6 +195,16 @@
     color: #111827;
   }
 
+  :root[data-theme='light'] .follow-btn {
+    color: #000000 !important;
+    border-color: #000000 !important;
+  }
+
+  :root[data-theme='light'] .follow-btn:hover {
+    color: #000000 !important;
+    border-color: #000000 !important;
+  }
+
   :root[data-theme='light'] .album-tab {
     color: #111827;
   }

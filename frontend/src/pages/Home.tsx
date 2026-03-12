@@ -1,11 +1,10 @@
-﻿import { useState } from 'react';
-import { BookOpen, Download, Github, Image as ImageIcon, LogIn, LogOut, UserCheck, Users } from 'lucide-react';
+﻿import { BookOpen, Download, Github, Image as ImageIcon, UserCheck, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { AuthButton } from '../layouts/AuthButton';
 import { ThemeButton } from '../layouts/ThemeButton';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
 import { useFollows } from '../hooks/useFollows';
-import { LoginModal } from '../ui/LoginModal';
 
 interface HomeProps {
   auth: ReturnType<typeof useAuth>;
@@ -68,7 +67,6 @@ function NavCard({ icon: Icon, label, subLabel, to, href, external, disabled }: 
 }
 
 export default function Home({ auth, images, follows, theme, onThemeToggle }: HomeProps) {
-  const [loginOpen, setLoginOpen] = useState(false);
   const githubOwner = images.stats.githubOwner || auth.user?.login || 'GitHub';
   const repoUrl = `https://github.com/${githubOwner}/story-timeline`;
   const androidUrl = `${repoUrl}/releases/latest`;
@@ -78,65 +76,50 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
   const followsDisabled = !auth.authenticated;
   const followingCount = follows.following.length;
   const followerCount = follows.followers.length;
+  const authAuthenticated = auth.authenticated;
+  const authLoading = auth.loading;
+  const authLoginUrl = auth.loginUrl;
+  const authGoogleLoginUrl = auth.googleLoginUrl;
+  const authUser = auth.user;
+  const onLogin = auth.loginWith;
+  const onLogout = auth.logout;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <header className="px-4 pt-3">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
           <div className="flex items-center gap-3">
-            {auth.user ? (
-              <>
-                <span className="text-sm font-medium text-[var(--text-main)]">{auth.user.login}</span>
-                <button
-                  className="inline-flex items-center gap-2 rounded-full border border-[var(--panel-border)] px-3 py-1.5 text-sm text-[var(--text-main)] transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)]"
-                  onClick={() => void auth.logout()}
-                  type="button"
-                >
-                  <LogOut size={16} />
-                  登出
-                </button>
-              </>
-            ) : (
-              <button
-                className="inline-flex items-center gap-2 rounded-full border border-[var(--panel-border)] px-3 py-1.5 text-sm text-[var(--text-main)] transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)]"
-                onClick={() => setLoginOpen(true)}
-                type="button"
-              >
-                <LogIn size={16} />
-                登录
-              </button>
-            )}
+            <AuthButton
+              authenticated={authAuthenticated}
+              loading={authLoading}
+              loginUrl={authLoginUrl}
+              googleLoginUrl={authGoogleLoginUrl}
+              onLogin={onLogin}
+              onLogout={onLogout}
+              user={authUser}
+            />
+            {authUser ? (
+              <span className="text-sm font-medium text-[var(--text-main)]">{authUser.login}</span>
+            ) : null}
           </div>
           <ThemeButton onToggle={onThemeToggle} theme={theme} />
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center px-4 pb-14 pt-2 text-center">
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center px-4 pb-14 pt-0 text-center">
         <h1 className="font-serif text-4xl font-semibold tracking-wide text-[var(--text-main)] md:text-5xl">物语集</h1>
-        <p className="mt-2 text-sm text-soft">
-          用户数：{images.stats.userCount}
-        </p>
+        <p className="mt-1 text-sm text-soft">记录故事</p>
 
         <div className="mt-6 grid w-full max-w-xl grid-cols-2 gap-4">
           <NavCard icon={BookOpen} label="物语" to="/story" />
           <NavCard icon={ImageIcon} label="相册" to={albumUrl} disabled={albumDisabled} />
           <NavCard icon={UserCheck} label="关注" to="/following" disabled={followsDisabled} subLabel={auth.authenticated ? `${followingCount} 人` : undefined} />
           <NavCard icon={Users} label="粉丝" to="/follower" disabled={followsDisabled} subLabel={auth.authenticated ? `${followerCount} 人` : undefined} />
-          
-          
+
           <NavCard icon={Github} label="代码仓库" href={repoUrl} external />
           <NavCard icon={Download} label="Android" href={androidUrl} external />
         </div>
       </main>
-
-      <LoginModal
-        open={loginOpen}
-        onClose={() => setLoginOpen(false)}
-        onSelect={auth.loginWith}
-        showGoogle={!!auth.googleLoginUrl}
-      />
     </div>
   );
 }
-
-

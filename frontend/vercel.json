@@ -11,6 +11,10 @@
     {
       "source": "/api/:path*",
       "destination": "/api/proxy?target=/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/"
     }
   ]
 }

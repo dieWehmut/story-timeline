@@ -8,7 +8,7 @@ import { ImageViewer } from '../ui/ImageViewer';
 
 import { FollowButton } from '../ui/FollowButton';
 
-import { useToast } from '../ui/useToast';
+import { useToast } from '../utils/useToast';
 
 import { api } from '../lib/api';
 
@@ -142,15 +142,15 @@ const toDisplayDateTime = (value: string) => {
 
   if (dateKey === todayKey) {
 
-    label = '浠婂ぉ';
+    label = '今天';
 
   } else if (dateKey === yesterdayKey) {
 
-    label = '鏄ㄥぉ';
+    label = '昨天';
 
   } else if (dateKey === beforeYesterdayKey) {
 
-    label = '鍓嶅ぉ';
+    label = '前天';
 
   }
 

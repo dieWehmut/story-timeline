@@ -6,7 +6,7 @@ import { ImageViewer } from './ImageViewer';
 
 import { FollowButton } from './FollowButton';
 
-import { useToast } from './useToast';
+import { useToast } from '../utils/useToast';
 
 import { api } from '../lib/api';
 
