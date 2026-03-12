@@ -49,6 +49,8 @@ export default function Home({ auth, images, theme, onThemeToggle }: HomeProps) 
   const githubOwner = images.stats.githubOwner || auth.user?.login || 'GitHub';
   const repoUrl = `https://github.com/${githubOwner}/story-timeline`;
   const androidUrl = `${repoUrl}/releases/latest`;
+  const albumUser = auth.user?.login || githubOwner;
+  const albumUrl = `/album?user=${encodeURIComponent(albumUser)}`;
 
   return (
     <div className="min-h-screen pb-28">
@@ -99,7 +101,7 @@ export default function Home({ auth, images, theme, onThemeToggle }: HomeProps) 
 
         <div className="mt-10 grid w-full max-w-xl grid-cols-2 gap-4">
           <NavCard icon={BookOpen} label="物语" to="/story" />
-          <NavCard icon={ImageIcon} label="相册" to="/album" />
+          <NavCard icon={ImageIcon} label="相册" to={albumUrl} />
           <NavCard icon={Github} label="代码仓库" href={repoUrl} external />
           <NavCard icon={Download} label="Android" href={androidUrl} external />
         </div>

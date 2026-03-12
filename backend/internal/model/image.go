@@ -77,14 +77,23 @@ type ImageIndex struct {
 
 // Like represents a single like on a post. Stored in the post owner's repo.
 type Like struct {
-	Login     string    `json:"login"`
-	AvatarURL string    `json:"avatarUrl"`
-	LikedAt   time.Time `json:"likedAt"`
+  Login     string    `json:"login"`
+  AvatarURL string    `json:"avatarUrl"`
+  LikedAt   time.Time `json:"likedAt"`
+}
+
+// PostLike represents a like with its post context.
+type PostLike struct {
+  PostOwner string    `json:"postOwner"`
+  PostID    string    `json:"postId"`
+  Login     string    `json:"login"`
+  AvatarURL string    `json:"avatarUrl"`
+  LikedAt   time.Time `json:"likedAt"`
 }
 
 // LikeFile is persisted as likes/{postID}.json in the post owner's repo.
 type LikeFile struct {
-	Likes []Like `json:"likes"`
+  Likes []Like `json:"likes"`
 }
 
 // CommentLike represents a like on a comment. Stored in Supabase.

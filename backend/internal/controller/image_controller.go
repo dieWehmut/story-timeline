@@ -163,22 +163,68 @@ func (controller *ImageController) Feed(c *gin.Context) {
 
 	items := controller.imageService.GetFeed(c.Request.Context(), tokenFromSession(session), feedLogins)
 	response := make([]dto.ImageResponse, 0, len(items))
+	if len(items) == 0 {
+		c.JSON(http.StatusOK, response)
+		return
+	}
+
+	postOwners := make([]string, 0, len(items))
+	postIDs := make([]string, 0, len(items))
+	ownerSeen := map[string]struct{}{}
+	idSeen := map[string]struct{}{}
+	validKeys := map[string]struct{}{}
+
 	for _, item := range items {
 		ownerLogin := item.AuthorLogin
 		if ownerLogin == "" {
 			ownerLogin = adminLogin
 		}
-		resp := dto.NewImageResponse(item, controller.assetURLs(item.AllImagePaths()))
+		key := strings.ToLower(ownerLogin) + "|" + item.ID
+		validKeys[key] = struct{}{}
 
-		likeCount, commentCount := controller.interactionService.GetPostInteractionCounts(
-			c.Request.Context(), tokenFromSession(session), ownerLogin, item.ID, allLogins,
-		)
-		resp.LikeCount = likeCount
-		resp.CommentCount = commentCount
+		if _, ok := ownerSeen[strings.ToLower(ownerLogin)]; !ok {
+			ownerSeen[strings.ToLower(ownerLogin)] = struct{}{}
+			postOwners = append(postOwners, ownerLogin)
+		}
+		if _, ok := idSeen[item.ID]; !ok {
+			idSeen[item.ID] = struct{}{}
+			postIDs = append(postIDs, item.ID)
+		}
+	}
+
+	likeCounts := map[string]int{}
+	likedByViewer := map[string]bool{}
+	for _, like := range controller.interactionService.GetLikesByPosts(c.Request.Context(), postOwners, postIDs) {
+		key := strings.ToLower(like.PostOwner) + "|" + like.PostID
+		if _, ok := validKeys[key]; !ok {
+			continue
+		}
+		likeCounts[key] += 1
+		if viewerLogin != "" && strings.EqualFold(like.Login, viewerLogin) {
+			likedByViewer[key] = true
+		}
+	}
+
+	commentCounts := map[string]int{}
+	for _, comment := range controller.interactionService.GetCommentsByPosts(c.Request.Context(), postOwners, postIDs, allLogins) {
+		key := strings.ToLower(comment.PostOwner) + "|" + comment.PostID
+		if _, ok := validKeys[key]; !ok {
+			continue
+		}
+		commentCounts[key] += 1
+	}
+
+	for _, item := range items {
+		ownerLogin := item.AuthorLogin
+		if ownerLogin == "" {
+			ownerLogin = adminLogin
+		}
+		key := strings.ToLower(ownerLogin) + "|" + item.ID
+		resp := dto.NewImageResponse(item, controller.assetURLs(item.AllImagePaths()))
+		resp.LikeCount = likeCounts[key]
+		resp.CommentCount = commentCounts[key]
 		if viewerLogin != "" {
-			resp.Liked = controller.interactionService.IsLikedBy(
-				c.Request.Context(), tokenFromSession(session), ownerLogin, item.ID, viewerLogin,
-			)
+			resp.Liked = likedByViewer[key]
 		}
 
 		response = append(response, resp)

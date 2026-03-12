@@ -103,6 +103,14 @@ func (service *InteractionService) GetLikes(ctx context.Context, _ string, owner
 	return likes
 }
 
+func (service *InteractionService) GetLikesByPosts(ctx context.Context, postOwners []string, postIDs []string) []model.PostLike {
+	likes, err := service.database.ListLikesByPosts(ctx, postOwners, postIDs)
+	if err != nil {
+		return []model.PostLike{}
+	}
+	return likes
+}
+
 func (service *InteractionService) GetCommentLikesByPost(ctx context.Context, postOwner, postID string) []model.CommentLike {
 	likes, err := service.database.ListCommentLikesByPost(ctx, postOwner, postID)
 	if err != nil {
@@ -160,6 +168,14 @@ func (service *InteractionService) GetAllComments(ctx context.Context, _ string,
 		result = append(result, CommentWithAuthor{Comment: comment, AuthorLogin: comment.AuthorLogin})
 	}
 	return result
+}
+
+func (service *InteractionService) GetCommentsByPosts(ctx context.Context, postOwners []string, postIDs []string, feedLogins []string) []model.Comment {
+	comments, err := service.database.ListCommentsByPosts(ctx, postOwners, postIDs, uniqueStrings(feedLogins))
+	if err != nil {
+		return []model.Comment{}
+	}
+	return comments
 }
 
 type CommentWithAuthor struct {

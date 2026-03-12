@@ -190,6 +190,35 @@ func (storage *SupabaseStorage) ListLikes(ctx context.Context, ownerLogin string
 	return &model.LikeFile{Likes: likes}, nil
 }
 
+func (storage *SupabaseStorage) ListLikesByPosts(ctx context.Context, ownerLogins []string, postIDs []string) ([]model.PostLike, error) {
+	if len(ownerLogins) == 0 || len(postIDs) == 0 {
+		return []model.PostLike{}, nil
+	}
+
+	params := url.Values{}
+	params.Set("select", "post_owner,post_id,login,avatar_url,liked_at")
+	params.Set("post_owner", inFilter(ownerLogins))
+	params.Set("post_id", inFilter(postIDs))
+	params.Set("order", "liked_at.asc")
+
+	var records []likeRecord
+	if err := storage.requestJSON(ctx, http.MethodGet, "/likes", params, nil, &records, nil); err != nil {
+		return nil, err
+	}
+
+	likes := make([]model.PostLike, 0, len(records))
+	for _, record := range records {
+		likes = append(likes, model.PostLike{
+			PostOwner: record.PostOwner,
+			PostID:    record.PostID,
+			Login:     record.Login,
+			AvatarURL: record.AvatarURL,
+			LikedAt:   record.LikedAt,
+		})
+	}
+	return likes, nil
+}
+
 func (storage *SupabaseStorage) UpsertLike(ctx context.Context, ownerLogin string, postID string, like model.Like) error {
 	payload := []likeRecord{{PostOwner: ownerLogin, PostID: postID, Login: like.Login, AvatarURL: like.AvatarURL, LikedAt: like.LikedAt}}
 	prefer := []string{"resolution=merge-duplicates"}
@@ -482,4 +511,30 @@ func inFilter(values []string) string {
 		parts = append(parts, fmt.Sprintf("\"%s\"", strings.ReplaceAll(trimmed, "\"", "\\\"")))
 	}
 	return "in.(" + strings.Join(parts, ",") + ")"
+}
+
+func (storage *SupabaseStorage) ListCommentsByPosts(ctx context.Context, postOwners []string, postIDs []string, authorLogins []string) ([]model.Comment, error) {
+	if len(postOwners) == 0 || len(postIDs) == 0 || len(authorLogins) == 0 {
+		return []model.Comment{}, nil
+	}
+
+	params := url.Values{}
+	params.Set("select", "id,post_owner,post_id,author_login,author_avatar,parent_id,reply_to_user_login,text,image_paths,deleted,hidden,created_at")
+	params.Set("post_owner", inFilter(postOwners))
+	params.Set("post_id", inFilter(postIDs))
+	params.Set("author_login", inFilter(authorLogins))
+	params.Set("deleted", "eq.false")
+	params.Set("hidden", "eq.false")
+	params.Set("order", "created_at.asc")
+
+	var records []commentRecord
+	if err := storage.requestJSON(ctx, http.MethodGet, "/comments", params, nil, &records, nil); err != nil {
+		return nil, err
+	}
+
+	comments := make([]model.Comment, 0, len(records))
+	for _, record := range records {
+		comments = append(comments, record.toModel())
+	}
+	return comments, nil
 }

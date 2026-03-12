@@ -8,7 +8,7 @@ interface AppLayoutProps {
 
 export function AppLayout({ footerStats }: AppLayoutProps) {
   const location = useLocation();
-  const hideFooter = location.pathname.startsWith('/album');
+  const hideFooter = location.pathname.startsWith('/album') || location.pathname.startsWith('/post');
 
   return (
     <div className="min-h-screen">

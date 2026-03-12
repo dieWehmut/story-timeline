@@ -257,7 +257,9 @@ export default function Album({ images, theme, onThemeToggle }: AlbumProps) {
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const userParam = searchParams.get('user');
   const tagParam = searchParams.get('tag');
+  const activeUser = userParam && userParam.trim() ? userParam.trim() : null;
   const activeTagKey = tagParam ? normalizeTag(tagParam) : null;
 
   useEffect(() => {
@@ -270,11 +272,19 @@ export default function Album({ images, theme, onThemeToggle }: AlbumProps) {
     sectionRefs.current = {};
     setActiveMonth(null);
     setTimelineOpen(false);
-  }, [activeTab, activeTagKey]);
+  }, [activeTab, activeTagKey, activeUser]);
+
+  const scopedItems = useMemo(() => {
+    if (!activeUser) return images.allItems;
+    const normalized = activeUser.toLowerCase();
+    return images.allItems.filter(
+      (item) => item.authorLogin.toLowerCase() === normalized
+    );
+  }, [images.allItems, activeUser]);
 
   const { albumCards, photoEntries, videoEntries } = useMemo(
-    () => buildMediaEntries(images.allItems),
-    [images.allItems]
+    () => buildMediaEntries(scopedItems),
+    [scopedItems]
   );
 
   const albumCount = albumCards.length;
@@ -398,12 +408,19 @@ export default function Album({ images, theme, onThemeToggle }: AlbumProps) {
   const handleTabChange = (tab: TabKey) => {
     setActiveTab(tab);
     if (tab !== 'albums' && activeTagKey) {
-      setSearchParams({});
+      const params = new URLSearchParams();
+      if (activeUser) {
+        params.set('user', activeUser);
+      }
+      setSearchParams(params);
     }
   };
 
   const handleAlbumClick = (tag: string) => {
     const params = new URLSearchParams();
+    if (activeUser) {
+      params.set('user', activeUser);
+    }
     params.set('tag', tag);
     setSearchParams(params);
     setActiveTab('albums');

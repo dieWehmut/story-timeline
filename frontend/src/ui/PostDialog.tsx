@@ -137,6 +137,8 @@ export function PostDialog({
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [dragPointer, setDragPointer] = useState<{ x: number; y: number } | null>(null);
   const [draggingUrl, setDraggingUrl] = useState<string | null>(null);
+  const dragPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const dragPointerRaf = useRef<number | null>(null);
   const previewsRef = useRef<PreviewItem[]>(previews);
   const { toast } = useToast();
   const tagSuggestionsKey = tagSuggestions.join(',');
@@ -216,6 +218,12 @@ export function PostDialog({
 
   useEffect(() => () => {
     revokeFilePreviews(previewsRef.current);
+  }, []);
+
+  useEffect(() => () => {
+    if (dragPointerRaf.current !== null) {
+      cancelAnimationFrame(dragPointerRaf.current);
+    }
   }, []);
 
   useEffect(() => {
@@ -374,13 +382,33 @@ export function PostDialog({
     }
   };
 
+  const updateDragPointer = useCallback((x: number, y: number) => {
+    dragPointerRef.current = { x, y };
+    if (dragPointerRaf.current !== null) return;
+    dragPointerRaf.current = requestAnimationFrame(() => {
+      dragPointerRaf.current = null;
+      if (dragPointerRef.current) {
+        setDragPointer(dragPointerRef.current);
+      }
+    });
+  }, []);
+
+  const resetDragPointer = useCallback(() => {
+    dragPointerRef.current = null;
+    if (dragPointerRaf.current !== null) {
+      cancelAnimationFrame(dragPointerRaf.current);
+      dragPointerRaf.current = null;
+    }
+    setDragPointer(null);
+  }, []);
+
   const handleDragStart = (index: number, event?: React.DragEvent<HTMLDivElement>) => {
     setDraggingIndex(index);
     setDragOverIndex(index);
     const nextUrl = previewsRef.current[index]?.url ?? null;
     setDraggingUrl(nextUrl);
     if (event) {
-      setDragPointer({ x: event.clientX, y: event.clientY });
+      updateDragPointer(event.clientX, event.clientY);
     }
     if (event?.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
@@ -418,7 +446,7 @@ export function PostDialog({
     setDraggingIndex(null);
     setDragOverIndex(null);
     setOverDelete(false);
-    setDragPointer(null);
+    resetDragPointer();
     setDraggingUrl(null);
   };
 
@@ -428,7 +456,7 @@ export function PostDialog({
       const touch = event.touches[0];
       if (!touch) return;
       event.preventDefault();
-      setDragPointer({ x: touch.clientX, y: touch.clientY });
+      updateDragPointer(touch.clientX, touch.clientY);
 
       const rect = deleteZoneRef.current?.getBoundingClientRect();
       const isOver =
@@ -450,7 +478,7 @@ export function PostDialog({
         }
       }
     },
-    [draggingIndex, movePreview]
+    [draggingIndex, movePreview, updateDragPointer]
   );
 
   const handleTouchEnd = useCallback(() => {
@@ -460,9 +488,9 @@ export function PostDialog({
     setDraggingIndex(null);
     setDragOverIndex(null);
     setOverDelete(false);
-    setDragPointer(null);
+    resetDragPointer();
     setDraggingUrl(null);
-  }, [overDelete, draggingIndex, removePreview]);
+  }, [overDelete, draggingIndex, removePreview, resetDragPointer]);
 
   if (!open && !animating) return null;
 
@@ -570,7 +598,7 @@ export function PostDialog({
                 onDragEnd={handleDragEnd}
                 onDrag={(event) => {
                   if (draggingIndex !== null) {
-                    setDragPointer({ x: event.clientX, y: event.clientY });
+                    updateDragPointer(event.clientX, event.clientY);
                   }
                 }}
                 onDragOver={(event) => handleDragOver(index, event)}
@@ -580,7 +608,7 @@ export function PostDialog({
                   handleDragStart(index);
                   const touch = event.touches[0];
                   if (touch) {
-                    setDragPointer({ x: touch.clientX, y: touch.clientY });
+                    updateDragPointer(touch.clientX, touch.clientY);
                   }
                 }}
               >
