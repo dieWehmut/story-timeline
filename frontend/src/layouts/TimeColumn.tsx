@@ -18,7 +18,7 @@ export function TimeColumn({ activeMonth, months, onJump, onToggleOrder, open, o
       }`}
       style={{ scrollbarWidth: 'none' }}
     >
-      <div className="flex justify-center pb-2 text-center">
+      <div className="sticky top-0 z-10 -mx-3 flex justify-center bg-[var(--page-bg-soft)] px-3 pb-2 pt-1 text-center md:-mx-4 md:px-4">
         <button
           aria-label="切换时间排序"
           className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--panel-border)] text-[var(--text-main)] transition hover:text-[var(--text-accent)]"

@@ -195,6 +195,17 @@
     animation: page-fade 260ms ease-out both;
     will-change: opacity;
   }
+
+  .image-card-reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 420ms ease, transform 420ms ease;
+  }
+
+  .image-card-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes page-fade {
@@ -209,5 +220,11 @@
 @media (prefers-reduced-motion: reduce) {
   .page-transition {
     animation: none;
+  }
+
+  .image-card-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }

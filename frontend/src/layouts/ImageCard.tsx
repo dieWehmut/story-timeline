@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Heart, LoaderCircle, MessageCircle, PencilLine, Trash2 } from 'lucide-react';
 import { CommentDialog } from '../ui/CommentDialog';
 import { ImageViewer } from '../ui/ImageViewer';
@@ -140,6 +140,8 @@ export function ImageCard({
   const [commentBusy, setCommentBusy] = useState(false);
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
   const [commentImageViewer, setCommentImageViewer] = useState<{ urls: string[]; initialIndex: number } | null>(null);
+  const [revealed, setRevealed] = useState(false);
+  const cardRef = useRef<HTMLElement | null>(null);
   const { confirm } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -148,6 +150,26 @@ export function ImageCard({
   useEffect(() => {
     if (item.commentCount > 0) loadCommentsIfNeeded();
   }, [item.commentCount]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const node = cardRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setRevealed(true);
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { rootMargin: '0px 0px -10% 0px', threshold: 0.15 }
+    );
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   const actionColumnClass =
     'grid w-20 shrink-0 grid-cols-2 items-center justify-items-start pr-0';
@@ -251,7 +273,7 @@ export function ImageCard({
 
   return (
     <>
-      <article className="group" id={`story-${item.id}`}>
+      <article className={`group image-card-reveal ${revealed ? 'is-visible' : ''}`} id={`story-${item.id}`} ref={cardRef}>
         {/* Row 1: Author + Description (left) + Edit/Delete (right) */}
         <div className="flex pt-3">
           <div

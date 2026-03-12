@@ -27,7 +27,7 @@ export function FloatingActions({ hidden = false }: FloatingActionsProps) {
     'inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition-all duration-300 hover:scale-110 hover:text-[var(--text-accent)] active:scale-95';
 
   return (
-    <div className="fixed bottom-1 right-1 z-50">
+    <div className="fixed bottom-14 right-1 z-50">
       <button
         aria-label="回到顶部"
         className={iconBtnCls}
