@@ -55,7 +55,7 @@ func main() {
 			AuthController:   controller.NewAuthController(authService, userService, env.FrontendBaseURL),
 			FollowController: controller.NewFollowController(userService),
 			ImageController:  controller.NewImageController(imageService, userService, authService, interactionService, cloudinaryStorage),
-			HealthController: controller.NewHealthController(env.GitHubRepoOwner, authService),
+			HealthController: controller.NewHealthController(env.GitHubRepoOwner, authService, userService),
 			UploadController: controller.NewUploadController(cloudinaryStorage),
 			AuthService:      authService,
 		}, config.AllowedOrigins(env)),

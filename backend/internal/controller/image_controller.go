@@ -79,6 +79,13 @@ func (controller *ImageController) commentAssetURLs(comment model.Comment) ([]st
 	return controller.assetURLs(comment.AllImagePaths())
 }
 
+func authUserToGitHub(user model.AuthUser) model.GitHubUser {
+	return model.GitHubUser{
+		Login:     user.Login,
+		AvatarURL: user.AvatarURL,
+	}
+}
+
 func setAssetCacheHeaders(c *gin.Context) {
 	c.Header("Cache-Control", fmt.Sprintf("public, max-age=%d", assetCacheMaxAgeSeconds))
 	c.Header("Vary", "Accept-Encoding")
@@ -364,7 +371,7 @@ func (controller *ImageController) FeedUsers(c *gin.Context) {
 			users = append(users, feedUsers...)
 		}
 		// Include viewer if authenticated
-		users = append(users, session.User)
+		users = append(users, authUserToGitHub(session.User))
 	}
 
 	// Ensure admin is in the list
@@ -459,7 +466,7 @@ func (controller *ImageController) Create(c *gin.Context) {
 		image, err := controller.imageService.CreateWithAssets(
 			c.Request.Context(),
 			session.AccessToken,
-			session.User,
+			authUserToGitHub(session.User),
 			payload.Description,
 			tags,
 			timeMode,
@@ -508,7 +515,7 @@ func (controller *ImageController) Create(c *gin.Context) {
 		return
 	}
 
-	image, err := controller.imageService.Create(c.Request.Context(), session.AccessToken, session.User, c.Request.FormValue("description"), tags, timeMode, startAt, endAt, files)
+	image, err := controller.imageService.Create(c.Request.Context(), session.AccessToken, authUserToGitHub(session.User), c.Request.FormValue("description"), tags, timeMode, startAt, endAt, files)
 	if err != nil {
 		_ = c.Error(err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -721,7 +728,7 @@ func (controller *ImageController) ToggleLike(c *gin.Context) {
 		return
 	}
 
-	lf, err := controller.interactionService.ToggleLike(c.Request.Context(), session.AccessToken, ownerLogin, postID, session.User)
+	lf, err := controller.interactionService.ToggleLike(c.Request.Context(), session.AccessToken, ownerLogin, postID, authUserToGitHub(session.User))
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
@@ -753,7 +760,7 @@ func (controller *ImageController) ToggleCommentLike(c *gin.Context) {
 		return
 	}
 
-	likeCount, liked, err := controller.interactionService.ToggleCommentLike(c.Request.Context(), ownerLogin, postID, commentID, session.User)
+	likeCount, liked, err := controller.interactionService.ToggleCommentLike(c.Request.Context(), ownerLogin, postID, commentID, authUserToGitHub(session.User))
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
@@ -895,7 +902,7 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 			comment, err := controller.interactionService.AddCommentWithAssets(
 				c.Request.Context(),
 				session.AccessToken,
-				session.User,
+				authUserToGitHub(session.User),
 				ownerLogin,
 				postID,
 				text,
@@ -940,7 +947,7 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 		return
 	}
 
-	comment, err := controller.interactionService.AddComment(c.Request.Context(), session.AccessToken, session.User, ownerLogin, postID, text, files, parentID, replyToUserLogin)
+	comment, err := controller.interactionService.AddComment(c.Request.Context(), session.AccessToken, authUserToGitHub(session.User), ownerLogin, postID, text, files, parentID, replyToUserLogin)
 	if err != nil {
 		_ = c.Error(err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
@@ -989,7 +996,7 @@ func (controller *ImageController) DeleteComment(c *gin.Context) {
 	}
 
 	if err := controller.interactionService.DeleteComment(
-		c.Request.Context(), session.AccessToken, session.User,
+		c.Request.Context(), session.AccessToken, authUserToGitHub(session.User),
 		commenterLogin, ownerLogin, postID, commentID,
 	); err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})

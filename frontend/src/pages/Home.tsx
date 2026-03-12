@@ -80,8 +80,8 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
   const followerCount = follows.followers.length;
 
   return (
-    <div className="min-h-screen pb-28">
-      <header className="px-4 pt-4">
+    <div className="flex h-screen flex-col overflow-hidden">
+      <header className="px-4 pt-3">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
           <div className="flex items-center gap-3">
             {auth.user ? (
@@ -111,13 +111,13 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-col items-center px-4 pt-16 text-center">
-        <h1 className="font-serif text-4xl font-semibold tracking-wide text-[var(--text-main)] md:text-5xl">物语</h1>
-        <p className="mt-3 text-sm text-soft">
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center px-4 pb-14 pt-2 text-center">
+        <h1 className="font-serif text-4xl font-semibold tracking-wide text-[var(--text-main)] md:text-5xl">物语集</h1>
+        <p className="mt-2 text-sm text-soft">
           用户数：{images.stats.userCount}
         </p>
 
-        <div className="mt-10 grid w-full max-w-xl grid-cols-2 gap-4">
+        <div className="mt-6 grid w-full max-w-xl grid-cols-2 gap-4">
           <NavCard icon={BookOpen} label="物语" to="/story" />
           <NavCard icon={ImageIcon} label="相册" to={albumUrl} disabled={albumDisabled} />
           <NavCard icon={UserCheck} label="关注" to="/following" disabled={followsDisabled} subLabel={auth.authenticated ? `${followingCount} 人` : undefined} />

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -73,6 +74,15 @@ type followRecord struct {
 	FollowerLogin  string    `json:"follower_login"`
 	FollowingLogin string    `json:"following_login"`
 	CreatedAt      time.Time `json:"created_at"`
+}
+
+type userRecord struct {
+	Login      string    `json:"login"`
+	Provider   string    `json:"provider"`
+	ProviderID string    `json:"provider_id"`
+	AvatarURL  string    `json:"avatar_url"`
+	CreatedAt  time.Time `json:"created_at,omitempty"`
+	UpdatedAt  time.Time `json:"updated_at,omitempty"`
 }
 
 func NewSupabaseStorage(baseURL string, serviceKey string) *SupabaseStorage {
@@ -433,6 +443,69 @@ func (storage *SupabaseStorage) requestJSON(ctx context.Context, method string, 
 	return json.NewDecoder(resp.Body).Decode(out)
 }
 
+func (storage *SupabaseStorage) requestCount(ctx context.Context, tablePath string, params url.Values) (int, error) {
+	if strings.TrimSpace(storage.restURL) == "" || strings.TrimSpace(storage.serviceKey) == "" {
+		return 0, fmt.Errorf("Supabase is not configured")
+	}
+
+	endpoint := storage.restURL + tablePath
+	if encoded := params.Encode(); encoded != "" {
+		endpoint += "?" + encoded
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return 0, err
+	}
+
+	req.Header.Set("apikey", storage.serviceKey)
+	req.Header.Set("Authorization", "Bearer "+storage.serviceKey)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Prefer", "count=exact")
+	req.Header.Set("Range", "0-0")
+
+	resp, err := storage.httpClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= http.StatusBadRequest {
+		payload, _ := io.ReadAll(resp.Body)
+		return 0, fmt.Errorf("supabase %s %s failed: %s", http.MethodGet, tablePath, strings.TrimSpace(string(payload)))
+	}
+
+	if total, ok := parseContentRangeTotal(resp.Header.Get("Content-Range")); ok {
+		return total, nil
+	}
+
+	// fallback: decode and count
+	var records []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&records); err != nil {
+		return 0, err
+	}
+	return len(records), nil
+}
+
+func parseContentRangeTotal(value string) (int, bool) {
+	if value == "" {
+		return 0, false
+	}
+	parts := strings.Split(value, "/")
+	if len(parts) != 2 {
+		return 0, false
+	}
+	totalRaw := strings.TrimSpace(parts[1])
+	if totalRaw == "" || totalRaw == "*" {
+		return 0, false
+	}
+	total, err := strconv.Atoi(totalRaw)
+	if err != nil {
+		return 0, false
+	}
+	return total, true
+}
+
 func imageRecordFromModel(image model.Image) imageRecord {
 	return imageRecord{
 		ID:           image.ID,
@@ -560,6 +633,25 @@ func (storage *SupabaseStorage) UnfollowUser(ctx context.Context, followerLogin 
 	params.Set("follower_login", "eq."+followerLogin)
 	params.Set("following_login", "eq."+followingLogin)
 	return storage.requestJSON(ctx, http.MethodDelete, "/follows", params, nil, nil, nil)
+}
+
+func (storage *SupabaseStorage) UpsertUser(ctx context.Context, user model.AuthUser) error {
+	now := time.Now()
+	payload := []map[string]any{{
+		"login":       user.Login,
+		"provider":    user.Provider,
+		"provider_id": user.ID,
+		"avatar_url":  user.AvatarURL,
+		"updated_at":  now,
+	}}
+	prefer := []string{"resolution=merge-duplicates"}
+	return storage.requestJSON(ctx, http.MethodPost, "/users", url.Values{"on_conflict": []string{"login"}}, payload, nil, prefer)
+}
+
+func (storage *SupabaseStorage) CountUsers(ctx context.Context) (int, error) {
+	params := url.Values{}
+	params.Set("select", "login")
+	return storage.requestCount(ctx, "/user_logins", params)
 }
 
 func (storage *SupabaseStorage) ListFollowing(ctx context.Context, followerLogin string) ([]string, error) {

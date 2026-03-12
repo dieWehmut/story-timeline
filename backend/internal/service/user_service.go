@@ -83,6 +83,17 @@ func (service *UserService) UnfollowUser(ctx context.Context, followerLogin stri
 	return service.database.UnfollowUser(ctx, followerLogin, followingLogin)
 }
 
+func (service *UserService) UpsertUser(ctx context.Context, user model.AuthUser) error {
+	if strings.TrimSpace(user.Login) == "" {
+		return nil
+	}
+	return service.database.UpsertUser(ctx, user)
+}
+
+func (service *UserService) CountUsers(ctx context.Context) (int, error) {
+	return service.database.CountUsers(ctx)
+}
+
 func (service *UserService) GetFeedUsers(ctx context.Context, viewerLogin string) ([]model.GitHubUser, error) {
 	if viewerLogin == "" {
 		return []model.GitHubUser{}, nil

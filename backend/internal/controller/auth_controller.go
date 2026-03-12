@@ -62,8 +62,11 @@ func (controller *AuthController) callback(c *gin.Context, provider string) {
 		return
 	}
 
-	if controller.userService != nil && session.User.Provider == "github" {
-		_ = controller.userService.SyncGitHubFollows(c.Request.Context(), session.AccessToken, session.User.Login)
+	if controller.userService != nil {
+		_ = controller.userService.UpsertUser(c.Request.Context(), session.User)
+		if session.User.Provider == "github" {
+			_ = controller.userService.SyncGitHubFollows(c.Request.Context(), session.AccessToken, session.User.Login)
+		}
 	}
 
 	c.Redirect(http.StatusTemporaryRedirect, controller.publicBaseURL(c.Request))

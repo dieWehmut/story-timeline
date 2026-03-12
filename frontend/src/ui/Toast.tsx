@@ -38,21 +38,29 @@ function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: (id: nu
           : 'bg-slate-700/90';
 
   if (item.type === 'confirm') {
+    const dismissConfirm = () => {
+      item.onCancel?.();
+      setVisible(false);
+      setTimeout(() => onDismiss(item.id), 200);
+    };
+
     return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 pointer-events-auto">
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 pointer-events-auto"
+        onClick={dismissConfirm}
+      >
         <div
           className={`w-72 rounded-lg bg-[var(--panel-bg)] border border-[var(--panel-border)] px-5 py-4 text-sm text-[var(--text-main)] backdrop-blur-xl shadow-xl transition-all duration-200 ${
             visible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
           }`}
+          onClick={(event) => event.stopPropagation()}
         >
           <p className="text-center">{item.message}</p>
           <div className="mt-4 flex justify-center gap-4">
             <button
               className="px-4 py-1.5 text-sm text-soft hover:text-[var(--text-main)] transition"
               onClick={() => {
-                item.onCancel?.();
-                setVisible(false);
-                setTimeout(() => onDismiss(item.id), 200);
+                dismissConfirm();
               }}
               type="button"
             >

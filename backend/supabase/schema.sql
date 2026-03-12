@@ -98,3 +98,25 @@ create table if not exists public.follows (
 
 create index if not exists follows_follower_idx on public.follows (follower_login);
 create index if not exists follows_following_idx on public.follows (following_login);
+
+create table if not exists public.users (
+  login text primary key,
+  provider text not null,
+  provider_id text not null default '',
+  avatar_url text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists users_provider_idx on public.users (provider);
+
+create or replace view public.user_logins as
+select distinct login from public.users where login <> ''
+union
+select distinct author_login as login from public.images where author_login <> ''
+union
+select distinct author_login as login from public.comments where author_login <> ''
+union
+select distinct follower_login as login from public.follows where follower_login <> ''
+union
+select distinct following_login as login from public.follows where following_login <> '';
