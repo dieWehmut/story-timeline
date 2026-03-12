@@ -7,7 +7,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: 'auto'
+      injectRegister: 'auto',
+      workbox: {
+        navigateFallbackDenylist: [/^\/api\//],
+      },
     }),
     tailwindcss()
   ],

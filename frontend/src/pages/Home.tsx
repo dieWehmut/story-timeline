@@ -100,7 +100,7 @@ export default function Home({ auth, images, theme, onThemeToggle }: HomeProps) 
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-col items-center px-4 pt-16 text-center">
-        <h1 className="font-serif text-4xl font-semibold tracking-wide text-[var(--text-main)] md:text-5xl">物语</h1>
+        <h1 className="font-serif text-4xl font-semibold tracking-wide text-[var(--text-main)] md:text-5xl">物語集</h1>
         <p className="mt-3 text-sm text-soft">
           用户數：{images.stats.userCount}
         </p>
