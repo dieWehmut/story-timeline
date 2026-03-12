@@ -12,6 +12,7 @@ interface HeaderProps {
   authAuthenticated: boolean;
   authLoading: boolean;
   authLoginUrl?: string;
+  authGoogleLoginUrl?: string;
   authUser: AuthUser | null;
   canPost: boolean;
   feedUsers: FeedUser[];
@@ -19,7 +20,7 @@ interface HeaderProps {
   isDetailView?: boolean;
   onBack?: () => void;
   onFilterUser: (login: string | null) => void;
-  onLogin: () => void;
+  onLogin: (provider: 'github' | 'google') => void;
   onLogout: () => Promise<void>;
   onTagSelect: (tag: string | null) => void;
   onThemeToggle: () => void;
@@ -37,6 +38,7 @@ export function Header({
   authAuthenticated,
   authLoading,
   authLoginUrl,
+  authGoogleLoginUrl,
   authUser,
   canPost,
   feedUsers,
@@ -89,6 +91,7 @@ export function Header({
                   authenticated={authAuthenticated}
                   loading={authLoading}
                   loginUrl={authLoginUrl}
+                  googleLoginUrl={authGoogleLoginUrl}
                   onLogin={onLogin}
                   onLogout={onLogout}
                   user={authUser}
@@ -99,16 +102,19 @@ export function Header({
           ) : (
             <>
               <HomeButton />
-              <AuthButton
-                authenticated={authAuthenticated}
-                loading={authLoading}
-                loginUrl={authLoginUrl}
-                onLogin={onLogin}
-                onLogout={onLogout}
-                user={authUser}
-              />
-              <ThemeButton onToggle={onThemeToggle} theme={theme} />
+              {!authAuthenticated ? (
+                <AuthButton
+                  authenticated={authAuthenticated}
+                  loading={authLoading}
+                  loginUrl={authLoginUrl}
+                  googleLoginUrl={authGoogleLoginUrl}
+                  onLogin={onLogin}
+                  onLogout={onLogout}
+                  user={authUser}
+                />
+              ) : null}
               {authUser && canPost && showUploadButton ? <UploadButton busy={uploadBusy} /> : null}
+              <ThemeButton onToggle={onThemeToggle} theme={theme} />
               <div className={`transition-all duration-300 ${timelineOpen ? 'pointer-events-none scale-75 opacity-0' : 'opacity-100'}`}>
                 <button
                   aria-expanded={timelineOpen}

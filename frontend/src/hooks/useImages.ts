@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import { mediaTypeFromFile, normalizeAssetTypes } from '../lib/media';
 import type {
@@ -446,6 +446,16 @@ export const useImages = () => {
     setTimeOrder((current) => (current === 'desc' ? 'asc' : 'desc'));
   };
 
+  const refreshFeedUsers = useCallback(async () => {
+    try {
+      const users = await api.getFeedUsers();
+      setFeedUsers(users);
+      saveCacheUsers(users);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   return {
     items: filteredItems,
     allItems: items,
@@ -459,6 +469,7 @@ export const useImages = () => {
     timeline,
     timeOrder,
     toggleTimeOrder,
+    refreshFeedUsers,
     stats,
     loading,
     submitting,

@@ -36,6 +36,7 @@ const withApiBase = (value: string) => {
 const normalizeSession = (session: AuthSession): AuthSession => ({
   ...session,
   loginUrl: withApiBase(session.loginUrl),
+  googleLoginUrl: session.googleLoginUrl ? withApiBase(session.googleLoginUrl) : undefined,
 });
 
 const normalizeImageItem = (item: ImageItem): ImageItem => {
@@ -177,33 +178,82 @@ const fileToWebp = async (file: File): Promise<Blob> => {
   }
 };
 
-const buildImageFormData = async (payload: CreateImagePayload | UpdateImagePayload): Promise<FormData> => {
-  const formData = new FormData();
-  formData.set('description', payload.description);
-  payload.tags.forEach((tag) => formData.append('tags', tag));
-  formData.set('timeMode', payload.timeMode);
-  formData.set('startAt', payload.startAt);
-  formData.set('capturedAt', payload.startAt);
-  if (payload.endAt) {
-    formData.set('endAt', payload.endAt);
-  }
+type SignedUpload = {
+  publicId: string;
+  uploadUrl: string;
+  apiKey: string;
+  timestamp: string;
+  signature: string;
+  resourceType: 'image' | 'video';
+  invalidate: string;
+  overwrite: string;
+};
 
-  if ('id' in payload) {
-    formData.set('id', payload.id);
-  }
+type UploadPlan = {
+  imageId?: string;
+  commentId?: string;
+  uploads: SignedUpload[];
+};
 
-  const files = 'files' in payload ? (payload.files ?? []) : [];
+type UploadItem = {
+  file: File;
+  mediaType: 'image' | 'video';
+};
+
+const toWebpFile = async (file: File): Promise<File> => {
+  const webpBlob = await fileToWebp(file);
+  const baseName = file.name.replace(/\.[^.]+$/, '') || 'image';
+  return new File([webpBlob], `${baseName}.webp`, { type: 'image/webp' });
+};
+
+const prepareUploadItems = async (files: File[]): Promise<UploadItem[]> => {
+  const items: UploadItem[] = [];
   for (const file of files) {
-    if (mediaTypeFromFile(file) === 'video') {
-      formData.append('files', file, file.name || 'video');
+    const mediaType = mediaTypeFromFile(file);
+    if (mediaType === 'video') {
+      items.push({ file, mediaType: 'video' });
       continue;
     }
-    const webpBlob = await fileToWebp(file);
-    const fileName = file.name.replace(/\.[^.]+$/, '') || 'image';
-    formData.append('files', webpBlob, `${fileName}.webp`);
+    const webpFile = await toWebpFile(file);
+    items.push({ file: webpFile, mediaType: 'image' });
   }
+  return items;
+};
 
-  return formData;
+const uploadToCloudinary = async (signed: SignedUpload, file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('api_key', signed.apiKey);
+  formData.append('timestamp', signed.timestamp);
+  formData.append('signature', signed.signature);
+  formData.append('public_id', signed.publicId);
+  formData.append('invalidate', signed.invalidate || 'true');
+  formData.append('overwrite', signed.overwrite || 'true');
+
+  const response = await fetch(signed.uploadUrl, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let message = 'Cloudinary upload failed';
+    try {
+      const payload = (await response.json()) as { error?: { message?: string } };
+      if (payload?.error?.message) {
+        message = payload.error.message;
+      }
+    } catch {
+      try {
+        const text = await response.text();
+        if (text) {
+          message = text;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    throw new Error(message);
+  }
 };
 
 type CommentPayloadOptions = {
@@ -216,18 +266,111 @@ export const api = {
   logout: () => request<{ ok: boolean }>(`${API_BASE}/api/auth/logout`, { method: 'POST' }),
   getFeed: async () => (await request<ImageItem[]>(`${API_BASE}/api/feed`)).map(normalizeImageItem),
   getFeedUsers: () => request<FeedUser[]>(`${API_BASE}/api/feed/users`),
+  getFollowing: () => request<FeedUser[]>(`${API_BASE}/api/following`),
+  getFollowers: () => request<FeedUser[]>(`${API_BASE}/api/followers`),
+  followUser: (login: string) =>
+    request<{ ok: boolean }>(`${API_BASE}/api/follow/${encodeURIComponent(login)}`, { method: 'POST' }),
+  unfollowUser: (login: string) =>
+    request<{ ok: boolean }>(`${API_BASE}/api/follow/${encodeURIComponent(login)}`, { method: 'DELETE' }),
   createImage: async (payload: CreateImagePayload) => {
-    const body = await buildImageFormData(payload);
     // Use trailing slash when using proxy (API_BASE empty) or direct HF to avoid redirect loops.
     const imagesEndpoint =
       API_BASE === '' || API_BASE.includes('.hf.space')
         ? `${API_BASE}/api/images/`
         : `${API_BASE}/api/images`;
-    return normalizeImageItem(await request<ImageItem>(imagesEndpoint, { method: 'POST', body }));
+
+    const basePayload = {
+      description: payload.description,
+      tags: payload.tags,
+      timeMode: payload.timeMode,
+      startAt: payload.startAt,
+      endAt: payload.endAt,
+    };
+
+    if (!payload.files || payload.files.length === 0) {
+      return normalizeImageItem(
+        await request<ImageItem>(imagesEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(basePayload),
+        })
+      );
+    }
+
+    const items = await prepareUploadItems(payload.files);
+    const plan = await request<UploadPlan>(`${API_BASE}/api/uploads/images`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: items.map((item) => ({ mediaType: item.mediaType })),
+      }),
+    });
+
+    if (!plan.uploads || plan.uploads.length !== items.length) {
+      throw new Error('Upload plan mismatch');
+    }
+
+    await Promise.all(plan.uploads.map((upload, index) => uploadToCloudinary(upload, items[index].file)));
+
+    const assetPaths = plan.uploads.map((upload) => upload.publicId);
+    return normalizeImageItem(
+      await request<ImageItem>(imagesEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...basePayload,
+          id: plan.imageId,
+          assetPaths,
+        }),
+      })
+    );
   },
   updateImage: async (payload: UpdateImagePayload) => {
-    const body = await buildImageFormData(payload);
-    return normalizeImageItem(await request<ImageItem>(`${API_BASE}/api/my/images/${payload.id}`, { method: 'PATCH', body }));
+    const basePayload = {
+      description: payload.description,
+      tags: payload.tags,
+      timeMode: payload.timeMode,
+      startAt: payload.startAt,
+      endAt: payload.endAt,
+    };
+
+    if (!payload.files || payload.files.length === 0) {
+      return normalizeImageItem(
+        await request<ImageItem>(`${API_BASE}/api/my/images/${payload.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(basePayload),
+        })
+      );
+    }
+
+    const items = await prepareUploadItems(payload.files);
+    const plan = await request<UploadPlan>(`${API_BASE}/api/uploads/images`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageId: payload.id,
+        items: items.map((item) => ({ mediaType: item.mediaType })),
+      }),
+    });
+
+    if (!plan.uploads || plan.uploads.length !== items.length) {
+      throw new Error('Upload plan mismatch');
+    }
+
+    await Promise.all(plan.uploads.map((upload, index) => uploadToCloudinary(upload, items[index].file)));
+
+    const assetPaths = plan.uploads.map((upload) => upload.publicId);
+    return normalizeImageItem(
+      await request<ImageItem>(`${API_BASE}/api/my/images/${payload.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...basePayload,
+          assetPaths,
+        }),
+      })
+    );
   },
   deleteImage: (id: string) => request<{ ok: boolean }>(`${API_BASE}/api/my/images/${id}`, { method: 'DELETE' }),
   toggleLike: (ownerLogin: string, postID: string) =>
@@ -240,21 +383,35 @@ export const api = {
   },
   addComment: async (ownerLogin: string, postID: string, text: string, files?: File[], options?: CommentPayloadOptions) => {
     if (files && files.length > 0) {
-      const formData = new FormData();
-      formData.set('text', text);
-      if (options?.parentId) formData.set('parentId', options.parentId);
-      if (options?.replyToUserLogin) formData.set('replyToUserLogin', options.replyToUserLogin);
-      for (const [index, file] of files.entries()) {
-        if (mediaTypeFromFile(file) === 'video') {
-          formData.append('files', file, file.name || `comment-${index + 1}`);
-          continue;
-        }
-        const webpBlob = await fileToWebp(file);
-        formData.append('files', webpBlob, `comment-${index + 1}.webp`);
+      const items = await prepareUploadItems(files);
+      const plan = await request<UploadPlan>(`${API_BASE}/api/uploads/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          postOwner: ownerLogin,
+          postId: postID,
+          items: items.map((item) => ({ mediaType: item.mediaType })),
+        }),
+      });
+
+      if (!plan.uploads || plan.uploads.length !== items.length) {
+        throw new Error('Upload plan mismatch');
       }
+
+      await Promise.all(plan.uploads.map((upload, index) => uploadToCloudinary(upload, items[index].file)));
+
+      const payload: Record<string, any> = {
+        text,
+        commentId: plan.commentId,
+        assetPaths: plan.uploads.map((upload) => upload.publicId),
+      };
+      if (options?.parentId) payload.parentId = options.parentId;
+      if (options?.replyToUserLogin) payload.replyToUserLogin = options.replyToUserLogin;
+
       const item = await request<CommentItem>(`${API_BASE}/api/images/${ownerLogin}/${postID}/comments`, {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
       return normalizeCommentItem(item);
     }
@@ -263,8 +420,8 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text,
-        parentId: options?.parentId ?? null,
-        replyToUserLogin: options?.replyToUserLogin ?? null,
+        parentId: options?.parentId ?? '',
+        replyToUserLogin: options?.replyToUserLogin ?? '',
       }),
     });
     return normalizeCommentItem(item);

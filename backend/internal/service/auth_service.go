@@ -14,6 +14,7 @@ import (
 	"time"
 
 	githuboauth "github.com/dieWehmut/story-timeline/backend/internal/github"
+	googleoauth "github.com/dieWehmut/story-timeline/backend/internal/google"
 	"github.com/dieWehmut/story-timeline/backend/internal/model"
 	"github.com/dieWehmut/story-timeline/backend/internal/utils"
 )
@@ -25,15 +26,17 @@ const (
 
 type AuthService struct {
 	oauth         *githuboauth.OAuthClient
+	googleOAuth   *googleoauth.OAuthClient
 	graphql       *githuboauth.GraphQLClient
 	signingSecret []byte
 	secureCookies bool
 	adminLogin    string
 }
 
-func NewAuthService(oauth *githuboauth.OAuthClient, graphql *githuboauth.GraphQLClient, secret string, secureCookies bool, adminLogin string) *AuthService {
+func NewAuthService(oauth *githuboauth.OAuthClient, googleOAuth *googleoauth.OAuthClient, graphql *githuboauth.GraphQLClient, secret string, secureCookies bool, adminLogin string) *AuthService {
 	return &AuthService{
 		oauth:         oauth,
+		googleOAuth:   googleOAuth,
 		graphql:       graphql,
 		signingSecret: []byte(secret),
 		secureCookies: secureCookies,
@@ -45,7 +48,10 @@ func (service *AuthService) NewState() string {
 	return utils.NewID()
 }
 
-func (service *AuthService) LoginURL(state string, redirectURL string) string {
+func (service *AuthService) LoginURL(provider string, state string, redirectURL string) string {
+	if provider == "google" {
+		return service.googleOAuth.AuthCodeURL(state, redirectURL)
+	}
 	return service.oauth.AuthCodeURL(state, redirectURL)
 }
 
@@ -70,15 +76,47 @@ func (service *AuthService) ValidateState(r *http.Request, incoming string) bool
 	return incoming != "" && stateCookie.Value == incoming
 }
 
-func (service *AuthService) CompleteLogin(ctx context.Context, code string, redirectURL string) (model.Session, error) {
+func (service *AuthService) CompleteLogin(ctx context.Context, provider string, code string, redirectURL string) (model.Session, error) {
+	if provider == "google" {
+		token, err := service.googleOAuth.Exchange(ctx, code, redirectURL)
+		if err != nil {
+			return model.Session{}, err
+		}
+
+		googleUser, err := service.googleOAuth.FetchUser(ctx, token.AccessToken)
+		if err != nil {
+			return model.Session{}, err
+		}
+
+		user := model.AuthUser{
+			Provider:  "google",
+			ID:        googleUser.Id,
+			Login:     strings.Split(googleUser.Email, "@")[0],
+			AvatarURL: googleUser.Picture,
+		}
+
+		return model.Session{
+			AccessToken: token.AccessToken,
+			User:        user,
+			ExpiresAt:   time.Now().Add(7 * 24 * time.Hour),
+		}, nil
+	}
+
 	token, err := service.oauth.Exchange(ctx, code, redirectURL)
 	if err != nil {
 		return model.Session{}, err
 	}
 
-	user, err := service.graphql.FetchUser(ctx, token.AccessToken)
+	githubUser, err := service.graphql.FetchUser(ctx, token.AccessToken)
 	if err != nil {
 		return model.Session{}, err
+	}
+
+	user := model.AuthUser{
+		Provider:  "github",
+		ID:        fmt.Sprintf("%d", githubUser.ID),
+		Login:     githubUser.Login,
+		AvatarURL: githubUser.AvatarURL,
 	}
 
 	return model.Session{

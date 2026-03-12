@@ -1,4 +1,4 @@
-﻿package controller
+package controller
 
 import (
 	"bytes"
@@ -150,6 +150,101 @@ func parseTags(c *gin.Context) ([]string, error) {
 	return tags, nil
 }
 
+func parseTagsFromPayload(rawTags []string) ([]string, error) {
+	seen := map[string]struct{}{}
+	tags := make([]string, 0, len(rawTags))
+	for _, rawTag := range rawTags {
+		for _, part := range strings.Split(rawTag, ",") {
+			tag := strings.TrimSpace(part)
+			if tag == "" {
+				continue
+			}
+			if len([]rune(tag)) > maxTagLength {
+				return nil, fmt.Errorf("tag too long")
+			}
+			key := strings.ToLower(tag)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			tags = append(tags, tag)
+			if len(tags) > maxTags {
+				return nil, fmt.Errorf("too many tags")
+			}
+		}
+	}
+	return tags, nil
+}
+
+func parseImageTimesPayload(timeMode string, startValue string, endValue string) (string, time.Time, time.Time, error) {
+	if timeMode == "" {
+		timeMode = model.ImageTimeModePoint
+	}
+
+	startAt, err := utils.ParseBeijing(startValue)
+	if err != nil {
+		return "", time.Time{}, time.Time{}, err
+	}
+
+	if timeMode != model.ImageTimeModeRange {
+		return model.ImageTimeModePoint, startAt, time.Time{}, nil
+	}
+
+	endAt, err := utils.ParseBeijing(endValue)
+	if err != nil {
+		return "", time.Time{}, time.Time{}, err
+	}
+	if endAt.Before(startAt) {
+		return "", time.Time{}, time.Time{}, fmt.Errorf("end before start")
+	}
+
+	return model.ImageTimeModeRange, startAt, endAt, nil
+}
+
+func normalizeAssetPaths(paths []string) []string {
+	cleaned := make([]string, 0, len(paths))
+	for _, path := range paths {
+		trimmed := strings.TrimSpace(path)
+		if trimmed == "" {
+			continue
+		}
+		cleaned = append(cleaned, trimmed)
+	}
+	return cleaned
+}
+
+func validateAssetPaths(paths []string, maxCount int, maxVideos int, allowedPrefixes []string) error {
+	if len(paths) > maxCount {
+		return fmt.Errorf("too many files")
+	}
+
+	videoCount := 0
+	for _, path := range paths {
+		if !hasAllowedPrefix(path, allowedPrefixes) {
+			return fmt.Errorf("invalid asset path")
+		}
+		if assetTypeFromPath(path) == "video" {
+			videoCount++
+		}
+	}
+
+	if videoCount > maxVideos {
+		return fmt.Errorf("too many videos")
+	}
+
+	return nil
+}
+
+func hasAllowedPrefix(path string, prefixes []string) bool {
+	trimmed := strings.TrimSpace(path)
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(trimmed, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // Feed returns the aggregated feed for the current user.
 func (controller *ImageController) Feed(c *gin.Context) {
 	var feedLogins []string
@@ -158,7 +253,7 @@ func (controller *ImageController) Feed(c *gin.Context) {
 	session, _ := controller.authService.ReadSession(c.Request)
 	if session != nil {
 		viewerLogin = session.User.Login
-		feedUsers, err := controller.userService.GetFeedUsers(c.Request.Context(), session.AccessToken, session.User.Login)
+		feedUsers, err := controller.userService.GetFeedUsers(c.Request.Context(), session.User.Login)
 		if err == nil {
 			for _, u := range feedUsers {
 				feedLogins = append(feedLogins, u.Login)
@@ -264,7 +359,7 @@ func (controller *ImageController) FeedUsers(c *gin.Context) {
 
 	session, _ := controller.authService.ReadSession(c.Request)
 	if session != nil {
-		feedUsers, err := controller.userService.GetFeedUsers(c.Request.Context(), session.AccessToken, session.User.Login)
+		feedUsers, err := controller.userService.GetFeedUsers(c.Request.Context(), session.User.Login)
 		if err == nil {
 			users = append(users, feedUsers...)
 		}
@@ -314,6 +409,76 @@ func (controller *ImageController) FeedUsers(c *gin.Context) {
 }
 
 func (controller *ImageController) Create(c *gin.Context) {
+	if strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
+		var payload struct {
+			ID          string   `json:"id"`
+			Description string   `json:"description"`
+			Tags        []string `json:"tags"`
+			TimeMode    string   `json:"timeMode"`
+			StartAt     string   `json:"startAt"`
+			EndAt       string   `json:"endAt"`
+			AssetPaths  []string `json:"assetPaths"`
+		}
+		if err := c.ShouldBindJSON(&payload); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+			return
+		}
+
+		tags, err := parseTagsFromPayload(payload.Tags)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tags"})
+			return
+		}
+
+		timeMode, startAt, endAt, err := parseImageTimesPayload(payload.TimeMode, payload.StartAt, payload.EndAt)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid time fields"})
+			return
+		}
+
+		assetPaths := normalizeAssetPaths(payload.AssetPaths)
+		if strings.TrimSpace(payload.Description) == "" && len(assetPaths) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "empty content"})
+			return
+		}
+
+		session, ok := middleware.SessionFromContext(c)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing session"})
+			return
+		}
+
+		if err := validateAssetPaths(assetPaths, maxFiles, maxVideos, []string{
+			fmt.Sprintf("images/%s/", session.User.Login),
+			fmt.Sprintf("videos/%s/", session.User.Login),
+		}); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		image, err := controller.imageService.CreateWithAssets(
+			c.Request.Context(),
+			session.AccessToken,
+			session.User,
+			payload.Description,
+			tags,
+			timeMode,
+			startAt,
+			endAt,
+			assetPaths,
+			payload.ID,
+		)
+		if err != nil {
+			_ = c.Error(err)
+			c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+			return
+		}
+
+		assetURLs, assetTypes := controller.assetURLs(image.AllImagePaths())
+		c.JSON(http.StatusCreated, dto.NewImageResponse(image, assetURLs, assetTypes))
+		return
+	}
+
 	if err := c.Request.ParseMultipartForm(maxImageTotalSize + (1 << 20)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -355,6 +520,98 @@ func (controller *ImageController) Create(c *gin.Context) {
 }
 
 func (controller *ImageController) Update(c *gin.Context) {
+	if strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
+		var payload struct {
+			Description string   `json:"description"`
+			Tags        []string `json:"tags"`
+			TimeMode    string   `json:"timeMode"`
+			StartAt     string   `json:"startAt"`
+			EndAt       string   `json:"endAt"`
+			AssetPaths  []string `json:"assetPaths"`
+		}
+		if err := c.ShouldBindJSON(&payload); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+			return
+		}
+
+		timeMode, startAt, endAt, err := parseImageTimesPayload(payload.TimeMode, payload.StartAt, payload.EndAt)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid time fields"})
+			return
+		}
+
+		tags, err := parseTagsFromPayload(payload.Tags)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tags"})
+			return
+		}
+
+		session, ok := middleware.SessionFromContext(c)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing session"})
+			return
+		}
+
+		imageID := c.Param("imageID")
+		ownerLogin := session.User.Login
+
+		// If assetPaths is provided (even empty), replace assets. Otherwise update metadata only.
+		if payload.AssetPaths != nil {
+			assetPaths := normalizeAssetPaths(payload.AssetPaths)
+			if err := validateAssetPaths(assetPaths, maxFiles, maxVideos, []string{
+				fmt.Sprintf("images/%s/", ownerLogin),
+				fmt.Sprintf("videos/%s/", ownerLogin),
+			}); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			image, err := controller.imageService.UpdateWithAssets(
+				c.Request.Context(),
+				session.AccessToken,
+				ownerLogin,
+				imageID,
+				payload.Description,
+				tags,
+				timeMode,
+				startAt,
+				endAt,
+				assetPaths,
+			)
+			if err != nil {
+				_ = c.Error(err)
+				c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+				return
+			}
+
+			assetURLs, assetTypes := controller.assetURLs(image.AllImagePaths())
+			c.JSON(http.StatusOK, dto.NewImageResponse(image, assetURLs, assetTypes))
+			return
+		}
+
+		image, err := controller.imageService.Update(
+			c.Request.Context(),
+			session.AccessToken,
+			ownerLogin,
+			imageID,
+			payload.Description,
+			tags,
+			timeMode,
+			startAt,
+			endAt,
+			nil,
+		)
+		if err != nil {
+			_ = c.Error(err)
+			c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+			return
+		}
+
+		assetURLs, assetTypes := controller.assetURLs(image.AllImagePaths())
+		c.JSON(http.StatusOK, dto.NewImageResponse(image, assetURLs, assetTypes))
+		return
+	}
+
 	if err := c.Request.ParseMultipartForm(maxImageTotalSize + (1 << 20)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -516,7 +773,7 @@ func (controller *ImageController) GetComments(c *gin.Context) {
 	var feedLogins []string
 	session, _ := controller.authService.ReadSession(c.Request)
 	if session != nil {
-		feedUsers, err := controller.userService.GetFeedUsers(c.Request.Context(), session.AccessToken, session.User.Login)
+		feedUsers, err := controller.userService.GetFeedUsers(c.Request.Context(), session.User.Login)
 		if err == nil {
 			for _, u := range feedUsers {
 				feedLogins = append(feedLogins, u.Login)
@@ -613,7 +870,9 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 		var body struct {
 			Text             string `json:"text"`
 			ParentID         string `json:"parentId"`
-			ReplyToUserLogin string `json:"replyToUserLogin"`
+			ReplyToUserLogin string   `json:"replyToUserLogin"`
+			CommentID        string   `json:"commentId"`
+			AssetPaths       []string `json:"assetPaths"`
 		}
 		if err := c.ShouldBindJSON(&body); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "请输入评论内容"})
@@ -622,6 +881,58 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 		text = strings.TrimSpace(body.Text)
 		parentID = strings.TrimSpace(body.ParentID)
 		replyToUserLogin = strings.TrimSpace(body.ReplyToUserLogin)
+
+		assetPaths := normalizeAssetPaths(body.AssetPaths)
+		if len(assetPaths) > 0 {
+			if err := validateAssetPaths(assetPaths, maxCommentFiles, maxVideos, []string{
+				fmt.Sprintf("comments/%s/%s/%s/", session.User.Login, ownerLogin, postID),
+				fmt.Sprintf("comment-videos/%s/%s/%s/", session.User.Login, ownerLogin, postID),
+			}); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			comment, err := controller.interactionService.AddCommentWithAssets(
+				c.Request.Context(),
+				session.AccessToken,
+				session.User,
+				ownerLogin,
+				postID,
+				text,
+				assetPaths,
+				parentID,
+				replyToUserLogin,
+				body.CommentID,
+			)
+			if err != nil {
+				_ = c.Error(err)
+				c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+				return
+			}
+
+			var imageUrl string
+			imageURLs, assetTypes := controller.commentAssetURLs(comment)
+			if len(imageURLs) > 0 {
+				imageUrl = imageURLs[0]
+			}
+
+			c.JSON(http.StatusCreated, dto.CommentResponse{
+				ID:               comment.ID,
+				AuthorLogin:      session.User.Login,
+				PostOwner:        comment.PostOwner,
+				PostID:           comment.PostID,
+				Text:             comment.Text,
+				ImageUrl:         imageUrl,
+				ImageURLs:        imageURLs,
+				AssetTypes:       assetTypes,
+				CreatedAt:        comment.CreatedAt.Format("2006-01-02T15:04:05-07:00"),
+				LikeCount:        0,
+				Liked:            false,
+				ParentID:         comment.ParentID,
+				ReplyToUserLogin: comment.ReplyToUserLogin,
+			})
+			return
+		}
 	}
 
 	if text == "" && len(files) == 0 {

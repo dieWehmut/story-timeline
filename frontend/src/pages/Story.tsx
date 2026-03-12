@@ -8,12 +8,14 @@ import { TimeColumn } from '../layouts/TimeColumn';
 import { UploadButton } from '../layouts/UploadButton';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useFollows } from '../hooks/useFollows';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { TimelineMonth } from '../types/image';
 
 interface StoryProps {
   activeMonth: TimelineMonth | null;
   auth: ReturnType<typeof useAuth>;
+  follows: ReturnType<typeof useFollows>;
   images: ReturnType<typeof useImages>;
   onActiveMonthChange: (month: TimelineMonth) => void;
   onThemeToggle: () => void;
@@ -39,6 +41,7 @@ const getMonthKey = (startAt: string) => {
 export default function Story({
   activeMonth,
   auth,
+  follows,
   images,
   onActiveMonthChange,
   onThemeToggle,
@@ -47,10 +50,14 @@ export default function Story({
   theme,
   timelineOpen,
 }: StoryProps) {
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const quickActionsRef = useRef<HTMLDivElement | null>(null);
+  const [quickActionsVisible, setQuickActionsVisible] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { id: routeId } = useParams();
+  const selectedItemId = routeId ?? null;
   const selectedUser = searchParams.get('user');
   const selectedTag = searchParams.get('tag');
   const activeUser = selectedUser && selectedUser !== 'all' ? selectedUser : null;
@@ -70,6 +77,27 @@ export default function Story({
   const albumHref = `/album?user=${encodeURIComponent(albumOwner)}`;
   const recordDisabled = isUserScoped || !auth.canPost || images.submitting;
   const showQuickActions = selectedItemId === null;
+
+  useEffect(() => {
+    if (!showQuickActions) {
+      setQuickActionsVisible(false);
+      return;
+    }
+
+    const node = quickActionsRef.current;
+    if (!node) {
+      setQuickActionsVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setQuickActionsVisible(entry.isIntersecting),
+      { rootMargin: '-96px 0px 0px 0px', threshold: 0.1 }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [showQuickActions]);
 
   const monthGroups = useMemo(
     () =>
@@ -141,28 +169,38 @@ export default function Story({
   };
 
   const updateSearchParams = (nextUser: string | null, nextTag: string | null) => {
-    if (!nextUser && !nextTag) {
-      setSearchParams({});
-      return;
-    }
     const params = new URLSearchParams();
     if (nextUser) params.set('user', nextUser);
     if (nextTag) params.set('tag', nextTag);
+    const search = params.toString();
+
+    if (selectedItemId) {
+      const target = `/story${search ? `?${search}` : ''}`;
+      navigate(target, { replace: true });
+      return;
+    }
+
+    if (!search) {
+      setSearchParams({});
+      return;
+    }
     setSearchParams(params);
   };
 
   const handleUserSelect = (login: string | null) => {
     updateSearchParams(login, activeTag);
-    if (selectedItemId !== null) {
-      setSelectedItemId(null);
-    }
   };
 
   const handleTagSelect = (tag: string | null) => {
     updateSearchParams(activeUser, tag);
-    if (selectedItemId !== null) {
-      setSelectedItemId(null);
+  };
+
+  const handleFollowToggle = async (login: string, nextFollow: boolean, avatarUrl?: string) => {
+    if (nextFollow) {
+      await follows.follow(login, avatarUrl);
+      return;
     }
+    await follows.unfollow(login);
   };
 
   return (
@@ -171,15 +209,16 @@ export default function Story({
         activeMonth={activeMonth}
         authAuthenticated={auth.authenticated}
         authLoginUrl={auth.loginUrl}
+        authGoogleLoginUrl={auth.googleLoginUrl}
         authLoading={auth.loading}
         authUser={auth.user}
         canPost={auth.canPost}
         feedUsers={images.feedUsers}
         filterUser={activeUser}
         isDetailView={selectedItemId !== null}
-        onBack={() => setSelectedItemId(null)}
+        onBack={() => navigate(`/story${location.search}`)}
         onFilterUser={handleUserSelect}
-        onLogin={auth.login}
+        onLogin={auth.loginWith}
         onLogout={auth.logout}
         onTagSelect={handleTagSelect}
         onThemeToggle={onThemeToggle}
@@ -189,7 +228,7 @@ export default function Story({
         theme={theme}
         timelineOpen={timelineOpen}
         uploadBusy={images.submitting}
-        showUploadButton={!showQuickActions}
+        showUploadButton={!quickActionsVisible}
       />
 
       {timelineOpen && (
@@ -207,12 +246,15 @@ export default function Story({
 
       <main className="relative mx-auto flex w-full max-w-xl flex-col px-0 pb-36 pt-28 md:px-0 md:pt-36">
         {showQuickActions ? (
-          <div className="quick-actions grid w-full grid-cols-2 border-y border-[var(--panel-border)]">
+          <div
+            className="quick-actions grid w-full grid-cols-2 border-y border-[var(--panel-border)]"
+            ref={quickActionsRef}
+          >
             <UploadButton
               busy={images.submitting}
               className="quick-actions-button border-r border-[var(--panel-border)]"
               disabled={recordDisabled}
-              label="瑷橀寗"
+              label="記錄"
               showIcon={!isUserScoped}
               subLabel={isUserScoped ? `\u603b ${recordCount} \u5e16` : undefined}
               variant="card"
@@ -227,7 +269,7 @@ export default function Story({
               {!isUserScoped ? (
                 <ImageIcon className="quick-actions-icon text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={20} />
               ) : null}
-              <span className="leading-none">{'鐩稿唺'}</span>
+              <span className="leading-none">{'相册'}</span>
               {isUserScoped ? (
                 <span className="quick-actions-sub text-xs text-soft">{`${albumCount} \u9879`}</span>
               ) : null}
@@ -261,13 +303,15 @@ export default function Story({
                       canInteract={auth.authenticated}
                       editable={auth.user?.login === item.authorLogin}
                       fallbackAuthorLogin={images.stats.githubOwner || auth.user?.login || undefined}
+                      followed={follows.isFollowing(item.authorLogin)}
                       item={item}
                       key={item.id}
                       onAvatarClick={(login) => handleUserSelect(activeUser === login ? null : login)}
                       onCommentCountChange={images.incrementCommentCount}
                       onDelete={images.deleteImage}
                       onLikeChange={images.updateLike}
-                      onOpenDetail={() => setSelectedItemId(item.id)}
+                      onFollowToggle={handleFollowToggle}
+                      onOpenDetail={() => navigate(`/story/${item.id}${location.search}`)}
                       onTagClick={(tag) => handleTagSelect(activeTag === tag ? null : tag)}
                       roleLabel={item.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
                       tagCounts={images.tagCountMap}
@@ -286,10 +330,12 @@ export default function Story({
           currentUserLogin={auth.user?.login}
           editable={auth.user?.login === selectedItem.authorLogin}
           fallbackAuthorLogin={images.stats.githubOwner || auth.user?.login || undefined}
+          followed={follows.isFollowing(selectedItem.authorLogin)}
           item={selectedItem}
           onCommentCountChange={images.incrementCommentCount}
           onDelete={images.deleteImage}
           onLikeChange={images.updateLike}
+          onFollowToggle={handleFollowToggle}
           onTagClick={(tag) => handleTagSelect(activeTag === tag ? null : tag)}
           roleLabel={selectedItem.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
           tagCounts={images.tagCountMap}
@@ -300,4 +346,3 @@ export default function Story({
     </div>
   );
 }
-

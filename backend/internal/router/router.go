@@ -12,8 +12,10 @@ import (
 
 type Dependencies struct {
 	AuthController   *controller.AuthController
+	FollowController *controller.FollowController
 	ImageController  *controller.ImageController
 	HealthController *controller.HealthController
+	UploadController *controller.UploadController
 	AuthService      *service.AuthService
 }
 
@@ -39,8 +41,10 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 	{
 		auth := api.Group("/auth")
 		{
-			auth.GET("/github/login", deps.AuthController.Login)
-			auth.GET("/github/callback", deps.AuthController.Callback)
+			auth.GET("/github/login", deps.AuthController.GitHubLogin)
+			auth.GET("/github/callback", deps.AuthController.GitHubCallback)
+			auth.GET("/google/login", deps.AuthController.GoogleLogin)
+			auth.GET("/google/callback", deps.AuthController.GoogleCallback)
 			auth.GET("/session", deps.AuthController.Session)
 			auth.POST("/logout", deps.AuthController.Logout)
 		}
@@ -48,6 +52,18 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 		// Feed endpoints (public read, aggregated from multiple users)
 		api.GET("/feed", deps.ImageController.Feed)
 		api.GET("/feed/users", deps.ImageController.FeedUsers)
+
+		// Follow relationships (auth required)
+		api.GET("/following", middleware.RequireAuth(deps.AuthService), deps.FollowController.Following)
+		api.GET("/followers", middleware.RequireAuth(deps.AuthService), deps.FollowController.Followers)
+		api.POST("/follow/:login", middleware.RequireAuth(deps.AuthService), deps.FollowController.Follow)
+		api.DELETE("/follow/:login", middleware.RequireAuth(deps.AuthService), deps.FollowController.Unfollow)
+
+		uploads := api.Group("/uploads", middleware.RequireAuth(deps.AuthService))
+		{
+			uploads.POST("/images", deps.UploadController.SignImageUploads)
+			uploads.POST("/comments", deps.UploadController.SignCommentUploads)
+		}
 
 		images := api.Group("/images")
 		{

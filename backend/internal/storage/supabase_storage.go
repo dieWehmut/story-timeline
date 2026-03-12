@@ -69,6 +69,12 @@ type commentRecord struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+type followRecord struct {
+	FollowerLogin  string    `json:"follower_login"`
+	FollowingLogin string    `json:"following_login"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
 func NewSupabaseStorage(baseURL string, serviceKey string) *SupabaseStorage {
 	trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if trimmed != "" && !strings.HasSuffix(trimmed, "/rest/v1") {
@@ -537,4 +543,92 @@ func (storage *SupabaseStorage) ListCommentsByPosts(ctx context.Context, postOwn
 		comments = append(comments, record.toModel())
 	}
 	return comments, nil
+}
+
+func (storage *SupabaseStorage) FollowUser(ctx context.Context, followerLogin string, followingLogin string) error {
+	payload := []followRecord{{
+		FollowerLogin:  followerLogin,
+		FollowingLogin: followingLogin,
+		CreatedAt:      time.Now(),
+	}}
+	prefer := []string{"resolution=merge-duplicates"}
+	return storage.requestJSON(ctx, http.MethodPost, "/follows", url.Values{"on_conflict": []string{"follower_login,following_login"}}, payload, nil, prefer)
+}
+
+func (storage *SupabaseStorage) UnfollowUser(ctx context.Context, followerLogin string, followingLogin string) error {
+	params := url.Values{}
+	params.Set("follower_login", "eq."+followerLogin)
+	params.Set("following_login", "eq."+followingLogin)
+	return storage.requestJSON(ctx, http.MethodDelete, "/follows", params, nil, nil, nil)
+}
+
+func (storage *SupabaseStorage) ListFollowing(ctx context.Context, followerLogin string) ([]string, error) {
+	params := url.Values{}
+	params.Set("select", "following_login")
+	params.Set("follower_login", "eq."+followerLogin)
+	
+	var records []followRecord
+	if err := storage.requestJSON(ctx, http.MethodGet, "/follows", params, nil, &records, nil); err != nil {
+		return nil, err
+	}
+
+	following := make([]string, 0, len(records))
+	for _, record := range records {
+		following = append(following, record.FollowingLogin)
+	}
+	return following, nil
+}
+
+func (storage *SupabaseStorage) ListFollowers(ctx context.Context, followingLogin string) ([]string, error) {
+	params := url.Values{}
+	params.Set("select", "follower_login")
+	params.Set("following_login", "eq."+followingLogin)
+	
+	var records []followRecord
+	if err := storage.requestJSON(ctx, http.MethodGet, "/follows", params, nil, &records, nil); err != nil {
+		return nil, err
+	}
+
+	followers := make([]string, 0, len(records))
+	for _, record := range records {
+		followers = append(followers, record.FollowerLogin)
+	}
+	return followers, nil
+}
+
+func (storage *SupabaseStorage) GetUsersByLogins(ctx context.Context, logins []string) ([]model.GitHubUser, error) {
+	if len(logins) == 0 {
+		return []model.GitHubUser{}, nil
+	}
+
+	params := url.Values{}
+	params.Set("select", "author_login,author_avatar,updated_at")
+	params.Set("author_login", inFilter(logins))
+	params.Set("order", "updated_at.desc")
+
+	// We query the images table to get their latest avatar. 
+	// This relies on the fact that any user with content has their avatar recorded.
+	var records []struct {
+		AuthorLogin  string    `json:"author_login"`
+		AuthorAvatar string    `json:"author_avatar"`
+		UpdatedAt    time.Time `json:"updated_at"`
+	}
+	if err := storage.requestJSON(ctx, http.MethodGet, "/images", params, nil, &records, nil); err != nil {
+		return nil, err
+	}
+
+	seen := map[string]struct{}{}
+	users := make([]model.GitHubUser, 0, len(records))
+	for _, record := range records {
+		key := strings.ToLower(strings.TrimSpace(record.AuthorLogin))
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		users = append(users, model.GitHubUser{Login: record.AuthorLogin, AvatarURL: record.AuthorAvatar})
+	}
+	return users, nil
 }

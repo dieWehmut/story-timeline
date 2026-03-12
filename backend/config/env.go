@@ -13,6 +13,9 @@ type Env struct {
 	GitHubClientSecret  string
 	GitHubCallbackURL   string
 	GitHubRepoOwner     string
+	GoogleClientID      string
+	GoogleClientSecret  string
+	GoogleCallbackURL   string
 	SupabaseURL         string
 	SupabaseServiceKey  string
 	SupabaseDBURL       string
@@ -36,6 +39,9 @@ func LoadEnv() Env {
 		GitHubClientSecret:  os.Getenv("GITHUB_CLIENT_SECRET"),
 		GitHubCallbackURL:   getEnv("GITHUB_CALLBACK_URL", defaultCallbackURL),
 		GitHubRepoOwner:     os.Getenv("GITHUB_REPO_OWNER"),
+		GoogleClientID:      os.Getenv("GOOGLE_CLIENT_ID"),
+		GoogleClientSecret:  os.Getenv("GOOGLE_CLIENT_SECRET"),
+		GoogleCallbackURL:   getEnv("GOOGLE_CALLBACK_URL", getEnv("FRONTEND_BASE_URL", "http://localhost:5173")+"/api/auth/google/callback"),
 		SupabaseURL:         os.Getenv("SUPABASE_URL"),
 		SupabaseServiceKey:  os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
 		SupabaseDBURL:       os.Getenv("SUPABASE_DB_URL"),

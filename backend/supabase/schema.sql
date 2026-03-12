@@ -88,3 +88,13 @@ as $$
   group by tag
   order by post_count desc, tag asc;
 $$;
+
+create table if not exists public.follows (
+  follower_login text not null,
+  following_login text not null,
+  created_at timestamptz not null,
+  primary key (follower_login, following_login)
+);
+
+create index if not exists follows_follower_idx on public.follows (follower_login);
+create index if not exists follows_following_idx on public.follows (following_login);

@@ -62,14 +62,16 @@ export interface HealthStats {
 }
 
 export interface AuthUser {
-  id: number;
+  id: string;
   login: string;
   avatarUrl: string;
+  provider?: string;
 }
 
 export interface AuthSession {
   authenticated: boolean;
   loginUrl: string;
+  googleLoginUrl?: string;
   isAdmin: boolean;
   canPost: boolean;
   roleLabel: string;

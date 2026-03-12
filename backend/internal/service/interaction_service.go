@@ -181,6 +181,35 @@ func (service *InteractionService) AddComment(ctx context.Context, _ string, com
 	return comment, nil
 }
 
+func (service *InteractionService) AddCommentWithAssets(ctx context.Context, _ string, commenter model.GitHubUser, postOwner, postID, text string, assetPaths []string, parentID, replyToUserLogin, commentID string) (model.Comment, error) {
+	resolvedID := strings.TrimSpace(commentID)
+	if resolvedID == "" {
+		resolvedID = utils.NewID()
+	}
+
+	comment := model.Comment{
+		ID:              resolvedID,
+		PostOwner:       postOwner,
+		PostID:          postID,
+		AuthorLogin:     commenter.Login,
+		AuthorAvatar:    commenter.AvatarURL,
+		ParentID:        parentID,
+		ReplyToUserLogin: replyToUserLogin,
+		Text:            text,
+		ImagePaths:      assetPaths,
+		CreatedAt:       utils.NowBeijing(),
+	}
+	if len(assetPaths) == 1 {
+		comment.ImagePath = assetPaths[0]
+	}
+
+	if err := service.database.AddComment(ctx, comment); err != nil {
+		return model.Comment{}, err
+	}
+
+	return comment, nil
+}
+
 func (service *InteractionService) GetAllComments(ctx context.Context, _ string, postOwner, postID string, feedLogins []string) []CommentWithAuthor {
 	comments, err := service.database.ListComments(ctx, postOwner, postID, uniqueStrings(feedLogins))
 	if err != nil {

@@ -5,11 +5,14 @@ import type { AuthSession } from '../types/image';
 const defaultSession: AuthSession = {
   authenticated: false,
   loginUrl: `${API_BASE}/api/auth/github/login`,
+  googleLoginUrl: `${API_BASE}/api/auth/google/login`,
   isAdmin: false,
   canPost: false,
   roleLabel: '游客',
   user: null,
 };
+
+export const LOGIN_RETURN_KEY = 'story_login_return';
 
 export const useAuth = () => {
   const [session, setSession] = useState<AuthSession>(defaultSession);
@@ -43,8 +46,18 @@ export const useAuth = () => {
     };
   }, []);
 
-  const login = () => {
-    const raw = session.loginUrl || `${API_BASE}/api/auth/github/login`;
+  const loginWith = (provider: 'github' | 'google') => {
+    try {
+      const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      localStorage.setItem(LOGIN_RETURN_KEY, currentPath);
+    } catch {
+      // ignore storage errors
+    }
+
+    const raw =
+      provider === 'google'
+        ? session.googleLoginUrl || `${API_BASE}/api/auth/google/login`
+        : session.loginUrl || `${API_BASE}/api/auth/github/login`;
     if (raw.startsWith('http://') || raw.startsWith('https://')) {
       window.location.assign(raw);
       return;
@@ -58,6 +71,8 @@ export const useAuth = () => {
     }
   };
 
+  const login = () => loginWith('github');
+
   const logout = async () => {
     await api.logout();
     setSession(defaultSession);
@@ -67,6 +82,7 @@ export const useAuth = () => {
     ...session,
     loading,
     login,
+    loginWith,
     logout,
   };
 };

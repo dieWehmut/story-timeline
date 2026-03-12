@@ -4,6 +4,8 @@ import { CornerUpLeft, Heart, ImagePlus, LoaderCircle, MessageCircle, PencilLine
 
 import { ImageViewer } from './ImageViewer';
 
+import { FollowButton } from './FollowButton';
+
 import { useToast } from './useToast';
 
 import { api } from '../lib/api';
@@ -353,6 +355,10 @@ interface CardDetailProps {
 
   tagCounts?: Record<string, number>;
 
+  followed?: boolean;
+
+  onFollowToggle?: (login: string, nextFollow: boolean, avatarUrl?: string) => Promise<void>;
+
 }
 
 
@@ -381,6 +387,10 @@ export function CardDetail({
 
   tagCounts,
 
+  followed,
+
+  onFollowToggle,
+
 }: CardDetailProps) {
 
   const [comments, setComments] = useState<CommentViewItem[]>([]);
@@ -402,6 +412,8 @@ export function CardDetail({
   const [viewingCommentImage, setViewingCommentImage] = useState<{ items: { url: string; type: 'image' | 'video' }[]; initialIndex: number } | null>(null);
 
   const [likeBusy, setLikeBusy] = useState(false);
+
+  const [followBusy, setFollowBusy] = useState(false);
 
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
 
@@ -496,6 +508,21 @@ export function CardDetail({
   const tags = item.tags ?? [];
 
   const commentCacheKey = `${authorLogin}/${item.id}`;
+
+  const canFollow = !!onFollowToggle && canInteract && !editable;
+  const isFollowing = !!followed;
+
+  const handleToggleFollow = async () => {
+    if (!canFollow || followBusy) return;
+    setFollowBusy(true);
+    try {
+      await onFollowToggle?.(authorLogin, !isFollowing, authorAvatar);
+    } catch {
+      // ignore
+    } finally {
+      setFollowBusy(false);
+    }
+  };
 
   const actionColumnClass =
 
@@ -1140,6 +1167,18 @@ export function CardDetail({
 
                   </button>
 
+                </div>
+
+              ) : canFollow ? (
+
+                <div className={actionColumnClass}>
+                  <div className="col-span-2 flex w-full justify-end pr-2">
+                    <FollowButton
+                      following={isFollowing}
+                      disabled={followBusy}
+                      onClick={() => void handleToggleFollow()}
+                    />
+                  </div>
                 </div>
 
               ) : (
@@ -1910,9 +1949,3 @@ export function CardDetail({
   );
 
 }
-
-
-
-
-
-

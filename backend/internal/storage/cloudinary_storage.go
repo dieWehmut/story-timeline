@@ -46,6 +46,18 @@ type cloudinaryDestroyResponse struct {
 	} `json:"error"`
 }
 
+// SignedUpload contains the parameters needed for direct browser uploads.
+type SignedUpload struct {
+	PublicID    string `json:"publicId"`
+	UploadURL   string `json:"uploadUrl"`
+	APIKey      string `json:"apiKey"`
+	Timestamp   string `json:"timestamp"`
+	Signature   string `json:"signature"`
+	ResourceType string `json:"resourceType"`
+	Invalidate  string `json:"invalidate"`
+	Overwrite   string `json:"overwrite"`
+}
+
 func NewCloudinaryStorage(cfg CloudinaryConfig) (*CloudinaryStorage, error) {
 	if strings.TrimSpace(cfg.CloudName) == "" {
 		return nil, fmt.Errorf("CLOUDINARY_CLOUD_NAME is required")
@@ -258,6 +270,33 @@ func (storage *CloudinaryStorage) URLFor(publicID string) string {
 	}
 	resourceType := storage.resourceTypeFor(trimmed, "")
 	return fmt.Sprintf("https://res.cloudinary.com/%s/%s/upload/%s", storage.cloudName, resourceType, escapeCloudinaryPath(trimmed))
+}
+
+// SignUpload returns the signed parameters for a direct upload.
+func (storage *CloudinaryStorage) SignUpload(publicID string, resourceType string) SignedUpload {
+	resolved := strings.TrimSpace(resourceType)
+	if resolved != "video" {
+		resolved = "image"
+	}
+
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+	params := map[string]string{
+		"invalidate": "true",
+		"overwrite":  "true",
+		"public_id":  strings.TrimSpace(publicID),
+		"timestamp":  timestamp,
+	}
+
+	return SignedUpload{
+		PublicID:     params["public_id"],
+		UploadURL:    storage.uploadEndpoint(resolved),
+		APIKey:       storage.apiKey,
+		Timestamp:    timestamp,
+		Signature:    signCloudinaryParams(params, storage.apiSecret),
+		ResourceType: resolved,
+		Invalidate:   params["invalidate"],
+		Overwrite:    params["overwrite"],
+	}
 }
 
 func (storage *CloudinaryStorage) uploadEndpoint(resourceType string) string {

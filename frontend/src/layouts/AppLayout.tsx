@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Footer } from './Footer';
+import { getUIFlags, subscribeUIFlags } from '../lib/uiFlags';
 import type { HealthStats } from '../types/image';
 
 interface AppLayoutProps {
@@ -8,7 +10,15 @@ interface AppLayoutProps {
 
 export function AppLayout({ footerStats }: AppLayoutProps) {
   const location = useLocation();
-  const hideFooter = location.pathname.startsWith('/album') || location.pathname.startsWith('/post');
+  const [uiFlags, setUiFlags] = useState(getUIFlags());
+
+  useEffect(() => subscribeUIFlags(setUiFlags), []);
+
+  const hideFooter =
+    uiFlags.commentInputActive ||
+    location.pathname.startsWith('/album') ||
+    location.pathname.startsWith('/post') ||
+    location.pathname.startsWith('/story/');
 
   return (
     <div className="min-h-screen">

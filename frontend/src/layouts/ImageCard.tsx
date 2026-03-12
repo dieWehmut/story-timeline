@@ -6,6 +6,8 @@ import { CommentDialog } from '../ui/CommentDialog';
 
 import { ImageViewer } from '../ui/ImageViewer';
 
+import { FollowButton } from '../ui/FollowButton';
+
 import { useToast } from '../ui/useToast';
 
 import { api } from '../lib/api';
@@ -45,6 +47,10 @@ interface ImageCardProps {
   onOpenDetail?: () => void;
 
   tagCounts?: Record<string, number>;
+
+  followed?: boolean;
+
+  onFollowToggle?: (login: string, nextFollow: boolean, avatarUrl?: string) => Promise<void>;
 
 }
 
@@ -340,6 +346,10 @@ export function ImageCard({
 
   tagCounts,
 
+  followed,
+
+  onFollowToggle,
+
 }: ImageCardProps) {
 
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
@@ -349,6 +359,8 @@ export function ImageCard({
   const [commentsLoading, setCommentsLoading] = useState(false);
 
   const [likeBusy, setLikeBusy] = useState(false);
+
+  const [followBusy, setFollowBusy] = useState(false);
 
   const [commentBusy, setCommentBusy] = useState(false);
 
@@ -441,6 +453,21 @@ export function ImageCard({
   const tags = item.tags ?? [];
 
   const commentCacheKey = `${authorLogin}/${item.id}`;
+
+  const canFollow = !!onFollowToggle && canInteract && !editable;
+  const isFollowing = !!followed;
+
+  const handleToggleFollow = async () => {
+    if (!canFollow || followBusy) return;
+    setFollowBusy(true);
+    try {
+      await onFollowToggle?.(authorLogin, !isFollowing, authorAvatar);
+    } catch {
+      // ignore
+    } finally {
+      setFollowBusy(false);
+    }
+  };
 
 
 
@@ -780,6 +807,16 @@ export function ImageCard({
                 </button>
 
               </>
+
+            ) : canFollow ? (
+
+              <div className="col-span-2 flex w-full justify-end pr-2">
+                <FollowButton
+                  following={isFollowing}
+                  disabled={followBusy}
+                  onClick={() => void handleToggleFollow()}
+                />
+              </div>
 
             ) : (
 

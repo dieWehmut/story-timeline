@@ -94,6 +94,40 @@ func (service *ImageService) Create(ctx context.Context, _ string, author model.
 	return image, nil
 }
 
+func (service *ImageService) CreateWithAssets(ctx context.Context, _ string, author model.GitHubUser, description string, tags []string, timeMode string, startAt time.Time, endAt time.Time, assetPaths []string, imageID string) (model.Image, error) {
+	service.mu.Lock()
+	defer service.mu.Unlock()
+
+	now := utils.NowBeijing()
+	resolvedID := strings.TrimSpace(imageID)
+	if resolvedID == "" {
+		resolvedID = utils.NewID()
+	}
+
+	image := model.Image{
+		ID:           resolvedID,
+		AuthorLogin:  author.Login,
+		AuthorAvatar: author.AvatarURL,
+		Description:  description,
+		Tags:         normalizeTags(tags),
+		TimeMode:     timeMode,
+		StartAt:      startAt,
+		EndAt:        endAt,
+		CapturedAt:   startAt,
+		MetadataPath: metadataPath(author.Login, resolvedID),
+		CreatedAt:    now,
+		UpdatedAt:    now,
+		ImagePaths:   assetPaths,
+	}
+	image.NormalizeTimeFields()
+
+	if err := service.database.UpsertImage(ctx, image); err != nil {
+		return model.Image{}, err
+	}
+
+	return image, nil
+}
+
 func (service *ImageService) Update(ctx context.Context, _ string, ownerLogin string, id string, description string, tags []string, timeMode string, startAt time.Time, endAt time.Time, files []*multipart.FileHeader) (model.Image, error) {
 	service.mu.Lock()
 	defer service.mu.Unlock()
@@ -125,6 +159,42 @@ func (service *ImageService) Update(ctx context.Context, _ string, ownerLogin st
 			if !containsString(newPaths, oldPath) {
 				_ = service.assets.DeleteObject(ctx, oldPath)
 			}
+		}
+	}
+
+	if err := service.database.UpsertImage(ctx, updated); err != nil {
+		return model.Image{}, err
+	}
+
+	return updated, nil
+}
+
+func (service *ImageService) UpdateWithAssets(ctx context.Context, _ string, ownerLogin string, id string, description string, tags []string, timeMode string, startAt time.Time, endAt time.Time, assetPaths []string) (model.Image, error) {
+	service.mu.Lock()
+	defer service.mu.Unlock()
+
+	current, err := service.database.GetImage(ctx, ownerLogin, id)
+	if err != nil {
+		return model.Image{}, err
+	}
+
+	updated := current
+	updated.Description = description
+	updated.Tags = normalizeTags(tags)
+	updated.TimeMode = timeMode
+	updated.StartAt = startAt
+	updated.EndAt = endAt
+	updated.CapturedAt = startAt
+	updated.UpdatedAt = utils.NowBeijing()
+	updated.NormalizeTimeFields()
+
+	updated.ImagePaths = assetPaths
+	updated.ImagePath = ""
+
+	oldPaths := current.AllImagePaths()
+	for _, oldPath := range oldPaths {
+		if !containsString(assetPaths, oldPath) {
+			_ = service.assets.DeleteObject(ctx, oldPath)
 		}
 	}
 

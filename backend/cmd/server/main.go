@@ -9,6 +9,7 @@ import (
 	"github.com/dieWehmut/story-timeline/backend/config"
 	"github.com/dieWehmut/story-timeline/backend/internal/controller"
 	"github.com/dieWehmut/story-timeline/backend/internal/github"
+	"github.com/dieWehmut/story-timeline/backend/internal/google"
 	"github.com/dieWehmut/story-timeline/backend/internal/router"
 	"github.com/dieWehmut/story-timeline/backend/internal/service"
 	"github.com/dieWehmut/story-timeline/backend/internal/storage"
@@ -25,9 +26,10 @@ func main() {
 	}
 
 	githubOAuthClient := github.NewOAuthClient(env.GitHubClientID, env.GitHubClientSecret, env.GitHubCallbackURL)
+	googleOAuthClient := google.NewOAuthClient(env.GoogleClientID, env.GoogleClientSecret, env.GoogleCallbackURL)
 	graphqlClient := github.NewGraphQLClient()
 
-	authService := service.NewAuthService(githubOAuthClient, graphqlClient, env.SessionSecret, env.SecureCookies, env.GitHubRepoOwner)
+	authService := service.NewAuthService(githubOAuthClient, googleOAuthClient, graphqlClient, env.SessionSecret, env.SecureCookies, env.GitHubRepoOwner)
 	supabaseStorage := storage.NewSupabaseStorage(env.SupabaseURL, env.SupabaseServiceKey)
 	cloudinaryStorage, err := storage.NewCloudinaryStorage(storage.CloudinaryConfig{
 		CloudName: env.CloudinaryCloudName,
@@ -50,9 +52,11 @@ func main() {
 	server := &http.Server{
 		Addr: ":" + env.Port,
 		Handler: router.New(router.Dependencies{
-			AuthController:   controller.NewAuthController(authService, env.FrontendBaseURL),
+			AuthController:   controller.NewAuthController(authService, userService, env.FrontendBaseURL),
+			FollowController: controller.NewFollowController(userService),
 			ImageController:  controller.NewImageController(imageService, userService, authService, interactionService, cloudinaryStorage),
 			HealthController: controller.NewHealthController(env.GitHubRepoOwner, authService),
+			UploadController: controller.NewUploadController(cloudinaryStorage),
 			AuthService:      authService,
 		}, config.AllowedOrigins(env)),
 		ReadHeaderTimeout: 5 * time.Second,

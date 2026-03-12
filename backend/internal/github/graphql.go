@@ -157,6 +157,63 @@ func (c *GraphQLClient) FetchFollowing(ctx context.Context, token string) ([]mod
 	return all, nil
 }
 
+// FetchFollowers returns the list of users who follow the authenticated user.
+func (c *GraphQLClient) FetchFollowers(ctx context.Context, token string) ([]model.GitHubUser, error) {
+	query := `query($cursor: String) {
+		viewer {
+			followers(first: 100, after: $cursor) {
+				pageInfo { hasNextPage endCursor }
+				nodes { databaseId login avatarUrl }
+			}
+		}
+	}`
+
+	var all []model.GitHubUser
+	var cursor *string
+
+	for {
+		vars := map[string]any{}
+		if cursor != nil {
+			vars["cursor"] = *cursor
+		}
+
+		var data struct {
+			Viewer struct {
+				Followers struct {
+					PageInfo struct {
+						HasNextPage bool   `json:"hasNextPage"`
+						EndCursor   string `json:"endCursor"`
+					} `json:"pageInfo"`
+					Nodes []struct {
+						DatabaseID int64  `json:"databaseId"`
+						Login      string `json:"login"`
+						AvatarURL  string `json:"avatarUrl"`
+					} `json:"nodes"`
+				} `json:"followers"`
+			} `json:"viewer"`
+		}
+
+		if err := c.execute(ctx, token, query, vars, &data); err != nil {
+			return nil, err
+		}
+
+		for _, node := range data.Viewer.Followers.Nodes {
+			all = append(all, model.GitHubUser{
+				ID:        node.DatabaseID,
+				Login:     node.Login,
+				AvatarURL: node.AvatarURL,
+			})
+		}
+
+		if !data.Viewer.Followers.PageInfo.HasNextPage {
+			break
+		}
+		cursor = &data.Viewer.Followers.PageInfo.EndCursor
+	}
+
+	return all, nil
+}
+
 // SearchRepoOwners returns owners of repositories whose name matches repoName.
 func (c *GraphQLClient) SearchRepoOwners(ctx context.Context, token string, repoName string) ([]model.GitHubUser, error) {
 	query := `query($query: String!, $cursor: String) {
