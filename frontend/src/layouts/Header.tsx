@@ -4,7 +4,7 @@ import { AuthButton } from './AuthButton';
 import { UploadButton } from './UploadButton';
 import { TagBar } from './TagBar';
 import { UserBar } from './UserBar';
-import type { AuthUser, CreateImagePayload, FeedUser, TimelineMonth } from '../types/image';
+import type { AuthUser, FeedUser, TimelineMonth } from '../types/image';
 
 interface HeaderProps {
   activeMonth: TimelineMonth | null;
@@ -21,8 +21,6 @@ interface HeaderProps {
   onTagSelect: (tag: string | null) => void;
   onThemeToggle: () => void;
   onTimelineToggle: () => void;
-  onUpload: (payload: CreateImagePayload) => Promise<void>;
-  tagSuggestions: string[];
   tagFilter: string | null;
   tagSummary: { tag: string; count: number }[];
   theme: 'dark' | 'light';
@@ -45,8 +43,6 @@ export function Header({
   onTagSelect,
   onThemeToggle,
   onTimelineToggle,
-  onUpload,
-  tagSuggestions,
   tagFilter,
   tagSummary,
   theme,
@@ -84,9 +80,7 @@ export function Header({
             <>
               <AuthButton loading={authLoading} onLogin={onLogin} onLogout={onLogout} user={authUser} />
               <ThemeButton onToggle={onThemeToggle} theme={theme} />
-              {authUser && canPost ? (
-                <UploadButton busy={uploadBusy} onSubmit={onUpload} tagSuggestions={tagSuggestions} />
-              ) : null}
+              {authUser && canPost ? <UploadButton busy={uploadBusy} /> : null}
               <div className={`transition-all duration-300 ${timelineOpen ? 'pointer-events-none scale-75 opacity-0' : 'opacity-100'}`}>
                 <button
                   aria-expanded={timelineOpen}

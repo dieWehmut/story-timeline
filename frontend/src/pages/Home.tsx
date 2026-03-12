@@ -1,260 +1,109 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { LoaderCircle } from 'lucide-react';
-import { CardDetail } from '../ui/CardDetail';
-import { Footer } from '../layouts/Footer';
-import { Header } from '../layouts/Header';
-import { ImageCard } from '../layouts/ImageCard';
-import { FloatingActions } from '../layouts/FloatingActions';
-import { TimeColumn } from '../layouts/TimeColumn';
+import { BookOpen, Download, Github, Image as ImageIcon, LogIn, LogOut, UserRound } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ThemeButton } from '../layouts/ThemeButton';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
-import type { TimelineMonth } from '../types/image';
 
 interface HomeProps {
-  activeMonth: TimelineMonth | null;
   auth: ReturnType<typeof useAuth>;
   images: ReturnType<typeof useImages>;
-  onActiveMonthChange: (month: TimelineMonth) => void;
-  onThemeToggle: () => void;
-  onTimelineClose: () => void;
-  onTimelineToggle: () => void;
   theme: 'dark' | 'light';
-  timelineOpen: boolean;
+  onThemeToggle: () => void;
 }
 
-const getMonthKey = (startAt: string) => {
-  const parts = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: 'numeric',
-  }).formatToParts(new Date(startAt));
+interface NavCardProps {
+  icon: typeof BookOpen;
+  label: string;
+  to?: string;
+  href?: string;
+  external?: boolean;
+}
 
-  const year = Number(parts.find((part) => part.type === 'year')?.value ?? '0');
-  const month = Number(parts.find((part) => part.type === 'month')?.value ?? '0');
+function NavCard({ icon: Icon, label, to, href, external }: NavCardProps) {
+  const baseClass =
+    'group flex h-28 w-full flex-col items-center justify-center gap-2 rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg)] text-[var(--text-main)] shadow-[var(--panel-shadow)] transition hover:-translate-y-0.5 hover:border-[var(--text-accent)]';
 
-  return `${year}-${String(month).padStart(2, '0')}`;
-};
-
-export default function Home({
-  activeMonth,
-  auth,
-  images,
-  onActiveMonthChange,
-  onThemeToggle,
-  onTimelineClose,
-  onTimelineToggle,
-  theme,
-  timelineOpen,
-}: HomeProps) {
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
-
-  const monthGroups = useMemo(
-    () =>
-      images.timeline.map((month) => ({
-        month,
-        items: images.items.filter((item) => getMonthKey(item.startAt) === month.key),
-      })),
-    [images.items, images.timeline]
-  );
-
-  const tagSuggestions = useMemo(() => {
-    if (!auth.user) return [];
-    const counts = new Map<string, { tag: string; count: number }>();
-    images.items.forEach((item) => {
-      if (item.authorLogin.toLowerCase() !== auth.user!.login.toLowerCase()) return;
-      (item.tags ?? []).forEach((tag) => {
-        const normalized = tag.trim();
-        if (!normalized) return;
-        const key = normalized.toLowerCase();
-        const existing = counts.get(key);
-        if (existing) {
-          existing.count += 1;
-        } else {
-          counts.set(key, { tag: normalized, count: 1 });
-        }
-      });
-    });
-    return [...counts.values()]
-      .sort((left, right) => {
-        if (right.count !== left.count) return right.count - left.count;
-        return left.tag.localeCompare(right.tag, 'zh-Hans-CN');
-      })
-      .map((entry) => entry.tag);
-  }, [auth.user, images.items]);
-
-  const selectedItem = useMemo(
-    () => (selectedItemId ? images.items.find((i) => i.id === selectedItemId) ?? null : null),
-    [images.items, selectedItemId]
-  );
-
-  useEffect(() => {
-    const nodes = images.timeline
-      .map((month) => sectionRefs.current[month.key])
-      .filter(Boolean) as HTMLElement[];
-
-    if (!nodes.length) {
-      return;
-    }
-
-    const syncActiveMonth = () => {
-      const activationOffset = 140;
-      const current =
-        [...nodes]
-          .reverse()
-          .find((node) => node.getBoundingClientRect().top <= activationOffset) ??
-        nodes[0];
-
-      const monthKey = current?.getAttribute('data-month-key');
-      const month = images.timeline.find((item) => item.key === monthKey);
-
-      if (month && month.key !== activeMonth?.key) {
-        onActiveMonthChange(month);
-      }
-    };
-
-    syncActiveMonth();
-
-    const handleScroll = () => {
-      window.requestAnimationFrame(syncActiveMonth);
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
-  }, [activeMonth?.key, images.timeline, monthGroups, onActiveMonthChange]);
-
-  const jumpToMonth = (month: TimelineMonth) => {
-    const target = sectionRefs.current[month.key];
-    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    onActiveMonthChange(month);
-    onTimelineClose();
-  };
-
-  const handleTagSelect = (tag: string | null) => {
-    images.setTagFilter(tag);
-    if (selectedItemId !== null) {
-      setSelectedItemId(null);
-    }
-  };
+  if (to) {
+    return (
+      <Link className={baseClass} to={to}>
+        <Icon className="text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={26} />
+        <span className="text-sm">{label}</span>
+      </Link>
+    );
+  }
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden">
-      <Header
-        activeMonth={activeMonth}
-        authLoading={auth.loading}
-        authUser={auth.user}
-        canPost={auth.canPost}
-        feedUsers={images.feedUsers}
-        filterUser={images.filterUser}
-        isDetailView={selectedItemId !== null}
-        onBack={() => setSelectedItemId(null)}
-        onFilterUser={(login) => {
-          images.setFilterUser(login);
-          images.setTagFilter(null);
-        }}
-        onLogin={auth.login}
-        onLogout={auth.logout}
-        onTagSelect={handleTagSelect}
-        onThemeToggle={onThemeToggle}
-        onTimelineToggle={onTimelineToggle}
-        onUpload={(payload) => images.createImage(payload, auth.user ? { login: auth.user.login, avatarUrl: auth.user.avatarUrl } : undefined)}
-        tagSuggestions={tagSuggestions}
-        tagFilter={images.tagFilter}
-        tagSummary={images.tagSummary}
-        theme={theme}
-        timelineOpen={timelineOpen}
-        uploadBusy={images.submitting}
-      />
+    <a
+      className={baseClass}
+      href={href}
+      rel={external ? 'noopener noreferrer' : undefined}
+      target={external ? '_blank' : undefined}
+    >
+      <Icon className="text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={26} />
+      <span className="text-sm">{label}</span>
+    </a>
+  );
+}
 
-      {timelineOpen && (
-        <div className="fixed inset-0 z-30" onClick={onTimelineClose} />
-      )}
+export default function Home({ auth, images, theme, onThemeToggle }: HomeProps) {
+  const githubOwner = images.stats.githubOwner || auth.user?.login || 'GitHub';
+  const repoUrl = `https://github.com/${githubOwner}/story-timeline`;
+  const androidUrl = `${repoUrl}/releases/latest`;
 
-      <TimeColumn
-        activeMonth={activeMonth}
-        months={images.timeline}
-        onJump={jumpToMonth}
-        onToggleOrder={images.toggleTimeOrder}
-        open={timelineOpen}
-        order={images.timeOrder}
-      />
-
-      <main className="relative mx-auto flex w-full max-w-xl flex-col px-0 pb-36 pt-28 md:px-0 md:pt-36">
-        {images.error ? (
-          <div className="mb-6 border border-rose-400/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
-            {images.error}
-          </div>
-        ) : null}
-
-        {images.loading ? (
-          <div className="flex min-h-64 items-center justify-center">
-            <LoaderCircle className="animate-spin text-cyan-300" size={28} />
-          </div>
-        ) : (
-          <div className="divide-y divide-[var(--panel-border)]">
-            {monthGroups.map(({ month, items }) => (
-              <section
-                className="scroll-mt-28 md:scroll-mt-36"
-                data-month-key={month.key}
-                key={month.key}
-                ref={(node) => {
-                  sectionRefs.current[month.key] = node;
-                }}
+  return (
+    <div className="min-h-screen pb-28">
+      <header className="px-4 pt-4">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
+          <div className="flex items-center gap-3">
+            {auth.loading ? (
+              <button
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--panel-border)] px-3 py-1.5 text-sm text-soft"
+                disabled
+                type="button"
               >
-                <div className="divide-y divide-[var(--panel-border)]">
-                  {items.map((item) => (
-                    <ImageCard
-                      busy={images.submitting}
-                      canInteract={auth.authenticated}
-                      editable={auth.user?.login === item.authorLogin}
-                      fallbackAuthorLogin={images.stats.githubOwner || auth.user?.login || undefined}
-                      item={item}
-                      key={item.id}
-                      onAvatarClick={(login) => images.setFilterUser(images.filterUser === login ? null : login)}
-                      onCommentCountChange={images.incrementCommentCount}
-                      onDelete={images.deleteImage}
-                      onLikeChange={images.updateLike}
-                      onOpenDetail={() => setSelectedItemId(item.id)}
-                      onSave={images.updateImage}
-                      onTagClick={(tag) => handleTagSelect(tag)}
-                      roleLabel={item.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
-                      tagCounts={images.tagCountMap}
-                      tagSuggestions={tagSuggestions}
-                    />
-                  ))}
-                </div>
-              </section>
-            ))}
+                <UserRound size={16} />
+                载入中
+              </button>
+            ) : auth.user ? (
+              <>
+                <span className="text-sm font-medium text-[var(--text-main)]">{auth.user.login}</span>
+                <button
+                  className="inline-flex items-center gap-2 rounded-full border border-[var(--panel-border)] px-3 py-1.5 text-sm text-[var(--text-main)] transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)]"
+                  onClick={() => void auth.logout()}
+                  type="button"
+                >
+                  <LogOut size={16} />
+                  登出
+                </button>
+              </>
+            ) : (
+              <button
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--panel-border)] px-3 py-1.5 text-sm text-[var(--text-main)] transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)]"
+                onClick={auth.login}
+                type="button"
+              >
+                <LogIn size={16} />
+                登录
+              </button>
+            )}
           </div>
-        )}
+          <ThemeButton onToggle={onThemeToggle} theme={theme} />
+        </div>
+      </header>
+
+      <main className="mx-auto flex w-full max-w-3xl flex-col items-center px-4 pt-16 text-center">
+        <h1 className="font-serif text-4xl font-semibold tracking-wide text-[var(--text-main)] md:text-5xl">物语集</h1>
+        <p className="mt-3 text-sm text-soft">
+          注册用户数统计：{images.stats.userCount}
+        </p>
+
+        <div className="mt-10 grid w-full max-w-xl grid-cols-2 gap-4">
+          <NavCard icon={BookOpen} label="物语" to="/story" />
+          <NavCard icon={ImageIcon} label="相册" to="/album" />
+          <NavCard icon={Github} label="代码仓库 GitHub" href={repoUrl} external />
+          <NavCard icon={Download} label="Android 下载" href={androidUrl} external />
+        </div>
       </main>
-
-      {selectedItemId === null ? (
-        <Footer stats={{ ...images.stats, githubOwner: images.stats.githubOwner || auth.user?.login || 'GitHub' }} />
-      ) : null}
-
-      {selectedItem ? (
-        <CardDetail
-          canInteract={auth.authenticated}
-          currentUserLogin={auth.user?.login}
-          editable={auth.user?.login === selectedItem.authorLogin}
-          fallbackAuthorLogin={images.stats.githubOwner || auth.user?.login || undefined}
-          item={selectedItem}
-          onCommentCountChange={images.incrementCommentCount}
-          onDelete={images.deleteImage}
-          onLikeChange={images.updateLike}
-          onSave={images.updateImage}
-          onTagClick={(tag) => handleTagSelect(tag)}
-          roleLabel={selectedItem.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
-          tagCounts={images.tagCountMap}
-          tagSuggestions={tagSuggestions}
-        />
-      ) : null}
-
-      <FloatingActions hidden={timelineOpen || selectedItemId !== null} />
     </div>
   );
 }

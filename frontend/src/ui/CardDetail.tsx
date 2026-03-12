@@ -1,12 +1,12 @@
 ﻿import { useState, useEffect, useRef, useCallback, useId, useMemo } from 'react';
 import { CornerUpLeft, Heart, ImagePlus, LoaderCircle, MessageCircle, PencilLine, Send, Trash2, X } from 'lucide-react';
 import { ImageViewer } from './ImageViewer';
-import { PostDialog } from './PostDialog';
 import { useToast } from './useToast';
 import { api } from '../lib/api';
 import { getCommentCache, setCommentCache } from '../lib/commentCache';
 import { setCommentInputActive } from '../lib/uiFlags';
-import type { CommentItem, ImageItem, UpdateImagePayload } from '../types/image';
+import { useLocation, useNavigate } from 'react-router-dom';
+import type { CommentItem, ImageItem } from '../types/image';
 
 // Module-level cache: persists draft comment files while detail view is closed
 const detailFileCache = new Map<string, File[]>();
@@ -17,19 +17,6 @@ const MAX_COMMENT_TOTAL_SIZE = 25 * 1024 * 1024;
 const createPreviewUrls = (files: File[]) => files.map((currentFile) => URL.createObjectURL(currentFile));
 const revokePreviewUrls = (urls: string[]) => {
   urls.forEach((url) => URL.revokeObjectURL(url));
-};
-
-const toDateTimeInputValue = (value: string) => {
-  const formatter = new Intl.DateTimeFormat('sv-SE', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-  return formatter.format(new Date(value)).replace(' ', 'T');
 };
 
 const dateOnlyFormatter = new Intl.DateTimeFormat('zh-CN', {
@@ -156,11 +143,9 @@ interface CardDetailProps {
   currentUserLogin?: string;
   onTagClick?: (tag: string) => void;
   onDelete?: (id: string) => Promise<void>;
-  onSave?: (payload: UpdateImagePayload) => Promise<void>;
   onLikeChange?: (id: string, likeCount: number, liked: boolean) => void;
   onCommentCountChange?: (id: string, delta: number) => void;
   tagCounts?: Record<string, number>;
-  tagSuggestions?: string[];
 }
 
 export function CardDetail({
@@ -172,16 +157,13 @@ export function CardDetail({
   currentUserLogin,
   onTagClick,
   onDelete,
-  onSave,
   onLikeChange,
   onCommentCountChange,
   tagCounts,
-  tagSuggestions,
 }: CardDetailProps) {
   const [comments, setComments] = useState<CommentViewItem[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentBusy, setCommentBusy] = useState(false);
-  const [editing, setEditing] = useState(false);
   const [text, setText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -197,6 +179,8 @@ export function CardDetail({
   const commentInputRef = useRef<HTMLInputElement>(null);
   const commentInputFocusedRef = useRef(false);
   const { confirm } = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
   const fileRef = useRef<File[]>([]);
   const previewRef = useRef<string[]>([]);
 
@@ -308,26 +292,6 @@ export function CardDetail({
     confirm('确定要删除这张卡片吗？', () => {
       void onDelete?.(item.id);
     });
-  };
-
-  const handleEditSubmit = async (data: {
-    description: string;
-    tags: string[];
-    timeMode: 'point' | 'range';
-    startAt: string;
-    endAt?: string;
-    files: File[];
-  }) => {
-    await onSave?.({
-      id: item.id,
-      description: data.description,
-      tags: data.tags,
-      timeMode: data.timeMode,
-      startAt: data.startAt,
-      endAt: data.endAt,
-      files: data.files.length > 0 ? data.files : undefined,
-    });
-    setEditing(false);
   };
 
   const handleFileSelect = useCallback((incoming: FileList | null) => {
@@ -541,7 +505,9 @@ export function CardDetail({
                   <button
                     aria-label="修改卡片"
                     className={`${actionButtonBaseClass} text-soft hover:text-[var(--text-main)]`}
-                    onClick={() => setEditing(true)}
+                    onClick={() => {
+                      navigate(`/post?id=${item.id}`, { state: { from: `${location.pathname}${location.search}` } });
+                    }}
                     type="button"
                   >
                     <PencilLine size={14} />
@@ -877,24 +843,6 @@ export function CardDetail({
           </div>
         ) : null}
       </div>
-
-      {/* Edit dialog */}
-      {editable ? (
-        <PostDialog
-          busy={false}
-          initialDescription={item.description}
-          initialImageUrls={imageUrls}
-          initialTags={tags}
-          initialStartAt={toDateTimeInputValue(item.startAt)}
-          initialEndAt={item.endAt ? toDateTimeInputValue(item.endAt) : undefined}
-          initialTimeMode={item.timeMode}
-          mode="edit"
-          onClose={() => setEditing(false)}
-          onSubmit={handleEditSubmit}
-          open={editing}
-          tagSuggestions={tagSuggestions}
-        />
-      ) : null}
 
       {/* Image viewer lightbox */}
       {viewerIndex !== null ? (

@@ -9,6 +9,8 @@ interface PostDialogProps {
   onClose: () => void;
   busy: boolean;
   mode: 'create' | 'edit';
+  variant?: 'modal' | 'page';
+  closeOnSubmit?: boolean;
   initialDescription?: string;
   initialTags?: string[];
   tagSuggestions?: string[];
@@ -96,6 +98,8 @@ export function PostDialog({
   onClose,
   busy,
   mode,
+  variant = 'modal',
+  closeOnSubmit,
   initialDescription = '',
   initialTags = [],
   tagSuggestions = [],
@@ -105,6 +109,8 @@ export function PostDialog({
   initialImageUrls = [],
   onSubmit,
 }: PostDialogProps) {
+  const resolvedCloseOnSubmit = closeOnSubmit ?? variant !== 'page';
+  const isPage = variant === 'page';
   const descriptionId = useId();
   const startTimeId = useId();
   const endTimeId = useId();
@@ -343,7 +349,9 @@ export function PostDialog({
       (url) => !previews.some((item) => item.type === 'url' && item.url === url)
     );
     setError(null);
-    onClose();
+    if (resolvedCloseOnSubmit) {
+      onClose();
+    }
     try {
       await onSubmit({
         description: description.trim(),
@@ -462,10 +470,20 @@ export function PostDialog({
   const cols = totalPreviews <= 2 ? 2 : 3;
   const availableTags = tagHistory.filter((tag) => !tags.some((selected) => selected.toLowerCase() === tag.toLowerCase()));
   const previewUrls = previews.map((item) => item.url);
+  const wrapperClass = isPage
+    ? 'min-h-screen w-full bg-[var(--page-bg)]'
+    : `fixed inset-0 z-50 flex flex-col md:items-center md:justify-center transition-colors duration-250 ${
+      visible ? 'bg-[var(--page-bg)] md:bg-slate-950/65' : 'bg-transparent md:bg-transparent'
+    }`;
+  const panelClass = isPage
+    ? 'mx-auto flex min-h-screen w-full max-w-xl flex-col bg-[var(--page-bg)]'
+    : `flex h-full w-full flex-col bg-[var(--page-bg)] transition-all duration-250 md:h-auto md:max-h-[90vh] md:max-w-lg md:border md:border-[var(--panel-border)] md:bg-[var(--panel-bg)] md:backdrop-blur-xl ${
+      visible ? 'translate-y-0 opacity-100 md:scale-100' : 'translate-y-full opacity-100 md:translate-y-0 md:scale-95 md:opacity-0'
+    }`;
 
   return (
-    <div className={`fixed inset-0 z-50 flex flex-col md:items-center md:justify-center transition-colors duration-250 ${visible ? 'bg-[var(--page-bg)] md:bg-slate-950/65' : 'bg-transparent md:bg-transparent'}`}>
-      <div className={`flex h-full w-full flex-col bg-[var(--page-bg)] transition-all duration-250 md:h-auto md:max-h-[90vh] md:max-w-lg md:border md:border-[var(--panel-border)] md:bg-[var(--panel-bg)] md:backdrop-blur-xl ${visible ? 'translate-y-0 opacity-100 md:scale-100' : 'translate-y-full opacity-100 md:translate-y-0 md:scale-95 md:opacity-0'}`}>
+    <div className={wrapperClass}>
+      <div className={panelClass}>
         <div className="flex shrink-0 items-center justify-between px-4 py-3">
           <button className="text-sm text-soft hover:text-[var(--text-main)] transition" onClick={onClose} type="button">
             取消

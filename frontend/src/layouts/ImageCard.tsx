@@ -2,43 +2,26 @@ import { useEffect, useState } from 'react';
 import { Heart, LoaderCircle, MessageCircle, PencilLine, Trash2 } from 'lucide-react';
 import { CommentDialog } from '../ui/CommentDialog';
 import { ImageViewer } from '../ui/ImageViewer';
-import { PostDialog } from '../ui/PostDialog';
 import { useToast } from '../ui/useToast';
 import { api } from '../lib/api';
 import { getCommentCache, setCommentCache } from '../lib/commentCache';
-import type { CommentItem, ImageItem, UpdateImagePayload } from '../types/image';
+import { useLocation, useNavigate } from 'react-router-dom';
+import type { CommentItem, ImageItem } from '../types/image';
 
 interface ImageCardProps {
   item: ImageItem;
   fallbackAuthorLogin?: string;
   roleLabel?: string;
   editable: boolean;
-  busy: boolean;
   canInteract: boolean;
   onAvatarClick?: (login: string) => void;
   onTagClick?: (tag: string) => void;
   onDelete: (id: string) => Promise<void>;
-  onSave: (payload: UpdateImagePayload) => Promise<void>;
   onLikeChange?: (id: string, likeCount: number, liked: boolean) => void;
   onCommentCountChange?: (id: string, delta: number) => void;
   onOpenDetail?: () => void;
   tagCounts?: Record<string, number>;
-  tagSuggestions?: string[];
 }
-
-const toDateTimeInputValue = (value: string) => {
-  const formatter = new Intl.DateTimeFormat('sv-SE', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
-
-  return formatter.format(new Date(value)).replace(' ', 'T');
-};
 
 const dateOnlyFormatter = new Intl.DateTimeFormat('zh-CN', {
   timeZone: 'Asia/Shanghai',
@@ -137,7 +120,6 @@ function ImageGrid({ urls, alt, onImageClick }: { urls: string[]; alt: string; o
 }
 
 export function ImageCard({
-  busy,
   canInteract,
   editable,
   fallbackAuthorLogin,
@@ -148,12 +130,9 @@ export function ImageCard({
   onDelete,
   onLikeChange,
   onOpenDetail,
-  onSave,
   roleLabel,
   tagCounts,
-  tagSuggestions,
 }: ImageCardProps) {
-  const [editing, setEditing] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [comments, setComments] = useState<CommentViewItem[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -162,6 +141,8 @@ export function ImageCard({
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
   const [commentImageViewer, setCommentImageViewer] = useState<{ urls: string[]; initialIndex: number } | null>(null);
   const { confirm } = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   // Auto-load comments on mount if there are any (for inline preview)
   useEffect(() => {
@@ -179,26 +160,6 @@ export function ImageCard({
   const imageUrls = item.imageUrls ?? [];
   const tags = item.tags ?? [];
   const commentCacheKey = `${authorLogin}/${item.id}`;
-
-  const handleEditSubmit = async (data: {
-    description: string;
-    tags: string[];
-    timeMode: 'point' | 'range';
-    startAt: string;
-    endAt?: string;
-    files: File[];
-  }) => {
-    await onSave({
-      id: item.id,
-      description: data.description,
-      tags: data.tags,
-      timeMode: data.timeMode,
-      startAt: data.startAt,
-      endAt: data.endAt,
-      files: data.files.length > 0 ? data.files : undefined,
-    });
-    setEditing(false);
-  };
 
   const handleDelete = () => {
     confirm('确定要删除这张卡片吗？', () => {
@@ -346,7 +307,10 @@ export function ImageCard({
                 <button
                   aria-label="编辑卡片"
                   className={`${actionButtonBaseClass} text-soft hover:text-[var(--text-main)]`}
-                  onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/post?id=${item.id}`, { state: { from: `${location.pathname}${location.search}` } });
+                  }}
                   type="button"
                 >
                   <PencilLine size={14} />
@@ -475,22 +439,6 @@ export function ImageCard({
       {viewerIndex !== null ? (
         <ImageViewer initialIndex={viewerIndex} onClose={() => setViewerIndex(null)} urls={imageUrls} />
       ) : null}
-
-      {/* Edit dialog */}
-      <PostDialog
-        busy={busy}
-        initialDescription={item.description}
-        initialImageUrls={imageUrls}
-        initialTags={tags}
-        initialStartAt={toDateTimeInputValue(item.startAt)}
-        initialEndAt={item.endAt ? toDateTimeInputValue(item.endAt) : undefined}
-        initialTimeMode={item.timeMode}
-        mode="edit"
-        onClose={() => setEditing(false)}
-        onSubmit={handleEditSubmit}
-        open={editing}
-        tagSuggestions={tagSuggestions}
-      />
 
       {/* Comment bottom sheet */}
       <CommentDialog

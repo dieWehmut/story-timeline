@@ -52,7 +52,17 @@ export function Footer({ stats }: FooterProps) {
             <span>{formatUptime(uptimeSeconds)}</span>
           </span>
         </div>
-        <p>Copyright (c) 2025-2026 {stats.githubOwner}</p>
+        <p>
+          Copyright (c) 2025-2026{' '}
+          <a
+            href={`https://github.com/${stats.githubOwner}`}
+            rel="noopener noreferrer"
+            target="_blank"
+            className="text-[var(--text-main)] underline decoration-transparent underline-offset-4 transition hover:decoration-current"
+          >
+            {stats.githubOwner}
+          </a>
+        </p>
       </div>
     </footer>
   );
