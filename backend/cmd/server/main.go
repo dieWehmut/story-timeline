@@ -46,13 +46,6 @@ func main() {
 		}
 	}
 
-	githubOAuthClient := github.NewOAuthClient(env.GitHubClientID, env.GitHubClientSecret, env.GitHubCallbackURL)
-	googleOAuthClient := google.NewOAuthClient(env.GoogleClientID, env.GoogleClientSecret, env.GoogleCallbackURL)
-	graphqlClient := github.NewGraphQLClient()
-
-	authService := service.NewAuthService(githubOAuthClient, googleOAuthClient, graphqlClient, env.SessionSecret, env.SecureCookies, env.GitHubRepoOwner)
-	supabaseStorage := storage.NewSupabaseStorage(env.SupabaseURL, env.SupabaseServiceKey)
-
 	var redisStore *storage.Store
 	if redisClient, err := storage.NewClient(env.RedisURL); err != nil {
 		if !errors.Is(err, storage.ErrRedisNotConfigured) {
@@ -61,6 +54,13 @@ func main() {
 	} else {
 		redisStore = storage.NewStore(redisClient)
 	}
+
+	githubOAuthClient := github.NewOAuthClient(env.GitHubClientID, env.GitHubClientSecret, env.GitHubCallbackURL)
+	googleOAuthClient := google.NewOAuthClient(env.GoogleClientID, env.GoogleClientSecret, env.GoogleCallbackURL)
+	graphqlClient := github.NewGraphQLClient()
+
+	authService := service.NewAuthService(githubOAuthClient, googleOAuthClient, graphqlClient, env.SessionSecret, env.SecureCookies, env.GitHubRepoOwner, redisStore)
+	supabaseStorage := storage.NewSupabaseStorage(env.SupabaseURL, env.SupabaseServiceKey)
 
 	loginLimiter := service.NewLoginLimiter(redisStore, 0)
 	emailService := service.NewEmailAuthService(supabaseStorage, env.ResendAPIKey, env.ResendEmailFrom, redisStore)
@@ -85,7 +85,7 @@ func main() {
 	server := &http.Server{
 		Addr: ":" + env.Port,
 		Handler: router.New(router.Dependencies{
-			AuthController:   controller.NewAuthController(authService, userService, emailService, loginLimiter, env.FrontendBaseURL),
+			AuthController:   controller.NewAuthController(authService, userService, emailService, loginLimiter, env.FrontendBaseURL, env.AppURLScheme),
 			FollowController: controller.NewFollowController(userService),
 			ImageController:  controller.NewImageController(imageService, userService, authService, interactionService, cloudinaryStorage),
 			HealthController: controller.NewHealthController(env.GitHubRepoOwner, authService, userService),

@@ -31,8 +31,9 @@ type uploadItemRequest struct {
 }
 
 type signImageUploadRequest struct {
-	ImageID string              `json:"imageId"`
-	Items   []uploadItemRequest `json:"items"`
+	ImageID    string              `json:"imageId"`
+	StartIndex int                 `json:"startIndex"`
+	Items      []uploadItemRequest `json:"items"`
 }
 
 type signCommentUploadRequest struct {
@@ -79,6 +80,10 @@ func (controller *UploadController) SignImageUploads(c *gin.Context) {
 	if imageID == "" {
 		imageID = utils.NewID()
 	}
+	startIndex := payload.StartIndex
+	if startIndex < 0 {
+		startIndex = 0
+	}
 
 	videoCount := 0
 	uploads := make([]storage.SignedUpload, 0, len(payload.Items))
@@ -96,9 +101,10 @@ func (controller *UploadController) SignImageUploads(c *gin.Context) {
 			}
 		}
 
-		publicID := imageObjectKey(session.User.Login, imageID, index)
+		assetIndex := startIndex + index
+		publicID := imageObjectKey(session.User.Login, imageID, assetIndex)
 		if mediaType == "video" {
-			publicID = videoObjectKey(session.User.Login, imageID, index)
+			publicID = videoObjectKey(session.User.Login, imageID, assetIndex)
 		}
 		uploads = append(uploads, controller.assets.SignUpload(publicID, mediaType))
 	}

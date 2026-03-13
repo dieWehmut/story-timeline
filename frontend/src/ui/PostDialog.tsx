@@ -4,7 +4,7 @@ import { ImageViewer } from './ImageViewer';
 import { useToast } from '../utils/useToast';
 import { setPostDialogOpen } from '../lib/uiFlags';
 import { isVideoUrl, mediaTypeFromFile } from '../lib/media';
-import type { MediaType } from '../types/image';
+import type { AssetOrderItem, MediaType } from '../types/image';
 
 interface PostDialogProps {
   open: boolean;
@@ -21,7 +21,7 @@ interface PostDialogProps {
   initialEndAt?: string;
   initialImageUrls?: string[];
   initialAssetTypes?: MediaType[];
-  onSubmit: (data: { description: string; tags: string[]; timeMode: 'point' | 'range'; startAt: string; endAt?: string; files: File[]; removedUrls?: string[] }) => Promise<void>;
+  onSubmit: (data: { description: string; tags: string[]; timeMode: 'point' | 'range'; startAt: string; endAt?: string; files: File[]; removedUrls?: string[]; assetOrder: AssetOrderItem[] }) => Promise<void>;
 }
 
 const MAX_FILES = 15;
@@ -418,7 +418,17 @@ export function PostDialog({
       return;
     }
 
-    const files = previews.filter((item) => item.type === 'file').map((item) => item.file!);
+    const files: File[] = [];
+    let fileIndex = 0;
+    const assetOrder: AssetOrderItem[] = previews.map((item) => {
+      if (item.type === 'url') {
+        return { kind: 'url', url: item.url };
+      }
+      const index = fileIndex;
+      fileIndex += 1;
+      files.push(item.file!);
+      return { kind: 'file', index };
+    });
     const removedUrls = initialImageUrls.filter(
       (url) => !previews.some((item) => item.type === 'url' && item.url === url)
     );
@@ -435,6 +445,7 @@ export function PostDialog({
         endAt: timeMode === 'range' ? `${endAt}:00+08:00` : undefined,
         files,
         removedUrls: removedUrls.length > 0 ? removedUrls : undefined,
+        assetOrder,
       });
       const updatedHistory = mergeTagHistory(loadTagHistory(), tags);
       setTagHistory(updatedHistory);

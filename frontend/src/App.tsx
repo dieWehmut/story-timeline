@@ -10,6 +10,7 @@ import Album from './pages/Album';
 import Post from './pages/Post';
 import Following from './pages/Following';
 import Follower from './pages/Follower';
+import AuthEmail from './pages/AuthEmail';
 import { ToastProvider } from './ui/Toast';
 import type { TimelineMonth } from './types/image';
 
@@ -139,6 +140,7 @@ function App() {
               path="/follower"
               element={<Follower auth={auth} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
             />
+            <Route path="/auth/email" element={<AuthEmail />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

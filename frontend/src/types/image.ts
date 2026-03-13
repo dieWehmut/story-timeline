@@ -47,7 +47,13 @@ export interface UpdateImagePayload {
   startAt: string;
   endAt?: string;
   files?: File[];
+  assetOrder?: AssetOrderItem[];
+  assetPathMap?: Record<string, string>;
 }
+
+export type AssetOrderItem =
+  | { kind: 'url'; url: string }
+  | { kind: 'file'; index: number };
 
 export interface FeedUser {
   login: string;

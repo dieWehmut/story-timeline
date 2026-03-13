@@ -9,6 +9,7 @@ type Env struct {
 	Port                string
 	FrontendOrigin      string
 	FrontendBaseURL     string
+	AppURLScheme        string
 	GitHubClientID      string
 	GitHubClientSecret  string
 	GitHubCallbackURL   string
@@ -39,6 +40,7 @@ func LoadEnv() Env {
 		Port:                getEnv("PORT", "7860"),
 		FrontendOrigin:      getEnv("FRONTEND_ORIGIN", "http://localhost:5173"),
 		FrontendBaseURL:     frontendBaseURL,
+		AppURLScheme:        getEnv("APP_URL_SCHEME", "storytimeline.me"),
 		GitHubClientID:      os.Getenv("GITHUB_CLIENT_ID"),
 		GitHubClientSecret:  os.Getenv("GITHUB_CLIENT_SECRET"),
 		GitHubCallbackURL:   getEnv("GITHUB_CALLBACK_URL", defaultCallbackURL),

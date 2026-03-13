@@ -18,6 +18,7 @@ import (
 	githuboauth "github.com/dieWehmut/story-timeline/backend/internal/github"
 	googleoauth "github.com/dieWehmut/story-timeline/backend/internal/google"
 	"github.com/dieWehmut/story-timeline/backend/internal/model"
+	"github.com/dieWehmut/story-timeline/backend/internal/storage"
 	"github.com/dieWehmut/story-timeline/backend/internal/utils"
 )
 
@@ -34,6 +35,7 @@ type AuthService struct {
 	signingSecret []byte
 	secureCookies bool
 	adminLogin    string
+	stateStore    *storage.Store
 }
 
 type sessionClaims struct {
@@ -42,7 +44,7 @@ type sessionClaims struct {
 	jwt.RegisteredClaims
 }
 
-func NewAuthService(oauth *githuboauth.OAuthClient, googleOAuth *googleoauth.OAuthClient, graphql *githuboauth.GraphQLClient, secret string, secureCookies bool, adminLogin string) *AuthService {
+func NewAuthService(oauth *githuboauth.OAuthClient, googleOAuth *googleoauth.OAuthClient, graphql *githuboauth.GraphQLClient, secret string, secureCookies bool, adminLogin string, stateStore *storage.Store) *AuthService {
 	return &AuthService{
 		oauth:         oauth,
 		googleOAuth:   googleOAuth,
@@ -50,11 +52,17 @@ func NewAuthService(oauth *githuboauth.OAuthClient, googleOAuth *googleoauth.OAu
 		signingSecret: []byte(secret),
 		secureCookies: secureCookies,
 		adminLogin:    strings.ToLower(strings.TrimSpace(adminLogin)),
+		stateStore:    stateStore,
 	}
 }
 
 func (service *AuthService) NewState() string {
 	return utils.NewID()
+}
+
+type OAuthStatePayload struct {
+	Client   string `json:"client,omitempty"`
+	ReturnTo string `json:"returnTo,omitempty"`
 }
 
 func (service *AuthService) LoginURL(provider string, state string, redirectURL string) string {
@@ -83,6 +91,80 @@ func (service *AuthService) ValidateState(r *http.Request, incoming string) bool
 	}
 
 	return incoming != "" && stateCookie.Value == incoming
+}
+
+func (service *AuthService) StoreOAuthState(ctx context.Context, state string, payload OAuthStatePayload) {
+	if service.stateStore == nil || !service.stateStore.Enabled() {
+		return
+	}
+
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+
+	_ = service.stateStore.SetOAuthState(ctx, state, string(encoded))
+}
+
+func (service *AuthService) ConsumeOAuthState(ctx context.Context, state string) (*OAuthStatePayload, bool) {
+	if service.stateStore == nil || !service.stateStore.Enabled() {
+		return nil, false
+	}
+
+	value, err := service.stateStore.ConsumeOAuthState(ctx, state)
+	if err != nil {
+		if storage.IsCacheMiss(err) {
+			return nil, false
+		}
+		return nil, false
+	}
+
+	var payload OAuthStatePayload
+	if err := json.Unmarshal([]byte(value), &payload); err != nil {
+		return nil, false
+	}
+
+	return &payload, true
+}
+
+type exchangePayload struct {
+	Session model.Session `json:"session"`
+}
+
+func (service *AuthService) CreateExchangeToken(ctx context.Context, session model.Session) (string, error) {
+	if service.stateStore == nil || !service.stateStore.Enabled() {
+		return "", errors.New("exchange store unavailable")
+	}
+
+	token := utils.NewID()
+	encoded, err := json.Marshal(exchangePayload{Session: session})
+	if err != nil {
+		return "", err
+	}
+
+	if err := service.stateStore.SetAuthExchange(ctx, token, string(encoded)); err != nil {
+		return "", err
+	}
+
+	return token, nil
+}
+
+func (service *AuthService) ConsumeExchangeToken(ctx context.Context, token string) (model.Session, error) {
+	if service.stateStore == nil || !service.stateStore.Enabled() {
+		return model.Session{}, errors.New("exchange store unavailable")
+	}
+
+	value, err := service.stateStore.ConsumeAuthExchange(ctx, token)
+	if err != nil {
+		return model.Session{}, err
+	}
+
+	var payload exchangePayload
+	if err := json.Unmarshal([]byte(value), &payload); err != nil {
+		return model.Session{}, err
+	}
+
+	return payload.Session, nil
 }
 
 func (service *AuthService) CompleteLogin(ctx context.Context, provider string, code string, redirectURL string) (model.Session, error) {

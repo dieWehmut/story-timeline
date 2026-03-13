@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -16,15 +17,17 @@ type AuthController struct {
 	emailService    *service.EmailAuthService
 	loginLimiter    *service.LoginLimiter
 	frontendBaseURL string
+	appURLScheme    string
 }
 
-func NewAuthController(authService *service.AuthService, userService *service.UserService, emailService *service.EmailAuthService, loginLimiter *service.LoginLimiter, frontendBaseURL string) *AuthController {
+func NewAuthController(authService *service.AuthService, userService *service.UserService, emailService *service.EmailAuthService, loginLimiter *service.LoginLimiter, frontendBaseURL string, appURLScheme string) *AuthController {
 	return &AuthController{
 		authService:     authService,
 		userService:     userService,
 		emailService:    emailService,
 		loginLimiter:    loginLimiter,
 		frontendBaseURL: frontendBaseURL,
+		appURLScheme:    appURLScheme,
 	}
 }
 
@@ -52,14 +55,19 @@ func (controller *AuthController) EmailLogin(c *gin.Context) {
 	}
 
 	var payload struct {
-		Email string `json:"email"`
+		Email    string `json:"email"`
+		ReturnTo string `json:"returnTo"`
+		Client   string `json:"client"`
 	}
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
 
-	if err := controller.emailService.RequestMagicLink(c.Request.Context(), payload.Email, controller.callbackURL(c.Request, "email")); err != nil {
+	returnTo := sanitizeReturnPath(payload.ReturnTo)
+	client := normalizeClient(payload.Client)
+	linkBase := controller.emailLinkBaseURL(c.Request, client, returnTo)
+	if err := controller.emailService.RequestMagicLink(c.Request.Context(), payload.Email, linkBase); err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
@@ -68,8 +76,14 @@ func (controller *AuthController) EmailLogin(c *gin.Context) {
 }
 
 func (controller *AuthController) login(c *gin.Context, provider string) {
+	returnTo := sanitizeReturnPath(c.Query("return"))
+	client := normalizeClient(c.Query("client"))
 	state := controller.authService.NewState()
 	controller.authService.SetOAuthStateCookie(c.Writer, state)
+	controller.authService.StoreOAuthState(c.Request.Context(), state, service.OAuthStatePayload{
+		Client:   client,
+		ReturnTo: returnTo,
+	})
 	c.Redirect(http.StatusTemporaryRedirect, controller.authService.LoginURL(provider, state, controller.callbackURL(c.Request, provider)))
 }
 
@@ -103,11 +117,14 @@ func (controller *AuthController) EmailCallback(c *gin.Context) {
 		_ = controller.userService.UpsertUser(c.Request.Context(), session.User)
 	}
 
-	c.Redirect(http.StatusTemporaryRedirect, controller.publicBaseURL(c.Request))
+	returnTo := sanitizeReturnPath(c.Query("return"))
+	c.Redirect(http.StatusTemporaryRedirect, controller.redirectTarget(c.Request, returnTo))
 }
 
 func (controller *AuthController) callback(c *gin.Context, provider string) {
-	if !controller.authService.ValidateState(c.Request, c.Query("state")) {
+	stateValue := c.Query("state")
+	statePayload, stateOK := controller.authService.ConsumeOAuthState(c.Request.Context(), stateValue)
+	if !controller.authService.ValidateState(c.Request, stateValue) && !stateOK {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid oauth state"})
 		return
 	}
@@ -115,6 +132,57 @@ func (controller *AuthController) callback(c *gin.Context, provider string) {
 	session, err := controller.authService.CompleteLogin(c.Request.Context(), provider, c.Query("code"), controller.callbackURL(c.Request, provider))
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+
+	returnTo := ""
+	client := "web"
+	if statePayload != nil {
+		returnTo = sanitizeReturnPath(statePayload.ReturnTo)
+		client = normalizeClient(statePayload.Client)
+	}
+
+	if client == "app" {
+		exchangeToken, exchangeErr := controller.authService.CreateExchangeToken(c.Request.Context(), session)
+		if exchangeErr == nil {
+			if controller.userService != nil {
+				_ = controller.userService.UpsertUser(c.Request.Context(), session.User)
+				if session.User.Provider == "github" {
+					_ = controller.userService.SyncGitHubFollows(c.Request.Context(), session.AccessToken, session.User.Login)
+				}
+			}
+			c.Redirect(http.StatusTemporaryRedirect, controller.appAuthURL("/callback", exchangeToken, returnTo))
+			return
+		}
+	}
+
+	if err := controller.authService.SetSessionCookie(c.Writer, session); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if controller.userService != nil {
+		_ = controller.userService.UpsertUser(c.Request.Context(), session.User)
+		if session.User.Provider == "github" {
+			_ = controller.userService.SyncGitHubFollows(c.Request.Context(), session.AccessToken, session.User.Login)
+		}
+	}
+
+	c.Redirect(http.StatusTemporaryRedirect, controller.redirectTarget(c.Request, returnTo))
+}
+
+func (controller *AuthController) ExchangeSession(c *gin.Context) {
+	var payload struct {
+		Token string `json:"token"`
+	}
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	session, err := controller.authService.ConsumeExchangeToken(c.Request.Context(), payload.Token)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -130,7 +198,39 @@ func (controller *AuthController) callback(c *gin.Context, provider string) {
 		}
 	}
 
-	c.Redirect(http.StatusTemporaryRedirect, controller.publicBaseURL(c.Request))
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func (controller *AuthController) EmailExchange(c *gin.Context) {
+	if controller.emailService == nil || !controller.emailService.Enabled() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "email login not configured"})
+		return
+	}
+
+	var payload struct {
+		Token string `json:"token"`
+	}
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	session, err := controller.emailService.CompleteLogin(c.Request.Context(), payload.Token)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := controller.authService.SetSessionCookie(c.Writer, session); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if controller.userService != nil {
+		_ = controller.userService.UpsertUser(c.Request.Context(), session.User)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 func (controller *AuthController) Session(c *gin.Context) {
@@ -234,4 +334,97 @@ func (controller *AuthController) publicBaseURL(r *http.Request) string {
 	}
 
 	return strings.TrimRight(controller.frontendBaseURL, "/")
+}
+
+func (controller *AuthController) redirectTarget(r *http.Request, returnTo string) string {
+	base := strings.TrimRight(controller.publicBaseURL(r), "/")
+	if returnTo == "" {
+		return base
+	}
+	if strings.HasPrefix(returnTo, "/") {
+		return base + returnTo
+	}
+	return base
+}
+
+func normalizeClient(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "app":
+		return "app"
+	default:
+		return "web"
+	}
+}
+
+func sanitizeReturnPath(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+	if !strings.HasPrefix(trimmed, "/") {
+		return ""
+	}
+	if strings.HasPrefix(trimmed, "//") {
+		return ""
+	}
+	if strings.Contains(trimmed, "://") {
+		return ""
+	}
+	if strings.Contains(trimmed, "\\") {
+		return ""
+	}
+	return trimmed
+}
+
+func (controller *AuthController) appScheme() string {
+	scheme := strings.TrimSpace(controller.appURLScheme)
+	scheme = strings.TrimSuffix(scheme, "://")
+	if scheme == "" {
+		scheme = "storytimeline.me"
+	}
+	return scheme
+}
+
+func (controller *AuthController) appAuthBase(path string, returnTo string) string {
+	u := url.URL{
+		Scheme: controller.appScheme(),
+		Host:   "auth",
+		Path:   path,
+	}
+	if returnTo != "" {
+		query := url.Values{}
+		query.Set("return", returnTo)
+		u.RawQuery = query.Encode()
+	}
+	return u.String()
+}
+
+func (controller *AuthController) appAuthURL(path string, token string, returnTo string) string {
+	u := url.URL{
+		Scheme: controller.appScheme(),
+		Host:   "auth",
+		Path:   path,
+	}
+	query := url.Values{}
+	query.Set("token", token)
+	if returnTo != "" {
+		query.Set("return", returnTo)
+	}
+	u.RawQuery = query.Encode()
+	return u.String()
+}
+
+func (controller *AuthController) emailLinkBaseURL(r *http.Request, client string, returnTo string) string {
+	if client == "app" {
+		return controller.appAuthBase("/email", returnTo)
+	}
+	base := strings.TrimRight(controller.publicBaseURL(r), "/") + "/auth/email"
+	if returnTo == "" {
+		return base
+	}
+	sep := "?"
+	if strings.Contains(base, "?") {
+		sep = "&"
+	}
+	return base + sep + "return=" + url.QueryEscape(returnTo)
 }

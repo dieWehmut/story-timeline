@@ -11,8 +11,11 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.2.0",
+    "@capacitor/app": "^8.0.1",
+    "@capacitor/browser": "^8.0.2",
     "@capacitor/core": "^8.2.0",
     "@capacitor/splash-screen": "^8.0.1",
+    "@codetrix-studio/capacitor-google-auth": "3.4.0-rc.4",
     "@sentry/react": "^10.43.0",
     "@sentry/vite-plugin": "^5.1.1",
     "lucide-react": "^0.542.0",
@@ -43,6 +46,11 @@
   "pnpm": {
     "overrides": {
       "sharp": "0.34.5"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@sentry/cli",
+      "esbuild",
+      "sharp"
+    ]
   }
 }

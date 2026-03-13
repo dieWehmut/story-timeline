@@ -1,2 +1,4 @@
+nodeLinker: hoisted
+
 onlyBuiltDependencies:
   - sharp

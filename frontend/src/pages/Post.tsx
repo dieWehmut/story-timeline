@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { PostDialog } from '../ui/PostDialog';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
+import type { AssetOrderItem } from '../types/image';
 
 interface PostProps {
   auth: ReturnType<typeof useAuth>;
@@ -72,8 +73,17 @@ export default function Post({ auth, images }: PostProps) {
     endAt?: string;
     files: File[];
     removedUrls?: string[];
+    assetOrder: AssetOrderItem[];
   }) => {
     if (mode === 'edit' && item) {
+      const assetPathMap: Record<string, string> = {};
+      const imagePaths = item.imagePaths ?? [];
+      item.imageUrls.forEach((url, index) => {
+        const path = imagePaths[index];
+        if (path) {
+          assetPathMap[url] = path;
+        }
+      });
       await images.updateImage({
         id: item.id,
         description: data.description,
@@ -82,6 +92,8 @@ export default function Post({ auth, images }: PostProps) {
         startAt: data.startAt,
         endAt: data.endAt,
         files: data.files.length > 0 ? data.files : undefined,
+        assetOrder: data.assetOrder,
+        assetPathMap,
       });
     } else if (mode === 'create') {
       await images.createImage(

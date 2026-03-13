@@ -18,6 +18,6 @@ public class MainActivity extends BridgeActivity {
 
     private void registerPlugin() {
         ArrayList<Class<? extends Plugin>> plugins = new ArrayList<>();
-        init(savedInstanceState, plugins);
+        registerPlugins(plugins);
     }
 }

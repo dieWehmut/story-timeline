@@ -11,6 +11,8 @@ import (
 
 const (
 	MagicLinkTokenTTL = 10 * time.Minute
+	OAuthStateTTL     = 10 * time.Minute
+	AuthExchangeTTL   = 5 * time.Minute
 	LoginAttemptTTL   = 1 * time.Minute
 	TimelineCacheTTL  = 30 * time.Second
 )
@@ -105,6 +107,62 @@ func (store *Store) ConsumeMagicLinkToken(ctx context.Context, token string) (st
 		return "", ErrMissingToken
 	}
 	value, err := client.GetDel(ctx, magicTokenKey(token)).Result()
+	if err == redis.Nil {
+		return "", ErrCacheMiss
+	}
+	return value, err
+}
+
+func (store *Store) SetOAuthState(ctx context.Context, state string, payload string) error {
+	client, err := store.ensureClient()
+	if err != nil {
+		return err
+	}
+	state = strings.TrimSpace(state)
+	if state == "" {
+		return ErrMissingToken
+	}
+	return client.Set(ctx, oauthStateKey(state), payload, OAuthStateTTL).Err()
+}
+
+func (store *Store) ConsumeOAuthState(ctx context.Context, state string) (string, error) {
+	client, err := store.ensureClient()
+	if err != nil {
+		return "", err
+	}
+	state = strings.TrimSpace(state)
+	if state == "" {
+		return "", ErrMissingToken
+	}
+	value, err := client.GetDel(ctx, oauthStateKey(state)).Result()
+	if err == redis.Nil {
+		return "", ErrCacheMiss
+	}
+	return value, err
+}
+
+func (store *Store) SetAuthExchange(ctx context.Context, token string, payload string) error {
+	client, err := store.ensureClient()
+	if err != nil {
+		return err
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return ErrMissingToken
+	}
+	return client.Set(ctx, authExchangeKey(token), payload, AuthExchangeTTL).Err()
+}
+
+func (store *Store) ConsumeAuthExchange(ctx context.Context, token string) (string, error) {
+	client, err := store.ensureClient()
+	if err != nil {
+		return "", err
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return "", ErrMissingToken
+	}
+	value, err := client.GetDel(ctx, authExchangeKey(token)).Result()
 	if err == redis.Nil {
 		return "", ErrCacheMiss
 	}
@@ -232,6 +290,14 @@ func (store *Store) ensureClient() (*redis.Client, error) {
 
 func magicTokenKey(token string) string {
 	return "magic:token:" + token
+}
+
+func oauthStateKey(state string) string {
+	return "oauth:state:" + state
+}
+
+func authExchangeKey(token string) string {
+	return "auth:exchange:" + token
 }
 
 func loginAttemptKey(ip string) string {

@@ -66,6 +66,20 @@ const normalizeCommentItem = (item: CommentItem): CommentItem => {
   };
 };
 
+const nextAssetIndex = (paths: string[]) => {
+  let max = -1;
+  paths.forEach((path) => {
+    const trimmed = path.trim();
+    if (!trimmed) return;
+    const last = trimmed.split('/').pop() ?? '';
+    const parsed = Number.parseInt(last, 10);
+    if (!Number.isNaN(parsed)) {
+      max = Math.max(max, parsed);
+    }
+  });
+  return max + 1;
+};
+
 const extractErrorMessage = async (response: Response) => {
   const contentType = response.headers.get('content-type') || '';
 
@@ -264,11 +278,27 @@ type CommentPayloadOptions = {
 
 export const api = {
   getSession: async () => normalizeSession(await request<AuthSession>(`${API_BASE}/api/auth/session`)),
-  requestEmailLogin: (email: string, endpoint?: string) =>
+  requestEmailLogin: (email: string, endpoint?: string, options?: { returnTo?: string; client?: 'web' | 'app' }) =>
     request<{ ok: boolean }>(endpoint ?? `${API_BASE}/api/auth/email/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({
+        email,
+        returnTo: options?.returnTo,
+        client: options?.client,
+      }),
+    }),
+  exchangeSession: (token: string) =>
+    request<{ ok: boolean }>(`${API_BASE}/api/auth/exchange`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    }),
+  exchangeEmailLogin: (token: string) =>
+    request<{ ok: boolean }>(`${API_BASE}/api/auth/email/exchange`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
     }),
   logout: () => request<{ ok: boolean }>(`${API_BASE}/api/auth/logout`, { method: 'POST' }),
   getFeed: async () => (await request<ImageItem[]>(`${API_BASE}/api/feed`)).map(normalizeImageItem),
@@ -341,7 +371,38 @@ export const api = {
       endAt: payload.endAt,
     };
 
+    const buildAssetPaths = (newPaths: string[]) => {
+      if (!payload.assetOrder || !payload.assetPathMap) {
+        return newPaths;
+      }
+      const ordered: string[] = [];
+      payload.assetOrder.forEach((item) => {
+        if (item.kind === 'url') {
+          const existingPath = payload.assetPathMap?.[item.url];
+          if (existingPath) ordered.push(existingPath);
+          return;
+        }
+        const nextPath = newPaths[item.index];
+        if (nextPath) ordered.push(nextPath);
+      });
+      return ordered;
+    };
+
     if (!payload.files || payload.files.length === 0) {
+      if (payload.assetOrder && payload.assetPathMap) {
+        const assetPaths = buildAssetPaths([]);
+        return normalizeImageItem(
+          await request<ImageItem>(`${API_BASE}/api/my/images/${payload.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...basePayload,
+              assetPaths,
+            }),
+          })
+        );
+      }
+
       return normalizeImageItem(
         await request<ImageItem>(`${API_BASE}/api/my/images/${payload.id}`, {
           method: 'PATCH',
@@ -352,11 +413,14 @@ export const api = {
     }
 
     const items = await prepareUploadItems(payload.files);
+    const existingPaths = payload.assetPathMap ? Object.values(payload.assetPathMap) : [];
+    const startIndex = nextAssetIndex(existingPaths);
     const plan = await request<UploadPlan>(`${API_BASE}/api/uploads/images`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         imageId: payload.id,
+        startIndex,
         items: items.map((item) => ({ mediaType: item.mediaType })),
       }),
     });
@@ -367,7 +431,7 @@ export const api = {
 
     await Promise.all(plan.uploads.map((upload, index) => uploadToCloudinary(upload, items[index].file)));
 
-    const assetPaths = plan.uploads.map((upload) => upload.publicId);
+    const assetPaths = buildAssetPaths(plan.uploads.map((upload) => upload.publicId));
     return normalizeImageItem(
       await request<ImageItem>(`${API_BASE}/api/my/images/${payload.id}`, {
         method: 'PATCH',

@@ -120,7 +120,7 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
           <NavCard icon={UserCheck} label="关注" to="/following" disabled={followsDisabled} subLabel={auth.authenticated ? `${followingCount} 人` : undefined} />
           <NavCard icon={Users} label="粉丝" to="/follower" disabled={followsDisabled} subLabel={auth.authenticated ? `${followerCount} 人` : undefined} />
 
-          <NavCard icon={Github} label="代码仓库" href={repoUrl} external />
+          <NavCard icon={Github} label="賞個star喵" href={repoUrl} external />
           <NavCard icon={Download} label="Android" href={androidUrl} external />
         </div>
       </main>
