@@ -57,5 +57,31 @@ func main() {
 		log.Fatalf("delete timeline cache failed: %v", err)
 	}
 
+	streamName := fmt.Sprintf("stream:ci:%d", time.Now().Unix())
+	groupName := "ci-group"
+	consumerName := "ci-consumer"
+	if err := store.EnsureStreamGroup(ctx, streamName, groupName, "$"); err != nil {
+		log.Fatalf("ensure stream group failed: %v", err)
+	}
+	if _, err := store.AddStream(ctx, streamName, map[string]string{
+		"event":  "init",
+		"status": "ok",
+	}, 0); err != nil {
+		log.Fatalf("add stream entry failed: %v", err)
+	}
+	messages, err := store.ReadGroup(ctx, streamName, groupName, consumerName, ">", 10, 0)
+	if err != nil && !storage.IsStreamEmpty(err) {
+		log.Fatalf("read stream group failed: %v", err)
+	}
+	if len(messages) > 0 {
+		ids := make([]string, 0, len(messages))
+		for _, msg := range messages {
+			ids = append(ids, msg.ID)
+		}
+		if _, err := store.AckStream(ctx, streamName, groupName, ids...); err != nil {
+			log.Fatalf("ack stream messages failed: %v", err)
+		}
+	}
+
 	log.Println("redis init ok")
 }
