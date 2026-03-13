@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"time"
 
@@ -14,15 +13,25 @@ import (
 	"github.com/dieWehmut/story-timeline/backend/internal/router"
 	"github.com/dieWehmut/story-timeline/backend/internal/service"
 	"github.com/dieWehmut/story-timeline/backend/internal/storage"
+	"go.uber.org/zap"
 )
 
 func main() {
+	logger, err := zap.NewProduction()
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		_ = logger.Sync()
+	}()
+	zap.ReplaceGlobals(logger)
+
 	env := config.LoadEnv()
 	ctx := context.Background()
 
 	if env.AutoApplySchema {
 		if err := storage.ApplySchemaFile(ctx, env.SupabaseDBURL, "supabase/schema.sql"); err != nil {
-			log.Fatalf("failed to apply Supabase schema: %v", err)
+			zap.L().Fatal("failed to apply Supabase schema", zap.Error(err))
 		}
 	}
 
@@ -36,7 +45,7 @@ func main() {
 	var redisStore *storage.Store
 	if redisClient, err := storage.NewClient(env.RedisURL); err != nil {
 		if !errors.Is(err, storage.ErrRedisNotConfigured) {
-			log.Printf("failed to initialize redis: %v", err)
+			zap.L().Warn("failed to initialize redis", zap.Error(err))
 		}
 	} else {
 		redisStore = storage.NewStore(redisClient)
@@ -50,14 +59,14 @@ func main() {
 		APISecret: env.CloudinaryAPISecret,
 	})
 	if err != nil {
-		log.Fatalf("failed to initialize Cloudinary storage: %v", err)
+		zap.L().Fatal("failed to initialize Cloudinary storage", zap.Error(err))
 	}
 
 	userService := service.NewUserService(graphqlClient, supabaseStorage, env.GitHubRepoOwner)
 
 	imageService, err := service.NewImageService(ctx, supabaseStorage, cloudinaryStorage, env.GitHubRepoOwner)
 	if err != nil {
-		log.Fatalf("failed to initialize image service: %v", err)
+		zap.L().Fatal("failed to initialize image service", zap.Error(err))
 	}
 
 	interactionService := service.NewInteractionService(supabaseStorage, cloudinaryStorage)
@@ -79,8 +88,8 @@ func main() {
 		IdleTimeout:  2 * time.Minute,
 	}
 
-	log.Printf("github.com/dieWehmut/story-timeline/backend listening on %s", server.Addr)
+	zap.L().Info("story-timeline backend listening", zap.String("addr", server.Addr))
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("server failed: %v", err)
+		zap.L().Fatal("server failed", zap.Error(err))
 	}
 }

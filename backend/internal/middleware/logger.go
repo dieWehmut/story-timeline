@@ -1,10 +1,10 @@
 package middleware
 
 import (
-	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 func Logger() gin.HandlerFunc {
@@ -17,10 +17,17 @@ func Logger() gin.HandlerFunc {
 		if len(c.Errors) > 0 {
 			lastErr = c.Errors.Last().Error()
 		}
+		fields := []zap.Field{
+			zap.String("method", c.Request.Method),
+			zap.String("path", c.Request.URL.Path),
+			zap.Int("status", status),
+			zap.String("ip", c.ClientIP()),
+			zap.Duration("duration", time.Since(started)),
+		}
 		if lastErr != "" {
-			log.Printf("%s %s -> %d (%s) %s", c.Request.Method, c.Request.URL.Path, status, lastErr, time.Since(started).String())
+			zap.L().Warn("request completed with error", append(fields, zap.String("error", lastErr))...)
 			return
 		}
-		log.Printf("%s %s -> %d %s", c.Request.Method, c.Request.URL.Path, status, time.Since(started).String())
+		zap.L().Info("request completed", fields...)
 	}
 }

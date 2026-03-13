@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+
 	githuboauth "github.com/dieWehmut/story-timeline/backend/internal/github"
 	googleoauth "github.com/dieWehmut/story-timeline/backend/internal/google"
 	"github.com/dieWehmut/story-timeline/backend/internal/model"
@@ -22,6 +24,7 @@ import (
 const (
 	sessionCookieName = "story_session"
 	stateCookieName   = "story_oauth_state"
+	defaultSessionTTL = 7 * 24 * time.Hour
 )
 
 type AuthService struct {
@@ -31,6 +34,12 @@ type AuthService struct {
 	signingSecret []byte
 	secureCookies bool
 	adminLogin    string
+}
+
+type sessionClaims struct {
+	User        model.AuthUser `json:"user"`
+	AccessToken string         `json:"accessToken"`
+	jwt.RegisteredClaims
 }
 
 func NewAuthService(oauth *githuboauth.OAuthClient, googleOAuth *googleoauth.OAuthClient, graphql *githuboauth.GraphQLClient, secret string, secureCookies bool, adminLogin string) *AuthService {
@@ -127,22 +136,40 @@ func (service *AuthService) CompleteLogin(ctx context.Context, provider string, 
 }
 
 func (service *AuthService) SetSessionCookie(w http.ResponseWriter, session model.Session) error {
-	rawPayload, err := json.Marshal(session)
+	expiresAt := session.ExpiresAt
+	if expiresAt.IsZero() {
+		expiresAt = time.Now().Add(defaultSessionTTL)
+	}
+
+	claims := sessionClaims{
+		User:        session.User,
+		AccessToken: session.AccessToken,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   session.User.Login,
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := token.SignedString(service.signingSecret)
 	if err != nil {
 		return err
 	}
 
-	encodedPayload := base64.RawURLEncoding.EncodeToString(rawPayload)
-	signature := service.sign(encodedPayload)
+	maxAge := int(time.Until(expiresAt).Seconds())
+	if maxAge < 0 {
+		maxAge = 0
+	}
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
-		Value:    fmt.Sprintf("%s.%s", encodedPayload, signature),
+		Value:    signed,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   service.secureCookies,
 		SameSite: service.sameSiteMode(),
-		MaxAge:   int((7 * 24 * time.Hour).Seconds()),
+		MaxAge:   maxAge,
 	})
 
 	return nil
@@ -154,7 +181,40 @@ func (service *AuthService) ReadSession(r *http.Request) (*model.Session, error)
 		return nil, err
 	}
 
-	parts := strings.Split(cookie.Value, ".")
+	if strings.Count(cookie.Value, ".") == 2 {
+		return service.readJWTSession(cookie.Value)
+	}
+
+	return service.readLegacySession(cookie.Value)
+}
+
+func (service *AuthService) readJWTSession(value string) (*model.Session, error) {
+	claims := &sessionClaims{}
+	token, err := jwt.ParseWithClaims(value, claims, func(token *jwt.Token) (any, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
+		return service.signingSecret, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if token == nil || !token.Valid {
+		return nil, errors.New("invalid session token")
+	}
+	if claims.ExpiresAt == nil || claims.ExpiresAt.Time.Before(time.Now()) {
+		return nil, errors.New("session expired")
+	}
+
+	return &model.Session{
+		AccessToken: claims.AccessToken,
+		User:        claims.User,
+		ExpiresAt:   claims.ExpiresAt.Time,
+	}, nil
+}
+
+func (service *AuthService) readLegacySession(value string) (*model.Session, error) {
+	parts := strings.Split(value, ".")
 	if len(parts) != 2 {
 		return nil, errors.New("invalid session cookie")
 	}

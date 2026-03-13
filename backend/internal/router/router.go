@@ -2,7 +2,9 @@ package router
 
 import (
 	"net/http"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
 	"github.com/dieWehmut/story-timeline/backend/internal/controller"
@@ -24,7 +26,13 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 	r := gin.New()
 	r.Use(middleware.Recover())
 	r.Use(middleware.Logger())
-	r.Use(middleware.CORS(allowedOrigins))
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     allowedOrigins,
+		AllowMethods:     []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Content-Type", "Authorization"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	statusJSON := func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
