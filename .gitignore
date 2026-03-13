@@ -129,6 +129,9 @@ lint/tmp/
 # Android Profiling
 *.hprof
 .*
+!.github/
+!.github/workflows/
+!.github/workflows/*.yml
 # Cordova plugins for Capacitor
 capacitor-cordova-android-plugins
 

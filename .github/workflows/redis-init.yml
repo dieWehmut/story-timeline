@@ -1,0 +1,33 @@
+name: Init Redis
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/upstash/**"
+      - "backend/internal/storage/**"
+      - ".github/workflows/redis-init.yml"
+  workflow_dispatch: {}
+
+jobs:
+  init:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache: true
+          cache-dependency-path: backend/go.sum
+
+      - name: Init Redis
+        env:
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+        run: go run ./upstash

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -13,27 +14,38 @@ type AuthController struct {
 	authService     *service.AuthService
 	userService     *service.UserService
 	emailService    *service.EmailAuthService
+	loginLimiter    *service.LoginLimiter
 	frontendBaseURL string
 }
 
-func NewAuthController(authService *service.AuthService, userService *service.UserService, emailService *service.EmailAuthService, frontendBaseURL string) *AuthController {
+func NewAuthController(authService *service.AuthService, userService *service.UserService, emailService *service.EmailAuthService, loginLimiter *service.LoginLimiter, frontendBaseURL string) *AuthController {
 	return &AuthController{
 		authService:     authService,
 		userService:     userService,
 		emailService:    emailService,
+		loginLimiter:    loginLimiter,
 		frontendBaseURL: frontendBaseURL,
 	}
 }
 
 func (controller *AuthController) GitHubLogin(c *gin.Context) {
+	if !controller.checkLoginLimit(c) {
+		return
+	}
 	controller.login(c, "github")
 }
 
 func (controller *AuthController) GoogleLogin(c *gin.Context) {
+	if !controller.checkLoginLimit(c) {
+		return
+	}
 	controller.login(c, "google")
 }
 
 func (controller *AuthController) EmailLogin(c *gin.Context) {
+	if !controller.checkLoginLimit(c) {
+		return
+	}
 	if controller.emailService == nil || !controller.emailService.Enabled() {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "email login not configured"})
 		return
@@ -168,6 +180,36 @@ func (controller *AuthController) Session(c *gin.Context) {
 func (controller *AuthController) Logout(c *gin.Context) {
 	controller.authService.ClearSession(c.Writer)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func (controller *AuthController) checkLoginLimit(c *gin.Context) bool {
+	if controller.loginLimiter == nil || !controller.loginLimiter.Enabled() {
+		return true
+	}
+
+	allowed, count, ttl, err := controller.loginLimiter.Allow(c.Request.Context(), c.ClientIP())
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return false
+	}
+	if allowed {
+		return true
+	}
+
+	retryAfter := int(ttl.Seconds())
+	if retryAfter < 0 {
+		retryAfter = 0
+	}
+	if retryAfter > 0 {
+		c.Header("Retry-After", strconv.Itoa(retryAfter))
+	}
+
+	c.JSON(http.StatusTooManyRequests, gin.H{
+		"error":             "too many login attempts",
+		"retryAfterSeconds": retryAfter,
+		"attempts":          count,
+	})
+	return false
 }
 
 func (controller *AuthController) callbackURL(r *http.Request, provider string) string {

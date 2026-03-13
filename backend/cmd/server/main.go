@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"time"
@@ -31,7 +32,18 @@ func main() {
 
 	authService := service.NewAuthService(githubOAuthClient, googleOAuthClient, graphqlClient, env.SessionSecret, env.SecureCookies, env.GitHubRepoOwner)
 	supabaseStorage := storage.NewSupabaseStorage(env.SupabaseURL, env.SupabaseServiceKey)
-	emailService := service.NewEmailAuthService(supabaseStorage, env.ResendAPIKey, env.ResendEmailFrom)
+
+	var redisStore *storage.Store
+	if redisClient, err := storage.NewClient(env.RedisURL); err != nil {
+		if !errors.Is(err, storage.ErrRedisNotConfigured) {
+			log.Printf("failed to initialize redis: %v", err)
+		}
+	} else {
+		redisStore = storage.NewStore(redisClient)
+	}
+
+	loginLimiter := service.NewLoginLimiter(redisStore, 0)
+	emailService := service.NewEmailAuthService(supabaseStorage, env.ResendAPIKey, env.ResendEmailFrom, redisStore)
 	cloudinaryStorage, err := storage.NewCloudinaryStorage(storage.CloudinaryConfig{
 		CloudName: env.CloudinaryCloudName,
 		APIKey:    env.CloudinaryAPIKey,
@@ -53,7 +65,7 @@ func main() {
 	server := &http.Server{
 		Addr: ":" + env.Port,
 		Handler: router.New(router.Dependencies{
-			AuthController:   controller.NewAuthController(authService, userService, emailService, env.FrontendBaseURL),
+			AuthController:   controller.NewAuthController(authService, userService, emailService, loginLimiter, env.FrontendBaseURL),
 			FollowController: controller.NewFollowController(userService),
 			ImageController:  controller.NewImageController(imageService, userService, authService, interactionService, cloudinaryStorage),
 			HealthController: controller.NewHealthController(env.GitHubRepoOwner, authService, userService),

@@ -27,6 +27,7 @@ type Env struct {
 	SecureCookies       bool
 	ResendAPIKey        string
 	ResendEmailFrom     string
+	RedisURL            string
 }
 
 func LoadEnv() Env {
@@ -55,6 +56,7 @@ func LoadEnv() Env {
 		SecureCookies:       getEnv("SECURE_COOKIES", "false") == "true",
 		ResendAPIKey:        os.Getenv("RESEND_API_KEY"),
 		ResendEmailFrom:     os.Getenv("RESEND_EMAIL_FROM"),
+		RedisURL:            os.Getenv("REDIS_URL"),
 	}
 }
 

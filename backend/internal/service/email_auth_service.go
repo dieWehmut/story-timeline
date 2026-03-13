@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/mail"
@@ -19,29 +20,31 @@ import (
 	"github.com/dieWehmut/story-timeline/backend/internal/storage"
 )
 
-const defaultEmailTokenTTL = 15 * time.Minute
+const defaultEmailTokenTTL = storage.MagicLinkTokenTTL
 
 type EmailAuthService struct {
 	storage  *storage.SupabaseStorage
 	client   *resend.Client
 	from     string
 	tokenTTL time.Duration
+	redis    *storage.Store
 }
 
-func NewEmailAuthService(storage *storage.SupabaseStorage, apiKey string, from string) *EmailAuthService {
+func NewEmailAuthService(storage *storage.SupabaseStorage, apiKey string, from string, redisStore *storage.Store) *EmailAuthService {
 	trimmedFrom := strings.TrimSpace(from)
 	trimmedKey := strings.TrimSpace(apiKey)
 	if storage == nil {
-		return &EmailAuthService{storage: storage}
+		return &EmailAuthService{storage: storage, redis: redisStore}
 	}
 	if trimmedKey == "" || trimmedFrom == "" {
-		return &EmailAuthService{storage: storage, from: trimmedFrom}
+		return &EmailAuthService{storage: storage, from: trimmedFrom, redis: redisStore}
 	}
 	return &EmailAuthService{
 		storage:  storage,
 		client:   resend.NewClient(trimmedKey),
 		from:     trimmedFrom,
 		tokenTTL: defaultEmailTokenTTL,
+		redis:    redisStore,
 	}
 }
 
@@ -83,6 +86,10 @@ func (service *EmailAuthService) RequestMagicLink(ctx context.Context, email str
 		return err
 	}
 
+	if err := service.cacheMagicLink(ctx, token, record); err != nil {
+		return err
+	}
+
 	link := appendToken(callbackURL, token)
 	subject := "登录 Story Timeline"
 	html := fmt.Sprintf(`<p>点击登录链接：</p><p><a href="%s">%s</a></p><p>此链接 %d 分钟内有效，如非本人操作请忽略。</p>`, link, link, int(service.tokenTTL.Minutes()))
@@ -108,36 +115,13 @@ func (service *EmailAuthService) CompleteLogin(ctx context.Context, token string
 		return model.Session{}, errors.New("missing token")
 	}
 
-	tokenHash := hashToken(token)
-	record, err := service.storage.GetEmailLogin(ctx, tokenHash)
-	if err != nil {
+	if session, ok, err := service.completeLoginFromCache(ctx, token); err != nil {
 		return model.Session{}, err
+	} else if ok {
+		return session, nil
 	}
 
-	if record.ConsumedAt != nil {
-		return model.Session{}, errors.New("magic link already used")
-	}
-	if time.Now().After(record.ExpiresAt) {
-		return model.Session{}, errors.New("magic link expired")
-	}
-
-	now := time.Now()
-	if err := service.storage.ConsumeEmailLogin(ctx, tokenHash, now); err != nil {
-		return model.Session{}, err
-	}
-
-	user := model.AuthUser{
-		Provider:  "email",
-		ID:        record.Email,
-		Login:     record.Login,
-		AvatarURL: record.AvatarURL,
-	}
-
-	return model.Session{
-		AccessToken: "",
-		User:        user,
-		ExpiresAt:   now.Add(7 * 24 * time.Hour),
-	}, nil
+	return service.completeLoginFromStorage(ctx, token)
 }
 
 func normalizeEmail(value string) (string, error) {
@@ -168,6 +152,113 @@ func newEmailToken() (string, string, error) {
 func hashToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
+}
+
+type cachedMagicLink struct {
+	TokenHash string    `json:"token_hash"`
+	Email     string    `json:"email"`
+	Login     string    `json:"login"`
+	AvatarURL string    `json:"avatar_url"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+func (service *EmailAuthService) cacheMagicLink(ctx context.Context, token string, record model.EmailLogin) error {
+	if service.redis == nil || !service.redis.Enabled() {
+		return nil
+	}
+
+	payload := cachedMagicLink{
+		TokenHash: record.TokenHash,
+		Email:     record.Email,
+		Login:     record.Login,
+		AvatarURL: record.AvatarURL,
+		ExpiresAt: record.ExpiresAt,
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	return service.redis.SetMagicLinkToken(ctx, token, string(encoded))
+}
+
+func (service *EmailAuthService) completeLoginFromCache(ctx context.Context, token string) (model.Session, bool, error) {
+	if service.redis == nil || !service.redis.Enabled() {
+		return model.Session{}, false, nil
+	}
+
+	payload, err := service.redis.ConsumeMagicLinkToken(ctx, token)
+	if err != nil {
+		if storage.IsCacheMiss(err) {
+			return model.Session{}, false, nil
+		}
+		return model.Session{}, false, err
+	}
+
+	var cached cachedMagicLink
+	if err := json.Unmarshal([]byte(payload), &cached); err != nil {
+		return model.Session{}, false, err
+	}
+	if cached.TokenHash == "" {
+		cached.TokenHash = hashToken(token)
+	}
+	if cached.Email == "" || cached.Login == "" {
+		return model.Session{}, false, nil
+	}
+	if !cached.ExpiresAt.IsZero() && time.Now().After(cached.ExpiresAt) {
+		return model.Session{}, false, errors.New("magic link expired")
+	}
+
+	now := time.Now()
+	if err := service.storage.ConsumeEmailLogin(ctx, cached.TokenHash, now); err != nil {
+		return model.Session{}, false, err
+	}
+
+	user := model.AuthUser{
+		Provider:  "email",
+		ID:        cached.Email,
+		Login:     cached.Login,
+		AvatarURL: cached.AvatarURL,
+	}
+
+	return model.Session{
+		AccessToken: "",
+		User:        user,
+		ExpiresAt:   now.Add(7 * 24 * time.Hour),
+	}, true, nil
+}
+
+func (service *EmailAuthService) completeLoginFromStorage(ctx context.Context, token string) (model.Session, error) {
+	tokenHash := hashToken(token)
+	record, err := service.storage.GetEmailLogin(ctx, tokenHash)
+	if err != nil {
+		return model.Session{}, err
+	}
+
+	if record.ConsumedAt != nil {
+		return model.Session{}, errors.New("magic link already used")
+	}
+	if time.Now().After(record.ExpiresAt) {
+		return model.Session{}, errors.New("magic link expired")
+	}
+
+	now := time.Now()
+	if err := service.storage.ConsumeEmailLogin(ctx, tokenHash, now); err != nil {
+		return model.Session{}, err
+	}
+
+	user := model.AuthUser{
+		Provider:  "email",
+		ID:        record.Email,
+		Login:     record.Login,
+		AvatarURL: record.AvatarURL,
+	}
+
+	return model.Session{
+		AccessToken: "",
+		User:        user,
+		ExpiresAt:   now.Add(7 * 24 * time.Hour),
+	}, nil
 }
 
 var loginSanitizeRe = regexp.MustCompile(`[^a-z0-9_-]+`)
