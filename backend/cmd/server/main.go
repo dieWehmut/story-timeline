@@ -13,6 +13,7 @@ import (
 	"github.com/dieWehmut/story-timeline/backend/internal/router"
 	"github.com/dieWehmut/story-timeline/backend/internal/service"
 	"github.com/dieWehmut/story-timeline/backend/internal/storage"
+	"github.com/getsentry/sentry-go"
 	"go.uber.org/zap"
 )
 
@@ -28,6 +29,16 @@ func main() {
 
 	env := config.LoadEnv()
 	ctx := context.Background()
+
+	if env.SentryDSN != "" {
+		if err := sentry.Init(sentry.ClientOptions{
+			Dsn: env.SentryDSN,
+		}); err != nil {
+			zap.L().Warn("failed to initialize sentry", zap.Error(err))
+		} else {
+			defer sentry.Flush(2 * time.Second)
+		}
+	}
 
 	if env.AutoApplySchema {
 		if err := storage.ApplySchemaFile(ctx, env.SupabaseDBURL, "supabase/schema.sql"); err != nil {

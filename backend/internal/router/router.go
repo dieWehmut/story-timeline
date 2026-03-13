@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
@@ -24,6 +25,9 @@ type Dependencies struct {
 func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
+	r.Use(sentrygin.New(sentrygin.Options{
+		Repanic: true,
+	}))
 	r.Use(middleware.Recover())
 	r.Use(middleware.Logger())
 	r.Use(cors.New(cors.Config{
