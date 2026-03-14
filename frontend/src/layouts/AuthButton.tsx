@@ -13,6 +13,7 @@ interface AuthButtonProps {
   onLogin: (provider: 'github' | 'google') => void;
   onEmailLogin?: (email: string) => Promise<void> | void;
   onLogout: () => Promise<void>;
+  emailPolling?: boolean;
 }
 
 const iconBtnCls =
@@ -28,6 +29,7 @@ export function AuthButton({
   onEmailLogin,
   onLogout,
   user,
+  emailPolling,
 }: AuthButtonProps) {
   const [showPicker, setShowPicker] = useState(false);
 
@@ -63,6 +65,7 @@ export function AuthButton({
           onEmailLogin={onEmailLogin}
           showGoogle={!!googleLoginUrl}
           showEmail={!!onEmailLogin}
+          emailPolling={emailPolling}
         />
       ) : null}
     </>

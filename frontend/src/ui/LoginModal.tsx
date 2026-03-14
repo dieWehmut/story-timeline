@@ -9,6 +9,7 @@ interface LoginModalProps {
   onEmailLogin?: (email: string) => Promise<void> | void;
   showGoogle?: boolean;
   showEmail?: boolean;
+  emailPolling?: boolean;
 }
 
 function GitHubIcon({ size = 32 }: { size?: number }) {
@@ -78,17 +79,20 @@ export function LoginModal({
   onEmailLogin,
   showGoogle = true,
   showEmail = true,
+  emailPolling = false,
 }: LoginModalProps) {
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [sending, setSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setEmail('');
       setShowEmailForm(false);
       setSending(false);
+      setEmailSent(false);
     }
   }, [open]);
 
@@ -107,7 +111,7 @@ export function LoginModal({
       setSending(true);
       await onEmailLogin(trimmed);
       toast('登录链接已发送，请检查邮箱', 'success');
-      onClose();
+      setEmailSent(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : '发送失败';
       toast(message, 'error');
@@ -180,28 +184,38 @@ export function LoginModal({
         </div>
 
         {showEmail && showEmailForm ? (
-          <div className="mt-5 space-y-3">
-            <input
-              className="w-full rounded-xl border border-[var(--panel-border)] bg-transparent px-3 py-2 text-sm text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)]"
-              onChange={(event) => setEmail(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  void handleEmailSubmit();
-                }
-              }}
-              placeholder="输入邮箱地址"
-              type="email"
-              value={email}
-            />
-            <button
-              className="w-full rounded-xl border border-[var(--panel-border)] px-3 py-2 text-sm transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)]"
-              disabled={sending}
-              onClick={() => void handleEmailSubmit()}
-              type="button"
-            >
-              {sending ? '发送中...' : '发送登录链接'}
-            </button>
-          </div>
+          emailSent || emailPolling ? (
+            <div className="mt-5 space-y-2 text-center">
+              <div className="flex items-center justify-center gap-2 text-sm text-soft">
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[var(--text-accent)] border-t-transparent" />
+                等待邮件确认中...
+              </div>
+              <p className="text-xs text-soft">请打开邮箱，点击登录链接确认。确认后此页面会自动登录。</p>
+            </div>
+          ) : (
+            <div className="mt-5 space-y-3">
+              <input
+                className="w-full rounded-xl border border-[var(--panel-border)] bg-transparent px-3 py-2 text-sm text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)]"
+                onChange={(event) => setEmail(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    void handleEmailSubmit();
+                  }
+                }}
+                placeholder="输入邮箱地址"
+                type="email"
+                value={email}
+              />
+              <button
+                className="w-full rounded-xl border border-[var(--panel-border)] px-3 py-2 text-sm transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)]"
+                disabled={sending}
+                onClick={() => void handleEmailSubmit()}
+                type="button"
+              >
+                {sending ? '发送中...' : '发送登录链接'}
+              </button>
+            </div>
+          )
         ) : null}
       </div>
     </div>

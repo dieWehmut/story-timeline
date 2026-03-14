@@ -221,6 +221,7 @@ export default function Story({
         onFilterUser={handleUserSelect}
         onLogin={auth.loginWith}
         onEmailLogin={auth.requestEmailLogin}
+        emailPolling={auth.emailPolling}
         onLogout={auth.logout}
         onTagSelect={handleTagSelect}
         onThemeToggle={onThemeToggle}

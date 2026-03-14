@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -87,7 +88,31 @@ func (service *UserService) UpsertUser(ctx context.Context, user model.AuthUser)
 	if strings.TrimSpace(user.Login) == "" {
 		return nil
 	}
+	if service.database != nil {
+		if existing, err := service.database.GetUser(ctx, user.Login); err == nil {
+			if strings.TrimSpace(existing.AvatarURL) != "" {
+				user.AvatarURL = existing.AvatarURL
+			}
+			if strings.TrimSpace(existing.DisplayName) != "" {
+				user.DisplayName = existing.DisplayName
+			}
+		}
+	}
 	return service.database.UpsertUser(ctx, user)
+}
+
+func (service *UserService) GetUser(ctx context.Context, login string) (model.AuthUser, error) {
+	if service.database == nil {
+		return model.AuthUser{}, fmt.Errorf("user storage unavailable")
+	}
+	return service.database.GetUser(ctx, login)
+}
+
+func (service *UserService) UpdateProfile(ctx context.Context, login string, displayName *string, avatarURL *string) error {
+	if service.database == nil {
+		return fmt.Errorf("user storage unavailable")
+	}
+	return service.database.UpdateUserProfile(ctx, login, displayName, avatarURL)
 }
 
 func (service *UserService) CountUsers(ctx context.Context) (int, error) {

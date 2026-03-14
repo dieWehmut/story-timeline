@@ -10,11 +10,13 @@ import (
 )
 
 const (
-	MagicLinkTokenTTL = 10 * time.Minute
-	OAuthStateTTL     = 10 * time.Minute
-	AuthExchangeTTL   = 5 * time.Minute
-	LoginAttemptTTL   = 1 * time.Minute
-	TimelineCacheTTL  = 30 * time.Second
+	MagicLinkTokenTTL   = 10 * time.Minute
+	OAuthStateTTL       = 10 * time.Minute
+	AuthExchangeTTL     = 5 * time.Minute
+	LoginAttemptTTL     = 1 * time.Minute
+	TimelineCacheTTL    = 30 * time.Second
+	EmailPendingTTL     = 10 * time.Minute
+	EmailConfirmedTTL   = 5 * time.Minute
 )
 
 var (
@@ -306,4 +308,80 @@ func loginAttemptKey(ip string) string {
 
 func timelineCacheKey(user string) string {
 	return "cache:timeline:" + user
+}
+
+func emailPendingKey(loginId string) string {
+	return "email:pending:" + loginId
+}
+
+func emailConfirmedKey(tokenHash string) string {
+	return "email:confirmed:" + tokenHash
+}
+
+func (store *Store) SetEmailPendingLogin(ctx context.Context, loginId string, tokenHash string) error {
+	client, err := store.ensureClient()
+	if err != nil {
+		return err
+	}
+	loginId = strings.TrimSpace(loginId)
+	if loginId == "" {
+		return ErrMissingToken
+	}
+	return client.Set(ctx, emailPendingKey(loginId), tokenHash, EmailPendingTTL).Err()
+}
+
+func (store *Store) GetEmailPendingLogin(ctx context.Context, loginId string) (string, error) {
+	client, err := store.ensureClient()
+	if err != nil {
+		return "", err
+	}
+	loginId = strings.TrimSpace(loginId)
+	if loginId == "" {
+		return "", ErrMissingToken
+	}
+	value, err := client.Get(ctx, emailPendingKey(loginId)).Result()
+	if err == redis.Nil {
+		return "", ErrCacheMiss
+	}
+	return value, err
+}
+
+func (store *Store) DeleteEmailPendingLogin(ctx context.Context, loginId string) error {
+	client, err := store.ensureClient()
+	if err != nil {
+		return err
+	}
+	loginId = strings.TrimSpace(loginId)
+	if loginId == "" {
+		return ErrMissingToken
+	}
+	return client.Del(ctx, emailPendingKey(loginId)).Err()
+}
+
+func (store *Store) SetEmailConfirmedSession(ctx context.Context, tokenHash string, sessionJSON string) error {
+	client, err := store.ensureClient()
+	if err != nil {
+		return err
+	}
+	tokenHash = strings.TrimSpace(tokenHash)
+	if tokenHash == "" {
+		return ErrMissingToken
+	}
+	return client.Set(ctx, emailConfirmedKey(tokenHash), sessionJSON, EmailConfirmedTTL).Err()
+}
+
+func (store *Store) ConsumeEmailConfirmedSession(ctx context.Context, tokenHash string) (string, error) {
+	client, err := store.ensureClient()
+	if err != nil {
+		return "", err
+	}
+	tokenHash = strings.TrimSpace(tokenHash)
+	if tokenHash == "" {
+		return "", ErrMissingToken
+	}
+	value, err := client.GetDel(ctx, emailConfirmedKey(tokenHash)).Result()
+	if err == redis.Nil {
+		return "", ErrCacheMiss
+	}
+	return value, err
 }

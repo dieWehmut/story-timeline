@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 
@@ -9,18 +9,6 @@ const sanitizeReturn = (value: string | null) => {
   if (trimmed.startsWith('//')) return '';
   if (trimmed.includes('://')) return '';
   return trimmed;
-};
-
-const buildReturnUrl = (path: string, token: string) => {
-  const base = path || '/';
-  try {
-    const url = new URL(base, window.location.origin);
-    url.searchParams.set('email_token', token);
-    return `${url.pathname}${url.search}${url.hash}`;
-  } catch {
-    const sep = base.includes('?') ? '&' : '?';
-    return `${base}${sep}email_token=${encodeURIComponent(token)}`;
-  }
 };
 
 const buildAppLink = (scheme: string, token: string, returnTo: string) => {
@@ -41,7 +29,6 @@ export default function AuthEmail() {
   const client = (searchParams.get('client') ?? '').trim();
   const appScheme = (searchParams.get('appScheme') ?? '').trim();
 
-  const returnUrl = useMemo(() => (token ? buildReturnUrl(returnTo || '/', token) : ''), [returnTo, token]);
   const appLink = useMemo(() => {
     if (!token || !appScheme) return '';
     return buildAppLink(appScheme, token, returnTo);
@@ -56,7 +43,7 @@ export default function AuthEmail() {
 
     const run = async () => {
       try {
-        await api.verifyEmailLogin(token);
+        await api.confirmEmailLogin(token);
         setStatus('success');
       } catch (err) {
         const nextMessage = err instanceof Error ? err.message : '登录失败，请重试。';
@@ -73,7 +60,9 @@ export default function AuthEmail() {
     status === 'loading'
       ? '请稍候，我们正在为你确认登录。'
       : status === 'success'
-        ? '请返回原页面 / App 继续使用。'
+        ? client === 'app'
+          ? '登录成功！请返回 App 继续使用。'
+          : '登录成功！请返回原来的浏览器标签页，页面会自动登录。'
         : message;
 
   return (
@@ -81,24 +70,15 @@ export default function AuthEmail() {
       <div className="max-w-sm space-y-3 rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-6 py-8 shadow-xl">
         <p className="text-base font-semibold">{title}</p>
         <p className="text-sm text-soft">{detail}</p>
-        {status === 'success' ? (
+        {status === 'success' && client === 'app' && appLink ? (
           <div className="mt-2 flex flex-col gap-2">
             <button
               className="rounded-full border border-[var(--panel-border)] px-4 py-2 text-sm transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)]"
-              onClick={() => window.location.assign(returnUrl || '/')}
+              onClick={() => window.location.assign(appLink)}
               type="button"
             >
-              返回原页面
+              打开 App
             </button>
-            {client === 'app' && appLink ? (
-              <button
-                className="rounded-full border border-[var(--panel-border)] px-4 py-2 text-sm transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)]"
-                onClick={() => window.location.assign(appLink)}
-                type="button"
-              >
-                打开 App
-              </button>
-            ) : null}
           </div>
         ) : null}
         {status === 'error' ? (

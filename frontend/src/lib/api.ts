@@ -271,6 +271,42 @@ const uploadToCloudinary = async (signed: SignedUpload, file: File) => {
   }
 };
 
+const UPLOAD_BATCH_SIZE = 10;
+
+const uploadImageBatches = async (items: UploadItem[], options?: { imageId?: string; startIndex?: number }) => {
+  let imageId = options?.imageId ?? '';
+  let startIndex = options?.startIndex ?? 0;
+  const assetPaths: string[] = [];
+
+  for (let offset = 0; offset < items.length; offset += UPLOAD_BATCH_SIZE) {
+    const batch = items.slice(offset, offset + UPLOAD_BATCH_SIZE);
+    const plan = await request<UploadPlan>(`${API_BASE}/api/uploads/images`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageId: imageId || undefined,
+        startIndex,
+        items: batch.map((item) => ({ mediaType: item.mediaType })),
+      }),
+    });
+
+    if (!plan.uploads || plan.uploads.length !== batch.length) {
+      throw new Error('Upload plan mismatch');
+    }
+
+    if (!imageId && plan.imageId) {
+      imageId = plan.imageId;
+    }
+
+    await Promise.all(plan.uploads.map((upload, index) => uploadToCloudinary(upload, batch[index].file)));
+
+    assetPaths.push(...plan.uploads.map((upload) => upload.publicId));
+    startIndex += batch.length;
+  }
+
+  return { imageId, assetPaths };
+};
+
 type CommentPayloadOptions = {
   parentId?: string | null;
   replyToUserLogin?: string | null;
@@ -279,7 +315,7 @@ type CommentPayloadOptions = {
 export const api = {
   getSession: async () => normalizeSession(await request<AuthSession>(`${API_BASE}/api/auth/session`)),
   requestEmailLogin: (email: string, endpoint?: string, options?: { returnTo?: string; client?: 'web' | 'app' }) =>
-    request<{ ok: boolean }>(endpoint ?? `${API_BASE}/api/auth/email/login`, {
+    request<{ ok: boolean; loginId?: string }>(endpoint ?? `${API_BASE}/api/auth/email/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -305,6 +341,24 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
+    }),
+  confirmEmailLogin: (token: string) =>
+    request<{ ok: boolean }>(`${API_BASE}/api/auth/email/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    }),
+  pollEmailLogin: (loginId: string) =>
+    request<{ ok: boolean; authenticated: boolean }>(`${API_BASE}/api/auth/email/poll`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginId }),
+    }),
+  updateProfile: (payload: { displayName?: string; avatarUrl?: string }) =>
+    request<{ ok: boolean }>(`${API_BASE}/api/auth/profile`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     }),
   logout: () => request<{ ok: boolean }>(`${API_BASE}/api/auth/logout`, { method: 'POST' }),
   getFeed: async () => (await request<ImageItem[]>(`${API_BASE}/api/feed`)).map(normalizeImageItem),
@@ -341,28 +395,18 @@ export const api = {
     }
 
     const items = await prepareUploadItems(payload.files);
-    const plan = await request<UploadPlan>(`${API_BASE}/api/uploads/images`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: items.map((item) => ({ mediaType: item.mediaType })),
-      }),
-    });
-
-    if (!plan.uploads || plan.uploads.length !== items.length) {
+    const batchResult = await uploadImageBatches(items);
+    if (!batchResult.imageId) {
       throw new Error('Upload plan mismatch');
     }
-
-    await Promise.all(plan.uploads.map((upload, index) => uploadToCloudinary(upload, items[index].file)));
-
-    const assetPaths = plan.uploads.map((upload) => upload.publicId);
+    const assetPaths = batchResult.assetPaths;
     return normalizeImageItem(
       await request<ImageItem>(imagesEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...basePayload,
-          id: plan.imageId,
+          id: batchResult.imageId,
           assetPaths,
         }),
       })
@@ -421,23 +465,8 @@ export const api = {
     const items = await prepareUploadItems(payload.files);
     const existingPaths = payload.assetPathMap ? Object.values(payload.assetPathMap) : [];
     const startIndex = nextAssetIndex(existingPaths);
-    const plan = await request<UploadPlan>(`${API_BASE}/api/uploads/images`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        imageId: payload.id,
-        startIndex,
-        items: items.map((item) => ({ mediaType: item.mediaType })),
-      }),
-    });
-
-    if (!plan.uploads || plan.uploads.length !== items.length) {
-      throw new Error('Upload plan mismatch');
-    }
-
-    await Promise.all(plan.uploads.map((upload, index) => uploadToCloudinary(upload, items[index].file)));
-
-    const assetPaths = buildAssetPaths(plan.uploads.map((upload) => upload.publicId));
+    const batchResult = await uploadImageBatches(items, { imageId: payload.id, startIndex });
+    const assetPaths = buildAssetPaths(batchResult.assetPaths);
     return normalizeImageItem(
       await request<ImageItem>(`${API_BASE}/api/my/images/${payload.id}`, {
         method: 'PATCH',

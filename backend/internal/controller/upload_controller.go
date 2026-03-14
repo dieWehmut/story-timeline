@@ -13,9 +13,8 @@ import (
 )
 
 const (
-	uploadMaxFiles        = 15
-	uploadMaxCommentFiles = 3
-	uploadMaxVideos       = 3
+	uploadMaxCommentFiles  = 3
+	uploadMaxCommentVideos = 3
 )
 
 type UploadController struct {
@@ -71,10 +70,6 @@ func (controller *UploadController) SignImageUploads(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing upload items"})
 		return
 	}
-	if len(payload.Items) > uploadMaxFiles {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "too many files"})
-		return
-	}
 
 	imageID := strings.TrimSpace(payload.ImageID)
 	if imageID == "" {
@@ -85,20 +80,12 @@ func (controller *UploadController) SignImageUploads(c *gin.Context) {
 		startIndex = 0
 	}
 
-	videoCount := 0
 	uploads := make([]storage.SignedUpload, 0, len(payload.Items))
 	for index, item := range payload.Items {
 		mediaType := normalizeMediaType(item.MediaType)
 		if mediaType == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid media type"})
 			return
-		}
-		if mediaType == "video" {
-			videoCount++
-			if videoCount > uploadMaxVideos {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "too many videos"})
-				return
-			}
 		}
 
 		assetIndex := startIndex + index
@@ -164,7 +151,7 @@ func (controller *UploadController) SignCommentUploads(c *gin.Context) {
 		}
 		if mediaType == "video" {
 			videoCount++
-			if videoCount > uploadMaxVideos {
+			if videoCount > uploadMaxCommentVideos {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "too many videos"})
 				return
 			}

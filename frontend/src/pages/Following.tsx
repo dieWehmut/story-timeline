@@ -3,10 +3,12 @@ import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { HomeButton } from '../layouts/HomeButton';
 import { ThemeButton } from '../layouts/ThemeButton';
+import { SettingsButton } from '../layouts/SettingsButton';
 import { FollowButton } from '../ui/FollowButton';
 import { LoginModal } from '../ui/LoginModal';
 import { useAuth } from '../hooks/useAuth';
 import { useFollows } from '../hooks/useFollows';
+import { useProfile } from '../context/ProfileContext';
 
 interface FollowingProps {
   auth: ReturnType<typeof useAuth>;
@@ -16,6 +18,7 @@ interface FollowingProps {
 }
 
 export default function Following({ auth, follows, theme, onThemeToggle }: FollowingProps) {
+  const profile = useProfile();
   const navigate = useNavigate();
   const [loginOpen, setLoginOpen] = useState(false);
   const list = follows.following;
@@ -47,6 +50,7 @@ export default function Following({ auth, follows, theme, onThemeToggle }: Follo
           </div>
           <div className="flex items-center gap-1">
             <HomeButton />
+            <SettingsButton />
             <ThemeButton onToggle={onThemeToggle} theme={theme} />
           </div>
         </div>
@@ -75,6 +79,8 @@ export default function Following({ auth, follows, theme, onThemeToggle }: Follo
           <div className="divide-y divide-[var(--panel-border)]">
             {list.map((user) => {
               const followed = follows.isFollowing(user.login);
+              const displayName = profile.resolveName(user.login);
+              const displayAvatar = profile.resolveAvatar(user.login, user.avatarUrl);
               return (
                 <div className="flex items-center justify-between py-3" key={user.login}>
                   <button
@@ -83,11 +89,11 @@ export default function Following({ auth, follows, theme, onThemeToggle }: Follo
                     type="button"
                   >
                     <img
-                      alt={user.login}
+                      alt={displayName || user.login}
                       className="h-9 w-9 rounded-full object-cover ring-1 ring-white/10"
-                      src={user.avatarUrl}
+                      src={displayAvatar}
                     />
-                    <span className="text-sm text-[var(--text-main)]">{user.login}</span>
+                    <span className="text-sm text-[var(--text-main)]">{displayName || user.login}</span>
                   </button>
                   {auth.user?.login.toLowerCase() !== user.login.toLowerCase() ? (
                     <FollowButton
@@ -112,6 +118,7 @@ export default function Following({ auth, follows, theme, onThemeToggle }: Follo
         onClose={() => setLoginOpen(false)}
         onSelect={auth.loginWith}
         onEmailLogin={auth.requestEmailLogin}
+        emailPolling={auth.emailPolling}
         showGoogle={!!auth.googleLoginUrl}
         showEmail={!!auth.requestEmailLogin}
       />

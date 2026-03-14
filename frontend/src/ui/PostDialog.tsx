@@ -24,10 +24,7 @@ interface PostDialogProps {
   onSubmit: (data: { description: string; tags: string[]; timeMode: 'point' | 'range'; startAt: string; endAt?: string; files: File[]; removedUrls?: string[]; assetOrder: AssetOrderItem[] }) => Promise<void>;
 }
 
-const MAX_FILES = 15;
 const MAX_IMAGE_FILE_SIZE = 5 * 1024 * 1024;
-const MAX_IMAGE_TOTAL_SIZE = 25 * 1024 * 1024;
-const MAX_VIDEOS = 3;
 const MAX_VIDEO_SIZE = 200 * 1024 * 1024;
 const MAX_TAGS = 12;
 const MAX_TAG_LENGTH = 32;
@@ -90,6 +87,16 @@ const mergeTagHistory = (current: string[], incoming: string[]) => {
 
 const buildFilePreviewItems = (files: File[]): PreviewItem[] =>
   files.map((file) => ({ type: 'file' as const, file, url: URL.createObjectURL(file), mediaType: mediaTypeFromFile(file) }));
+
+const formatFileSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(1)} MB`;
+  const gb = mb / 1024;
+  return `${gb.toFixed(2)} GB`;
+};
 
 const revokeFilePreviews = (items: PreviewItem[]) => {
   items.forEach((item) => {
@@ -289,32 +296,18 @@ export function PostDialog({
       if (!incoming || incoming.length === 0) return;
 
       const incomingFiles = Array.from(incoming);
-      const slots = Math.max(0, MAX_FILES - previews.length);
-      const acceptedFiles = incomingFiles.slice(0, slots);
-      if (acceptedFiles.length === 0) return;
-
-      const newItems: PreviewItem[] = acceptedFiles.map((file) => ({
+      const newItems: PreviewItem[] = incomingFiles.map((file) => ({
         type: 'file' as const,
         file,
         url: URL.createObjectURL(file),
         mediaType: mediaTypeFromFile(file),
       }));
 
-      const next = [...previews, ...newItems];
-
       const revokeNew = () => {
         newItems.forEach((item) => URL.revokeObjectURL(item.url));
       };
 
-      const videoCount = next.filter((item) => item.mediaType === 'video').length;
-      if (videoCount > MAX_VIDEOS) {
-        revokeNew();
-        setError(`最多上传 ${MAX_VIDEOS} 个视频`);
-        return;
-      }
-
-      let imageTotalSize = 0;
-      for (const item of next) {
+      for (const item of newItems) {
         if (!item.file) continue;
         if (item.mediaType === 'video') {
           if (item.file.size > MAX_VIDEO_SIZE) {
@@ -330,16 +323,9 @@ export function PostDialog({
           setError(`单张图片不能超过 5MB: ${item.file.name}`);
           return;
         }
-        imageTotalSize += item.file.size;
-      }
-
-      if (imageTotalSize > MAX_IMAGE_TOTAL_SIZE) {
-        revokeNew();
-        setError('图片总大小不能超过 25MB');
-        return;
       }
       setError(null);
-      setPreviews(next);
+      setPreviews((current) => [...current, ...newItems]);
     },
     [previews]
   );
@@ -715,6 +701,11 @@ export function PostDialog({
                 <span className="absolute left-1 top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-black/60 px-1 text-[10px] font-semibold text-white/90">
                   {index + 1}
                 </span>
+                {item.type === 'file' && item.file ? (
+                  <span className="absolute left-1 bottom-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white/90">
+                    {formatFileSize(item.file.size)}
+                  </span>
+                ) : null}
                 <button
                   className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white/80 hover:text-white"
                   onClick={(event) => {
@@ -727,14 +718,12 @@ export function PostDialog({
                 </button>
               </div>
             ))}
-            {totalPreviews < MAX_FILES ? (
-              <div
-                className="flex aspect-square cursor-pointer items-center justify-center bg-slate-950/30 hover:bg-slate-950/40 transition"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Plus className="text-soft" size={32} />
-              </div>
-            ) : null}
+            <div
+              className="flex aspect-square cursor-pointer items-center justify-center bg-slate-950/30 hover:bg-slate-950/40 transition"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Plus className="text-soft" size={32} />
+            </div>
           </div>
 
           <input

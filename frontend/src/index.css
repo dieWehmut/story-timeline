@@ -19,6 +19,7 @@
     color-scheme: dark;
     --page-bg: #0d1117;
     --page-bg-soft: #151b24;
+    --page-bg-image: none;
     --panel-bg: rgba(12, 18, 26, 0.78);
     --panel-border: rgba(148, 163, 184, 0.16);
     --panel-shadow: 0 24px 60px rgba(1, 4, 9, 0.35);
@@ -55,7 +56,11 @@
 
   body {
     @apply m-0 min-h-screen bg-[var(--page-bg)] font-sans text-[var(--text-main)] antialiased;
-
+    background-image: var(--page-bg-image);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+    background-attachment: fixed;
   }
 
   #root {

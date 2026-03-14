@@ -21,14 +21,13 @@ import (
 )
 
 const (
-	maxFiles        = 15
-	maxCommentFiles = 3
-	maxVideos       = 3
-	maxImageFileSize  = 5 << 20  // 5 MB
-	maxImageTotalSize = 25 << 20 // 25 MB (images only)
-	maxVideoSize      = 200 << 20 // 200 MB
-	maxTags         = 12
-	maxTagLength    = 32
+	maxCommentFiles       = 3
+	maxVideos             = 3
+	maxImageFileSize      = 5 << 20  // 5 MB
+	maxImageTotalSize     = 25 << 20 // 25 MB (images only)
+	maxVideoSize          = 200 << 20 // 200 MB
+	maxTags               = 12
+	maxTagLength          = 32
 	assetCacheMaxAgeSeconds = 86400
 )
 
@@ -221,7 +220,7 @@ func normalizeAssetPaths(paths []string) []string {
 }
 
 func validateAssetPaths(paths []string, maxCount int, maxVideos int, allowedPrefixes []string) error {
-	if len(paths) > maxCount {
+	if maxCount > 0 && len(paths) > maxCount {
 		return fmt.Errorf("too many files")
 	}
 
@@ -235,7 +234,7 @@ func validateAssetPaths(paths []string, maxCount int, maxVideos int, allowedPref
 		}
 	}
 
-	if videoCount > maxVideos {
+	if maxVideos > 0 && videoCount > maxVideos {
 		return fmt.Errorf("too many videos")
 	}
 
@@ -455,7 +454,7 @@ func (controller *ImageController) Create(c *gin.Context) {
 			return
 		}
 
-		if err := validateAssetPaths(assetPaths, maxFiles, maxVideos, []string{
+		if err := validateAssetPaths(assetPaths, 0, 0, []string{
 			fmt.Sprintf("images/%s/", session.User.Login),
 			fmt.Sprintf("videos/%s/", session.User.Login),
 		}); err != nil {
@@ -565,7 +564,7 @@ func (controller *ImageController) Update(c *gin.Context) {
 		// If assetPaths is provided (even empty), replace assets. Otherwise update metadata only.
 		if payload.AssetPaths != nil {
 			assetPaths := normalizeAssetPaths(payload.AssetPaths)
-			if err := validateAssetPaths(assetPaths, maxFiles, maxVideos, []string{
+		if err := validateAssetPaths(assetPaths, 0, 0, []string{
 				fmt.Sprintf("images/%s/", ownerLogin),
 				fmt.Sprintf("videos/%s/", ownerLogin),
 			}); err != nil {
@@ -867,7 +866,7 @@ func (controller *ImageController) AddComment(c *gin.Context) {
 		text = strings.TrimSpace(c.PostForm("text"))
 		parentID = strings.TrimSpace(c.PostForm("parentId"))
 		replyToUserLogin = strings.TrimSpace(c.PostForm("replyToUserLogin"))
-		selectedFiles, err := readMultipartFilesWithLimit(c.Request, maxCommentFiles)
+		selectedFiles, err := readMultipartFilesWithLimit(c.Request, maxCommentFiles, maxVideos, maxImageTotalSize)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -1044,15 +1043,15 @@ func (controller *ImageController) CommentAsset(c *gin.Context) {
 }
 
 func readMultipartFiles(r *http.Request) ([]*multipart.FileHeader, error) {
-	return readMultipartFilesWithLimit(r, maxFiles)
+	return readMultipartFilesWithLimit(r, 0, 0, 0)
 }
 
-func readMultipartFilesWithLimit(r *http.Request, maxCount int) ([]*multipart.FileHeader, error) {
+func readMultipartFilesWithLimit(r *http.Request, maxCount int, maxVideos int, maxImageTotalSize int64) ([]*multipart.FileHeader, error) {
 	fileHeaders := r.MultipartForm.File["files"]
 	if len(fileHeaders) == 0 {
 		fileHeaders = r.MultipartForm.File["file"]
 	}
-	if len(fileHeaders) > maxCount {
+	if maxCount > 0 && len(fileHeaders) > maxCount {
 		return nil, fmt.Errorf("最多上传 %d 个文件", maxCount)
 	}
 
@@ -1061,7 +1060,7 @@ func readMultipartFilesWithLimit(r *http.Request, maxCount int) ([]*multipart.Fi
 	for _, fh := range fileHeaders {
 		if isVideoFileHeader(fh) {
 			videoCount += 1
-			if videoCount > maxVideos {
+			if maxVideos > 0 && videoCount > maxVideos {
 				return nil, fmt.Errorf("最多上传 %d 个视频", maxVideos)
 			}
 			if fh.Size > maxVideoSize {
@@ -1074,7 +1073,7 @@ func readMultipartFilesWithLimit(r *http.Request, maxCount int) ([]*multipart.Fi
 			return nil, fmt.Errorf("单张图片不能超过 5MB: %s", fh.Filename)
 		}
 		imageTotalSize += fh.Size
-		if imageTotalSize > maxImageTotalSize {
+		if maxImageTotalSize > 0 && imageTotalSize > maxImageTotalSize {
 			return nil, fmt.Errorf("图片总大小不能超过 25MB")
 		}
 	}

@@ -1,4 +1,5 @@
 import type { FeedUser } from '../types/image';
+import { useProfile } from '../context/ProfileContext';
 
 interface UserBarProps {
   feedUsers: FeedUser[];
@@ -7,6 +8,7 @@ interface UserBarProps {
 }
 
 export function UserBar({ feedUsers, filterUser, onFilterUser }: UserBarProps) {
+  const profile = useProfile();
   if (feedUsers.length <= 1) return null;
 
   return (
@@ -25,6 +27,8 @@ export function UserBar({ feedUsers, filterUser, onFilterUser }: UserBarProps) {
       </button>
       {feedUsers.map((user) => {
         const isActive = filterUser === user.login;
+        const displayName = profile.resolveName(user.login);
+        const displayAvatar = profile.resolveAvatar(user.login, user.avatarUrl);
         return (
           <button
             className={`flex shrink-0 items-center gap-1 transition-all duration-200 ${
@@ -36,13 +40,13 @@ export function UserBar({ feedUsers, filterUser, onFilterUser }: UserBarProps) {
             }`}
             key={user.login}
             onClick={() => onFilterUser(filterUser === user.login ? null : user.login)}
-            title={user.login}
+            title={displayName || user.login}
             type="button"
           >
             <img
-              alt={user.login}
+              alt={displayName || user.login}
               className="h-6 w-6 rounded-full object-cover"
-              src={user.avatarUrl}
+              src={displayAvatar}
             />
           </button>
         );

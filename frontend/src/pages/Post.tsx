@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { PostDialog } from '../ui/PostDialog';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
+import { useProfile } from '../context/ProfileContext';
 import type { AssetOrderItem } from '../types/image';
 
 interface PostProps {
@@ -24,6 +25,7 @@ const toDateTimeInputValue = (value: string) => {
 };
 
 export default function Post({ auth, images }: PostProps) {
+  const profile = useProfile();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -105,7 +107,9 @@ export default function Post({ auth, images }: PostProps) {
           endAt: data.endAt,
           files: data.files,
         },
-        auth.user ? { login: auth.user.login, avatarUrl: auth.user.avatarUrl } : undefined
+        auth.user
+          ? { login: auth.user.login, avatarUrl: profile.currentAvatar || auth.user.avatarUrl }
+          : undefined
       );
     }
 

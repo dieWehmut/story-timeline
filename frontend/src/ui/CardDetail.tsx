@@ -19,6 +19,7 @@ import { buildMediaItems, mediaTypeFromFile } from '../lib/media';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import type { CommentItem, ImageItem } from '../types/image';
+import { useProfile } from '../context/ProfileContext';
 
 
 
@@ -430,6 +431,7 @@ export function CardDetail({
   const commentInputFocusedRef = useRef(false);
 
   const { confirm } = useToast();
+  const profile = useProfile();
 
   const navigate = useNavigate();
 
@@ -500,6 +502,8 @@ export function CardDetail({
   const authorAvatar =
 
     item.authorAvatar || (authorLogin !== 'GitHub' ? `https://github.com/${authorLogin}.png?size=64` : '');
+  const displayAuthorLogin = profile.resolveName(authorLogin);
+  const displayAuthorAvatar = profile.resolveAvatar(authorLogin, authorAvatar);
 
   const imageUrls = item.imageUrls ?? [];
 
@@ -788,7 +792,7 @@ export function CardDetail({
 
       id: `temp-${Date.now()}`,
 
-      authorLogin: '',
+      authorLogin: profile.user?.login ?? '',
 
       postOwner: authorLogin,
 
@@ -1089,15 +1093,15 @@ export function CardDetail({
 
               <div className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1">
 
-                {authorAvatar ? (
+                {displayAuthorAvatar ? (
 
                   <img
 
-                    alt={authorLogin}
+                    alt={displayAuthorLogin || authorLogin}
 
                     className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-white/10"
 
-                    src={authorAvatar}
+                    src={displayAuthorAvatar}
 
                   />
 
@@ -1105,7 +1109,7 @@ export function CardDetail({
 
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/8 text-xs font-semibold text-soft ring-1 ring-white/10">
 
-                    {authorLogin.slice(0, 1).toUpperCase()}
+                    {(displayAuthorLogin || authorLogin).slice(0, 1).toUpperCase()}
 
                   </span>
 
@@ -1113,7 +1117,7 @@ export function CardDetail({
 
                 <p className="flex min-w-0 flex-1 items-center gap-2 truncate text-sm font-medium text-[var(--text-main)]">
 
-                  {authorLogin}
+                  {displayAuthorLogin || authorLogin}
 
                   {roleLabel ? (
 
@@ -1125,7 +1129,7 @@ export function CardDetail({
 
               </div>
 
-              {/* Right: edit/delete (top), like/comment (bottom) — but here only top row */}
+              {/* Right: edit/delete (top), like/comment (bottom) –but here only top row */}
 
               {editable ? (
 
@@ -1261,7 +1265,7 @@ export function CardDetail({
 
 
 
-            {/* Time + like + comment — same 2-column alignment */}
+            {/* Time + like + comment –same 2-column alignment */}
 
             <div className="flex px-2">
 
@@ -1344,6 +1348,11 @@ export function CardDetail({
                     const replies = repliesByParent.get(c.id) ?? [];
 
                     const liked = !!c.liked;
+                    const commentAuthor = profile.resolveName(c.authorLogin);
+                    const commentAvatar = profile.resolveAvatar(
+                      c.authorLogin,
+                      `https://github.com/${c.authorLogin}.png?size=48`
+                    );
 
                     return (
 
@@ -1353,11 +1362,11 @@ export function CardDetail({
 
                           <img
 
-                            alt={c.authorLogin}
+                            alt={commentAuthor || c.authorLogin}
 
                             className="mt-0.5 h-8 w-8 shrink-0 rounded-full object-cover"
 
-                            src={`https://github.com/${c.authorLogin}.png?size=48`}
+                            src={commentAvatar}
 
                           />
 
@@ -1365,7 +1374,7 @@ export function CardDetail({
 
                             <div className="flex flex-wrap items-baseline gap-x-2">
 
-                              <span className="text-sm font-medium text-[var(--text-main)]">{c.authorLogin}</span>
+                              <span className="text-sm font-medium text-[var(--text-main)]">{commentAuthor || c.authorLogin}</span>
 
                               <span className="text-xs text-soft">{toCommentTime(c.createdAt)}</span>
 
@@ -1520,12 +1529,18 @@ export function CardDetail({
                             {replies.map((reply) => {
 
                               const replyTarget = getReplyTargetLabel(reply);
+                              const replyAuthor = profile.resolveName(reply.authorLogin);
+                              const replyTargetDisplay = replyTarget ? profile.resolveName(replyTarget) : null;
+                              const replyAvatar = profile.resolveAvatar(
+                                reply.authorLogin,
+                                `https://github.com/${reply.authorLogin}.png?size=48`
+                              );
 
                               const line = replyTarget
 
-                                ? `${reply.authorLogin} 回复 ${replyTarget}: ${reply.text ?? ''}`.trim()
+                                ? `${replyAuthor || reply.authorLogin} 回复 ${replyTargetDisplay || replyTarget}: ${reply.text ?? ''}`.trim()
 
-                                : `${reply.authorLogin}: ${reply.text ?? ''}`.trim();
+                                : `${replyAuthor || reply.authorLogin}: ${reply.text ?? ''}`.trim();
 
                               const replyLiked = !!reply.liked;
 
@@ -1541,11 +1556,11 @@ export function CardDetail({
 
                                   <img
 
-                                    alt={reply.authorLogin}
+                                    alt={replyAuthor || reply.authorLogin}
 
                                     className="mt-0.5 h-6 w-6 shrink-0 rounded-full object-cover"
 
-                                    src={`https://github.com/${reply.authorLogin}.png?size=48`}
+                                    src={replyAvatar}
 
                                   />
 
@@ -1884,7 +1899,7 @@ export function CardDetail({
 
                 }}
 
-                placeholder={replyTarget ? `回复 ${replyTarget.replyToUserLogin}...` : '写评论...'}
+                placeholder={replyTarget ? `回复 ${replyTarget.replyToUserLogin}...` : '写评论..'}
 
                 ref={commentInputRef}
 
@@ -1949,3 +1964,4 @@ export function CardDetail({
   );
 
 }
+

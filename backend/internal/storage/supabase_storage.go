@@ -81,6 +81,7 @@ type userRecord struct {
 	Provider   string    `json:"provider"`
 	ProviderID string    `json:"provider_id"`
 	AvatarURL  string    `json:"avatar_url"`
+	DisplayName string   `json:"display_name"`
 	CreatedAt  time.Time `json:"created_at,omitempty"`
 	UpdatedAt  time.Time `json:"updated_at,omitempty"`
 }
@@ -93,6 +94,16 @@ type emailLoginRecord struct {
 	CreatedAt  time.Time  `json:"created_at"`
 	ExpiresAt  time.Time  `json:"expires_at"`
 	ConsumedAt *time.Time `json:"consumed_at,omitempty"`
+}
+
+func (record userRecord) toAuthUser() model.AuthUser {
+	return model.AuthUser{
+		Provider:    record.Provider,
+		ID:          record.ProviderID,
+		Login:       record.Login,
+		AvatarURL:   record.AvatarURL,
+		DisplayName: record.DisplayName,
+	}
 }
 
 func NewSupabaseStorage(baseURL string, serviceKey string) *SupabaseStorage {
@@ -671,15 +682,60 @@ func (storage *SupabaseStorage) UnfollowUser(ctx context.Context, followerLogin 
 
 func (storage *SupabaseStorage) UpsertUser(ctx context.Context, user model.AuthUser) error {
 	now := time.Now()
-	payload := []map[string]any{{
+	item := map[string]any{
 		"login":       user.Login,
 		"provider":    user.Provider,
 		"provider_id": user.ID,
-		"avatar_url":  user.AvatarURL,
 		"updated_at":  now,
-	}}
+	}
+	if strings.TrimSpace(user.AvatarURL) != "" {
+		item["avatar_url"] = user.AvatarURL
+	}
+	if strings.TrimSpace(user.DisplayName) != "" {
+		item["display_name"] = user.DisplayName
+	}
+	payload := []map[string]any{item}
 	prefer := []string{"resolution=merge-duplicates"}
 	return storage.requestJSON(ctx, http.MethodPost, "/users", url.Values{"on_conflict": []string{"login"}}, payload, nil, prefer)
+}
+
+func (storage *SupabaseStorage) GetUser(ctx context.Context, login string) (model.AuthUser, error) {
+	params := url.Values{}
+	params.Set("select", "login,provider,provider_id,avatar_url,display_name")
+	params.Set("login", "eq."+login)
+	params.Set("limit", "1")
+
+	var records []userRecord
+	if err := storage.requestJSON(ctx, http.MethodGet, "/users", params, nil, &records, nil); err != nil {
+		return model.AuthUser{}, err
+	}
+	if len(records) == 0 {
+		return model.AuthUser{}, osErrNotFound(login)
+	}
+	return records[0].toAuthUser(), nil
+}
+
+func (storage *SupabaseStorage) UpdateUserProfile(ctx context.Context, login string, displayName *string, avatarURL *string) error {
+	if strings.TrimSpace(login) == "" {
+		return nil
+	}
+
+	payload := map[string]any{
+		"updated_at": time.Now(),
+	}
+	if displayName != nil {
+		payload["display_name"] = strings.TrimSpace(*displayName)
+	}
+	if avatarURL != nil {
+		payload["avatar_url"] = strings.TrimSpace(*avatarURL)
+	}
+	if len(payload) == 1 {
+		return nil
+	}
+
+	params := url.Values{}
+	params.Set("login", "eq."+login)
+	return storage.requestJSON(ctx, http.MethodPatch, "/users", params, payload, nil, nil)
 }
 
 func (storage *SupabaseStorage) CreateEmailLogin(ctx context.Context, login model.EmailLogin) error {

@@ -1,6 +1,7 @@
 import { ArrowLeft, CalendarRange } from 'lucide-react';
 import { HomeButton } from './HomeButton';
 import { ThemeButton } from './ThemeButton';
+import { SettingsButton } from './SettingsButton';
 
 interface AlbumHeaderProps {
   title: string;
@@ -42,6 +43,7 @@ export function AlbumHeader({
 
         <div className="flex items-center gap-0">
           <HomeButton />
+          <SettingsButton />
           <ThemeButton onToggle={onThemeToggle} theme={theme} />
           {showTimeline && onTimelineToggle ? (
             <div

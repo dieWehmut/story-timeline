@@ -71,6 +71,7 @@ export interface AuthUser {
   id: string;
   login: string;
   avatarUrl: string;
+  displayName?: string;
   provider?: string;
 }
 

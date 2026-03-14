@@ -1,6 +1,10 @@
 package controller
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -8,7 +12,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dieWehmut/story-timeline/backend/internal/model"
 	"github.com/dieWehmut/story-timeline/backend/internal/service"
+	"github.com/dieWehmut/story-timeline/backend/internal/storage"
 )
 
 type AuthController struct {
@@ -16,16 +22,18 @@ type AuthController struct {
 	userService     *service.UserService
 	emailService    *service.EmailAuthService
 	loginLimiter    *service.LoginLimiter
+	redisStore      *storage.Store
 	frontendBaseURL string
 	appURLScheme    string
 }
 
-func NewAuthController(authService *service.AuthService, userService *service.UserService, emailService *service.EmailAuthService, loginLimiter *service.LoginLimiter, frontendBaseURL string, appURLScheme string) *AuthController {
+func NewAuthController(authService *service.AuthService, userService *service.UserService, emailService *service.EmailAuthService, loginLimiter *service.LoginLimiter, redisStore *storage.Store, frontendBaseURL string, appURLScheme string) *AuthController {
 	return &AuthController{
 		authService:     authService,
 		userService:     userService,
 		emailService:    emailService,
 		loginLimiter:    loginLimiter,
+		redisStore:      redisStore,
 		frontendBaseURL: frontendBaseURL,
 		appURLScheme:    appURLScheme,
 	}
@@ -67,12 +75,18 @@ func (controller *AuthController) EmailLogin(c *gin.Context) {
 	returnTo := sanitizeReturnPath(payload.ReturnTo)
 	client := normalizeClient(payload.Client)
 	linkBase := controller.emailLinkBaseURL(c.Request, client, returnTo)
-	if err := controller.emailService.RequestMagicLink(c.Request.Context(), payload.Email, linkBase); err != nil {
+	tokenHash, err := controller.emailService.RequestMagicLink(c.Request.Context(), payload.Email, linkBase)
+	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"ok": true})
+	loginId := newLoginId()
+	if controller.redisStore != nil && controller.redisStore.Enabled() {
+		_ = controller.redisStore.SetEmailPendingLogin(c.Request.Context(), loginId, tokenHash)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "loginId": loginId})
 }
 
 func (controller *AuthController) login(c *gin.Context, provider string) {
@@ -151,7 +165,8 @@ func (controller *AuthController) callback(c *gin.Context, provider string) {
 					_ = controller.userService.SyncGitHubFollows(c.Request.Context(), session.AccessToken, session.User.Login)
 				}
 			}
-			c.Redirect(http.StatusTemporaryRedirect, controller.appAuthURL("/callback", exchangeToken, returnTo))
+			deepLink := controller.appAuthURL("/callback", exchangeToken, returnTo)
+			controller.renderAppRedirect(c, deepLink)
 			return
 		}
 	}
@@ -255,6 +270,153 @@ func (controller *AuthController) EmailVerify(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
+func (controller *AuthController) EmailConfirm(c *gin.Context) {
+	if controller.emailService == nil || !controller.emailService.Enabled() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "email login not configured"})
+		return
+	}
+
+	var payload struct {
+		Token string `json:"token"`
+	}
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	session, tokenHash, err := controller.emailService.ConfirmLogin(c.Request.Context(), payload.Token)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if controller.userService != nil {
+		_ = controller.userService.UpsertUser(c.Request.Context(), session.User)
+	}
+
+	if controller.redisStore != nil && controller.redisStore.Enabled() {
+		sessionJSON, err := json.Marshal(session)
+		if err == nil {
+			_ = controller.redisStore.SetEmailConfirmedSession(c.Request.Context(), tokenHash, string(sessionJSON))
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func (controller *AuthController) EmailPoll(c *gin.Context) {
+	var payload struct {
+		LoginId string `json:"loginId"`
+	}
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	loginId := strings.TrimSpace(payload.LoginId)
+	if loginId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing loginId"})
+		return
+	}
+
+	if controller.redisStore == nil || !controller.redisStore.Enabled() {
+		c.JSON(http.StatusOK, gin.H{"ok": true, "authenticated": false})
+		return
+	}
+
+	tokenHash, err := controller.redisStore.GetEmailPendingLogin(c.Request.Context(), loginId)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"ok": true, "authenticated": false})
+		return
+	}
+
+	sessionJSON, err := controller.redisStore.ConsumeEmailConfirmedSession(c.Request.Context(), tokenHash)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"ok": true, "authenticated": false})
+		return
+	}
+
+	var session model.Session
+	if err := json.Unmarshal([]byte(sessionJSON), &session); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "session decode failed"})
+		return
+	}
+
+	if err := controller.authService.SetSessionCookie(c.Writer, session); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if controller.userService != nil {
+		_ = controller.userService.UpsertUser(c.Request.Context(), session.User)
+	}
+
+	_ = controller.redisStore.DeleteEmailPendingLogin(c.Request.Context(), loginId)
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "authenticated": true})
+}
+
+func (controller *AuthController) UpdateProfile(c *gin.Context) {
+	session, err := controller.authService.ReadSession(c.Request)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing session"})
+		return
+	}
+
+	var payload struct {
+		DisplayName *string `json:"displayName"`
+		AvatarURL   *string `json:"avatarUrl"`
+	}
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+	if payload.DisplayName == nil && payload.AvatarURL == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no profile updates"})
+		return
+	}
+
+	var displayName *string
+	if payload.DisplayName != nil {
+		trimmed := strings.TrimSpace(*payload.DisplayName)
+		displayName = &trimmed
+		session.User.DisplayName = trimmed
+	}
+
+	var avatarURL *string
+	if payload.AvatarURL != nil {
+		trimmed := strings.TrimSpace(*payload.AvatarURL)
+		if trimmed == "" {
+			trimmed = defaultAvatarFor(session.User.Login, session.User.Provider, session.User.AvatarURL)
+		}
+		avatarURL = &trimmed
+		session.User.AvatarURL = trimmed
+	}
+
+	if controller.userService != nil {
+		if err := controller.userService.UpdateProfile(c.Request.Context(), session.User.Login, displayName, avatarURL); err != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	if err := controller.authService.SetSessionCookie(c.Writer, *session); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"ok": true,
+		"user": gin.H{
+			"provider":    session.User.Provider,
+			"id":          session.User.ID,
+			"login":       session.User.Login,
+			"avatarUrl":   session.User.AvatarURL,
+			"displayName": session.User.DisplayName,
+		},
+	})
+}
+
 func (controller *AuthController) Session(c *gin.Context) {
 	emailLoginURL := ""
 	if controller.emailService != nil && controller.emailService.Enabled() {
@@ -276,6 +438,18 @@ func (controller *AuthController) Session(c *gin.Context) {
 		return
 	}
 
+	originalUser := session.User
+	if controller.userService != nil {
+		if profile, err := controller.userService.GetUser(c.Request.Context(), session.User.Login); err == nil {
+			session.User.DisplayName = profile.DisplayName
+			session.User.AvatarURL = profile.AvatarURL
+		}
+	}
+
+	if session.User.DisplayName != originalUser.DisplayName || session.User.AvatarURL != originalUser.AvatarURL {
+		_ = controller.authService.SetSessionCookie(c.Writer, *session)
+	}
+
 	isAdmin := controller.authService.IsAdmin(session.User.Login)
 	roleLabel := "用户"
 	if isAdmin {
@@ -295,6 +469,7 @@ func (controller *AuthController) Session(c *gin.Context) {
 			"id":        session.User.ID,
 			"login":     session.User.Login,
 			"avatarUrl": session.User.AvatarURL,
+			"displayName": session.User.DisplayName,
 		},
 	})
 }
@@ -436,6 +611,27 @@ func (controller *AuthController) appAuthURL(path string, token string, returnTo
 	return u.String()
 }
 
+func defaultAvatarFor(login string, provider string, fallback string) string {
+	trimmedLogin := strings.TrimSpace(login)
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "github":
+		if trimmedLogin == "" {
+			return fallback
+		}
+		return fmt.Sprintf("https://github.com/%s.png?size=64", trimmedLogin)
+	case "email":
+		if trimmedLogin == "" {
+			return fallback
+		}
+		return fmt.Sprintf("https://ui-avatars.com/api/?name=%s&background=0D1117&color=ffffff&size=128", url.QueryEscape(trimmedLogin))
+	default:
+		if strings.TrimSpace(fallback) != "" {
+			return fallback
+		}
+		return ""
+	}
+}
+
 func (controller *AuthController) emailLinkBaseURL(r *http.Request, client string, returnTo string) string {
 	base := strings.TrimRight(controller.publicBaseURL(r), "/") + "/auth/email"
 	params := url.Values{}
@@ -452,4 +648,25 @@ func (controller *AuthController) emailLinkBaseURL(r *http.Request, client strin
 		return base
 	}
 	return base + "?" + params.Encode()
+}
+
+func (controller *AuthController) renderAppRedirect(c *gin.Context, deepLink string) {
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0b0b0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#f5f5f5;display:flex;align-items:center;justify-content:center;min-height:100vh;">
+<div style="text-align:center;padding:24px;">
+<p style="font-size:16px;margin-bottom:16px;">正在跳转到 App...</p>
+<a href="%s" style="display:inline-block;padding:12px 28px;background:#ff7bbd;border-radius:999px;color:#2a0e1a;text-decoration:none;font-weight:700;font-size:15px;">如果没有自动跳转，请点击这里</a>
+</div>
+<script>window.location.href=%q;</script>
+</body>
+</html>`, deepLink, deepLink)
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
+}
+
+func newLoginId() string {
+	raw := make([]byte, 16)
+	_, _ = rand.Read(raw)
+	return hex.EncodeToString(raw)
 }

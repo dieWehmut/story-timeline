@@ -2,9 +2,11 @@
 import { ThemeButton } from './ThemeButton';
 import { AuthButton } from './AuthButton';
 import { HomeButton } from './HomeButton';
+import { SettingsButton } from './SettingsButton';
 import { UploadButton } from './UploadButton';
 import { TagBar } from './TagBar';
 import { UserBar } from './UserBar';
+import { useProfile } from '../context/ProfileContext';
 import type { AuthUser, FeedUser, TimelineMonth } from '../types/image';
 
 interface HeaderProps {
@@ -24,6 +26,7 @@ interface HeaderProps {
   onLogin: (provider: 'github' | 'google') => void;
   onEmailLogin?: (email: string) => Promise<void> | void;
   onLogout: () => Promise<void>;
+  emailPolling?: boolean;
   onTagSelect: (tag: string | null) => void;
   onThemeToggle: () => void;
   onTimelineToggle: () => void;
@@ -52,6 +55,7 @@ export function Header({
   onLogin,
   onEmailLogin,
   onLogout,
+  emailPolling,
   onTagSelect,
   onThemeToggle,
   onTimelineToggle,
@@ -62,6 +66,8 @@ export function Header({
   uploadBusy,
   showUploadButton = true,
 }: HeaderProps) {
+  const profile = useProfile();
+  const displayName = authUser ? profile.resolveName(authUser.login) : '';
   return (
     <header className="fixed left-0 right-0 top-0 z-40 px-2 pt-2 md:px-3 md:pt-3">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
@@ -81,7 +87,7 @@ export function Header({
                 {activeMonth ? `${activeMonth.year}-${String(activeMonth.month).padStart(2, '0')}` : '---- --'}
               </p>
               {authUser ? (
-                <p className="text-sm font-medium text-[var(--text-main)]">{authUser.login}</p>
+                <p className="text-sm font-medium text-[var(--text-main)]">{displayName || authUser.login}</p>
               ) : null}
             </>
           )}
@@ -90,6 +96,7 @@ export function Header({
           {isDetailView ? (
             <>
               <HomeButton />
+              <SettingsButton />
               {!authAuthenticated ? (
                 <AuthButton
                   authenticated={authAuthenticated}
@@ -101,6 +108,7 @@ export function Header({
                   onEmailLogin={onEmailLogin}
                   onLogout={onLogout}
                   user={authUser}
+                  emailPolling={emailPolling}
                 />
               ) : null}
               <ThemeButton onToggle={onThemeToggle} theme={theme} />
@@ -108,6 +116,7 @@ export function Header({
           ) : (
             <>
               <HomeButton />
+              <SettingsButton />
               {!authAuthenticated ? (
                 <AuthButton
                   authenticated={authAuthenticated}
@@ -119,6 +128,7 @@ export function Header({
                   onEmailLogin={onEmailLogin}
                   onLogout={onLogout}
                   user={authUser}
+                  emailPolling={emailPolling}
                 />
               ) : null}
               {authUser && canPost && showUploadButton ? <UploadButton busy={uploadBusy} /> : null}

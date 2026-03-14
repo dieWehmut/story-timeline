@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
@@ -19,9 +19,23 @@ const defaultSession: AuthSession = {
 
 export const LOGIN_RETURN_KEY = 'story_login_return';
 
+const EMAIL_POLL_INTERVAL = 3000;
+const EMAIL_POLL_TIMEOUT = 10 * 60 * 1000;
+
 export const useAuth = () => {
   const [session, setSession] = useState<AuthSession>(defaultSession);
   const [loading, setLoading] = useState(true);
+  const [emailPolling, setEmailPolling] = useState(false);
+  const pollRef = useRef<{ timer: ReturnType<typeof setInterval>; timeout: ReturnType<typeof setTimeout> } | null>(null);
+
+  const stopEmailPoll = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current.timer);
+      clearTimeout(pollRef.current.timeout);
+      pollRef.current = null;
+    }
+    setEmailPolling(false);
+  }, []);
 
   const refreshSession = useCallback(async () => {
     try {
@@ -61,6 +75,7 @@ export const useAuth = () => {
     };
   }, []);
 
+  // Legacy: handle email_token URL param (for old links still in circulation)
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
@@ -158,6 +173,39 @@ export const useAuth = () => {
     };
   }, []);
 
+  // Clean up polling on unmount
+  useEffect(() => {
+    return () => {
+      stopEmailPoll();
+    };
+  }, [stopEmailPoll]);
+
+  const startEmailPoll = useCallback(
+    (loginId: string) => {
+      stopEmailPoll();
+      setEmailPolling(true);
+
+      const poll = async () => {
+        try {
+          const result = await api.pollEmailLogin(loginId);
+          if (result.authenticated) {
+            stopEmailPoll();
+            const nextSession = await api.getSession();
+            setSession(nextSession);
+            setLoading(false);
+          }
+        } catch {
+          // ignore poll errors, keep trying
+        }
+      };
+
+      const timer = setInterval(() => { void poll(); }, EMAIL_POLL_INTERVAL);
+      const timeout = setTimeout(() => { stopEmailPoll(); }, EMAIL_POLL_TIMEOUT);
+      pollRef.current = { timer, timeout };
+    },
+    [stopEmailPoll]
+  );
+
   const loginWith = (provider: 'github' | 'google') => {
     const isNative = Capacitor.isNativePlatform();
     const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -209,10 +257,15 @@ export const useAuth = () => {
     }
 
     const endpoint = session.emailLoginUrl || `${API_BASE}/api/auth/email/login`;
-    await api.requestEmailLogin(email, endpoint, { returnTo: currentPath, client: isNative ? 'app' : 'web' });
+    const result = await api.requestEmailLogin(email, endpoint, { returnTo: currentPath, client: isNative ? 'app' : 'web' });
+
+    if (result.loginId) {
+      startEmailPoll(result.loginId);
+    }
   };
 
   const logout = async () => {
+    stopEmailPoll();
     await api.logout();
     setSession(defaultSession);
   };
@@ -220,9 +273,11 @@ export const useAuth = () => {
   return {
     ...session,
     loading,
+    emailPolling,
     login,
     loginWith,
     requestEmailLogin,
+    stopEmailPoll,
     logout,
   };
 };

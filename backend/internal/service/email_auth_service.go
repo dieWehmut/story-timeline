@@ -52,22 +52,22 @@ func (service *EmailAuthService) Enabled() bool {
 	return service != nil && service.storage != nil && service.client != nil && service.from != ""
 }
 
-func (service *EmailAuthService) RequestMagicLink(ctx context.Context, email string, callbackURL string) error {
+func (service *EmailAuthService) RequestMagicLink(ctx context.Context, email string, callbackURL string) (string, error) {
 	if !service.Enabled() {
-		return errors.New("email login not configured")
+		return "", errors.New("email login not configured")
 	}
 	if strings.TrimSpace(callbackURL) == "" {
-		return errors.New("missing callback url")
+		return "", errors.New("missing callback url")
 	}
 
 	normalized, err := normalizeEmail(email)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	token, tokenHash, err := newEmailToken()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	login := loginFromEmail(normalized)
@@ -83,11 +83,11 @@ func (service *EmailAuthService) RequestMagicLink(ctx context.Context, email str
 	}
 
 	if err := service.storage.CreateEmailLogin(ctx, record); err != nil {
-		return err
+		return "", err
 	}
 
 	if err := service.cacheMagicLink(ctx, token, record); err != nil {
-		return err
+		return "", err
 	}
 
 	link := appendToken(callbackURL, token)
@@ -128,13 +128,13 @@ func (service *EmailAuthService) RequestMagicLink(ctx context.Context, email str
             </tr>
             <tr>
               <td style="padding:0 28px 26px;font-size:13px;line-height:1.7;color:#9a9ab0;">
-                如果这不是%s醬的操作，请直接忽略本邮件喵~
+                如果这不是 %s 醬的操作，请直接忽略本邮件喵~
               </td>
             </tr>
             <tr>
               <td style="padding:18px 28px 26px;border-top:1px solid #22222a;font-size:12px;color:#7c7c90;text-align:center;">
                 <br />
-                本邮件由hc系统自动发送，请勿回复喵~
+                本邮件由hc的系统自动发送，请勿回复喵~
               </td>
             </tr>
           </table>
@@ -151,10 +151,10 @@ _, err = service.client.Emails.Send(&resend.SendEmailRequest{
 		Html:    html,
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return tokenHash, nil
 }
 
 func (service *EmailAuthService) CompleteLogin(ctx context.Context, token string) (model.Session, error) {
@@ -172,6 +172,15 @@ func (service *EmailAuthService) CompleteLogin(ctx context.Context, token string
 	}
 
 	return service.completeLoginFromStorage(ctx, token)
+}
+
+func (service *EmailAuthService) ConfirmLogin(ctx context.Context, token string) (model.Session, string, error) {
+	session, err := service.CompleteLogin(ctx, token)
+	if err != nil {
+		return model.Session{}, "", err
+	}
+	tokenHash := hashToken(token)
+	return session, tokenHash, nil
 }
 
 func (service *EmailAuthService) VerifyToken(ctx context.Context, token string) error {

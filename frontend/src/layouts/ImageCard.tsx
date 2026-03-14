@@ -19,6 +19,7 @@ import { buildMediaItems, mediaTypeFromFile } from '../lib/media';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import type { CommentItem, ImageItem } from '../types/image';
+import { useProfile } from '../context/ProfileContext';
 
 
 
@@ -373,6 +374,7 @@ export function ImageCard({
   const cardRef = useRef<HTMLElement | null>(null);
 
   const { confirm } = useToast();
+  const profile = useProfile();
 
   const navigate = useNavigate();
 
@@ -445,6 +447,8 @@ export function ImageCard({
   const authorAvatar =
 
     item.authorAvatar || (authorLogin !== 'GitHub' ? `https://github.com/${authorLogin}.png?size=64` : '');
+  const displayAuthorLogin = profile.resolveName(authorLogin);
+  const displayAuthorAvatar = profile.resolveAvatar(authorLogin, authorAvatar);
 
   const imageUrls = item.imageUrls ?? [];
 
@@ -579,7 +583,7 @@ export function ImageCard({
 
       id: `temp-${Date.now()}`,
 
-      authorLogin: '',
+      authorLogin: profile.user?.login ?? '',
 
       postOwner: authorLogin,
 
@@ -680,7 +684,7 @@ export function ImageCard({
 
             <div className="flex items-center gap-2 pb-1">
 
-              {authorAvatar ? (
+              {displayAuthorAvatar ? (
 
                 <button
 
@@ -688,7 +692,7 @@ export function ImageCard({
 
                   onClick={(e) => { e.stopPropagation(); onAvatarClick?.(authorLogin); }}
 
-                  title={authorLogin}
+                  title={displayAuthorLogin || authorLogin}
 
                   type="button"
 
@@ -696,11 +700,11 @@ export function ImageCard({
 
                   <img
 
-                    alt={authorLogin}
+                    alt={displayAuthorLogin || authorLogin}
 
                     className="h-7 w-7 rounded-full object-cover ring-1 ring-white/10"
 
-                    src={authorAvatar}
+                    src={displayAuthorAvatar}
 
                   />
 
@@ -714,13 +718,13 @@ export function ImageCard({
 
                   onClick={(e) => { e.stopPropagation(); onAvatarClick?.(authorLogin); }}
 
-                  title={authorLogin}
+                  title={displayAuthorLogin || authorLogin}
 
                   type="button"
 
                 >
 
-                  {authorLogin.slice(0, 1).toUpperCase()}
+                  {(displayAuthorLogin || authorLogin).slice(0, 1).toUpperCase()}
 
                 </button>
 
@@ -728,7 +732,7 @@ export function ImageCard({
 
               <p className="flex min-w-0 flex-1 items-center gap-2 truncate text-sm font-medium text-[var(--text-main)]">
 
-                {authorLogin}
+                {displayAuthorLogin || authorLogin}
 
                 {roleLabel ? (
 
@@ -919,15 +923,17 @@ export function ImageCard({
                 {comments.map((c) => {
 
                   const replyTarget = getReplyTargetLabel(c);
+                  const commentAuthor = profile.resolveName(c.authorLogin);
+                  const replyTargetDisplay = replyTarget ? profile.resolveName(replyTarget) : null;
 
                   return (
 
                     <div className="text-xs" key={c.id}>
 
-                      <span className="font-medium text-[var(--text-main)]">{c.authorLogin}</span>
+                      <span className="font-medium text-[var(--text-main)]">{commentAuthor || c.authorLogin}</span>
 
                       {replyTarget ? (
-                        <span className="text-[var(--text-main)]"> replied to {replyTarget}: </span>
+                        <span className="text-[var(--text-main)]"> replied to {replyTargetDisplay || replyTarget}: </span>
                       ) : (
                         <span className="text-[var(--text-main)]">: </span>
                       )}

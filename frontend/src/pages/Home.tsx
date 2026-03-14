@@ -2,9 +2,11 @@
 import { Link } from 'react-router-dom';
 import { AuthButton } from '../layouts/AuthButton';
 import { ThemeButton } from '../layouts/ThemeButton';
+import { SettingsButton } from '../layouts/SettingsButton';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
 import { useFollows } from '../hooks/useFollows';
+import { useProfile } from '../context/ProfileContext';
 
 interface HomeProps {
   auth: ReturnType<typeof useAuth>;
@@ -67,6 +69,7 @@ function NavCard({ icon: Icon, label, subLabel, to, href, external, disabled }: 
 }
 
 export default function Home({ auth, images, follows, theme, onThemeToggle }: HomeProps) {
+  const profile = useProfile();
   const githubOwner = images.stats.githubOwner || auth.user?.login || 'GitHub';
   const repoUrl = `https://github.com/${githubOwner}/story-timeline`;
   const androidUrl = `${repoUrl}/releases/latest`;
@@ -82,9 +85,12 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
   const authGoogleLoginUrl = auth.googleLoginUrl;
   const authEmailLoginUrl = auth.emailLoginUrl;
   const authUser = auth.user;
+  const displayName = authUser ? profile.resolveName(authUser.login) : '';
+  const displayAvatar = authUser ? profile.resolveAvatar(authUser.login, authUser.avatarUrl) : '';
   const onLogin = auth.loginWith;
   const onEmailLogin = auth.requestEmailLogin;
   const onLogout = auth.logout;
+  const emailPolling = auth.emailPolling;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -94,11 +100,11 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
             {authAuthenticated && authUser ? (
               <>
                 <img
-                  alt={authUser.login}
+                  alt={displayName || authUser.login}
                   className="h-9 w-9 rounded-full border border-[var(--panel-border)] object-cover"
-                  src={authUser.avatarUrl}
+                  src={displayAvatar}
                 />
-                <span className="text-sm font-medium text-[var(--text-main)]">{authUser.login}</span>
+                <span className="text-sm font-medium text-[var(--text-main)]">{displayName || authUser.login}</span>
               </>
             ) : (
               <AuthButton
@@ -111,6 +117,7 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
                 onEmailLogin={onEmailLogin}
                 onLogout={onLogout}
                 user={authUser}
+                emailPolling={emailPolling}
               />
             )}
           </div>
@@ -126,8 +133,10 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
                 onEmailLogin={onEmailLogin}
                 onLogout={onLogout}
                 user={authUser}
+                emailPolling={emailPolling}
               />
             ) : null}
+            <SettingsButton />
             <ThemeButton onToggle={onThemeToggle} theme={theme} />
           </div>
         </div>

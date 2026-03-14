@@ -13,6 +13,7 @@ type AuthUser struct {
 	ID        string `json:"id"`
 	Login     string `json:"login"`
 	AvatarURL string `json:"avatarUrl"`
+	DisplayName string `json:"displayName,omitempty"`
 }
 
 type Session struct {

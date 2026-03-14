@@ -12,6 +12,7 @@ import Following from './pages/Following';
 import Follower from './pages/Follower';
 import AuthEmail from './pages/AuthEmail';
 import { ToastProvider } from './ui/Toast';
+import { ProfileProvider } from './context/ProfileContext';
 import type { TimelineMonth } from './types/image';
 
 const resolveTheme = (): 'dark' | 'light' => {
@@ -82,69 +83,71 @@ function App() {
 
   return (
     <ToastProvider>
-      <BrowserRouter>
-        <LoginReturnHandler authenticated={auth.authenticated} />
-        <Routes>
-          <Route element={<AppLayout footerStats={footerStats} />}>
-            <Route
-              path="/"
-              element={<Home auth={auth} images={images} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
-            />
-            <Route
-              path="/story"
-              element={
-                <Story
-                  activeMonth={activeMonth}
-                  auth={auth}
-                  follows={follows}
-                  images={images}
-                  onActiveMonthChange={setActiveMonth}
-                  onThemeToggle={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
-                  onTimelineClose={() => setTimelineOpen(false)}
-                  onTimelineToggle={() => setTimelineOpen((open) => !open)}
-                  theme={theme}
-                  timelineOpen={timelineOpen}
-                />
-              }
-            />
-            <Route
-              path="/story/:id"
-              element={
-                <Story
-                  activeMonth={activeMonth}
-                  auth={auth}
-                  follows={follows}
-                  images={images}
-                  onActiveMonthChange={setActiveMonth}
-                  onThemeToggle={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
-                  onTimelineClose={() => setTimelineOpen(false)}
-                  onTimelineToggle={() => setTimelineOpen((open) => !open)}
-                  theme={theme}
-                  timelineOpen={timelineOpen}
-                />
-              }
-            />
-            <Route
-              path="/album"
-              element={<Album auth={auth} images={images} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
-            />
-            <Route
-              path="/post"
-              element={<Post auth={auth} images={images} />}
-            />
-            <Route
-              path="/following"
-              element={<Following auth={auth} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
-            />
-            <Route
-              path="/follower"
-              element={<Follower auth={auth} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
-            />
-            <Route path="/auth/email" element={<AuthEmail />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <ProfileProvider user={auth.user}>
+        <BrowserRouter>
+          <LoginReturnHandler authenticated={auth.authenticated} />
+          <Routes>
+            <Route element={<AppLayout footerStats={footerStats} />}>
+              <Route
+                path="/"
+                element={<Home auth={auth} images={images} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+              />
+              <Route
+                path="/story"
+                element={
+                  <Story
+                    activeMonth={activeMonth}
+                    auth={auth}
+                    follows={follows}
+                    images={images}
+                    onActiveMonthChange={setActiveMonth}
+                    onThemeToggle={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
+                    onTimelineClose={() => setTimelineOpen(false)}
+                    onTimelineToggle={() => setTimelineOpen((open) => !open)}
+                    theme={theme}
+                    timelineOpen={timelineOpen}
+                  />
+                }
+              />
+              <Route
+                path="/story/:id"
+                element={
+                  <Story
+                    activeMonth={activeMonth}
+                    auth={auth}
+                    follows={follows}
+                    images={images}
+                    onActiveMonthChange={setActiveMonth}
+                    onThemeToggle={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
+                    onTimelineClose={() => setTimelineOpen(false)}
+                    onTimelineToggle={() => setTimelineOpen((open) => !open)}
+                    theme={theme}
+                    timelineOpen={timelineOpen}
+                  />
+                }
+              />
+              <Route
+                path="/album"
+                element={<Album auth={auth} images={images} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+              />
+              <Route
+                path="/post"
+                element={<Post auth={auth} images={images} />}
+              />
+              <Route
+                path="/following"
+                element={<Following auth={auth} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+              />
+              <Route
+                path="/follower"
+                element={<Follower auth={auth} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+              />
+              <Route path="/auth/email" element={<AuthEmail />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </ProfileProvider>
     </ToastProvider>
   );
 }
