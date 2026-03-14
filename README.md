@@ -9,16 +9,6 @@
 - Image objects: Cloudinary
 - Login and follow graph: GitHub OAuth + GitHub GraphQL
 
-## One-time migration
-
-From the `backend` directory:
-
-```bash
-go run ./cmd/migrate_github_data
-```
-
-This migrates old GitHub repo data into Supabase and Cloudinary.
-
 ## Deployment checklist
 
 ### 1. Supabase

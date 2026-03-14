@@ -19,16 +19,17 @@ jobs:
       - name: Push to HuggingFace
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ secrets.HF_SPACE }}
         run: |
-          if [ -z "$HF_TOKEN" ]; then
-            echo "HF_TOKEN secret is not set"
+          if [ -z "$HF_TOKEN" ] || [ -z "$HF_SPACE" ]; then
+            echo "HF_TOKEN or HF_SPACE secret is not set"
             exit 1
           fi
 
           git config --global user.email "actions@github.com"
           git config --global user.name "github-actions"
 
-          git clone https://oauth2:$HF_TOKEN@huggingface.co/spaces/REDACTED/REDACTED hf-space
+          git clone https://oauth2:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE hf-space
 
           rsync -av --delete \
             --exclude ".git" \
@@ -36,7 +37,7 @@ jobs:
 
           cd hf-space
 
-          git remote set-url origin https://oauth2:$HF_TOKEN@huggingface.co/spaces/REDACTED/REDACTED
+          git remote set-url origin https://oauth2:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE
 
           git add .
           git commit -m "sync from github" || echo "No changes"
