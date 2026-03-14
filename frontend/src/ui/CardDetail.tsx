@@ -250,7 +250,7 @@ function DetailImageGrid({
 
             preload="metadata"
 
-            src={item.url}
+            src={`${item.url}#t=0.001`}
 
           />
 
@@ -1448,7 +1448,7 @@ export function CardDetail({
 
                                           preload="metadata"
 
-                                          src={media.url}
+                                          src={`${media.url}#t=0.001`}
 
                                         />
 
@@ -1636,7 +1636,7 @@ export function CardDetail({
 
                                                   preload="metadata"
 
-                                                  src={media.url}
+                                                  src={`${media.url}#t=0.001`}
 
                                                 />
 

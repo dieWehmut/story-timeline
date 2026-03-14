@@ -239,7 +239,7 @@ function ImageGrid({
 
             preload="metadata"
 
-            src={item.url}
+            src={`${item.url}#t=0.001`}
 
           />
 
@@ -1026,7 +1026,7 @@ export function ImageCard({
 
                                     preload="metadata"
 
-                                    src={media.url}
+                                    src={`${media.url}#t=0.001`}
 
                                   />
 

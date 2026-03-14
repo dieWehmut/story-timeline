@@ -8,8 +8,9 @@ export interface MediaItem {
 const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.webm', '.m4v', '.avi', '.mkv'];
 
 export const isVideoUrl = (url: string) => {
-  const clean = url.split('?')[0].toLowerCase();
-  return VIDEO_EXTENSIONS.some((ext) => clean.endsWith(ext));
+  const clean = url.split('?')[0].split('#')[0].toLowerCase();
+  if (VIDEO_EXTENSIONS.some((ext) => clean.endsWith(ext))) return true;
+  return clean.includes('/video/upload/');
 };
 
 export const mediaTypeFromFile = (file: File): MediaType => {

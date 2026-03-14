@@ -111,6 +111,7 @@ export function ImageViewer({ items, initialIndex = 0, onClose }: ImageViewerPro
           className="max-h-full max-w-full object-contain select-none transition-transform duration-150"
           autoPlay
           controls
+          key={items[index].url}
           onClick={(e) => e.stopPropagation()}
           playsInline
           src={items[index].url}
@@ -121,6 +122,7 @@ export function ImageViewer({ items, initialIndex = 0, onClose }: ImageViewerPro
           alt=""
           className="max-h-full max-w-full object-contain select-none transition-transform duration-150"
           draggable={false}
+          key={items[index]?.url}
           onClick={(e) => e.stopPropagation()}
           src={items[index]?.url ?? ''}
           style={offsetX ? { transform: `translateX(${offsetX}px)`, transition: 'none' } : undefined}
