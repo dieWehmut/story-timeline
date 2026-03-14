@@ -8,7 +8,7 @@ const config: CapacitorConfig = {
 
   server: {
     androidScheme: 'https',
-    url: 'https://REDACTED.example.com',
+    url: 'https://story-timeline.hc-dsw-nexus.me',
     cleartext: false,
     allowNavigation: [
       "story-timeline.hc-dsw-nexus.me",
