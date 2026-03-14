@@ -289,13 +289,17 @@ function ImageGrid({
 
 
 
-  const cols = items.length <= 2 ? 2 : 3;
+  const maxVisible = 9;
+  const visibleItems = items.length > maxVisible ? items.slice(0, maxVisible) : items;
+  const extraCount = items.length > maxVisible ? items.length - maxVisible : 0;
+
+  const cols = visibleItems.length <= 2 ? 2 : 3;
 
   return (
 
     <div className={`grid gap-0.5 ${cols === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
 
-      {items.map((item, i) => (
+      {visibleItems.map((item, i) => (
 
         <div
 
@@ -308,6 +312,12 @@ function ImageGrid({
         >
 
           {renderMedia(item, `${alt} ${i + 1}`)}
+
+          {extraCount > 0 && i === visibleItems.length - 1 ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+              <span className="text-2xl font-bold text-white">+{extraCount}</span>
+            </div>
+          ) : null}
 
         </div>
 
@@ -416,7 +426,7 @@ export function ImageCard({
 
       },
 
-      { rootMargin: '0px 0px -10% 0px', threshold: 0.15 }
+      { rootMargin: '0px 0px -5% 0px', threshold: 0.05 }
 
     );
 

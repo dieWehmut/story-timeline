@@ -8,6 +8,7 @@ type ProfileContextValue = {
   displayName: string;
   displayAvatar: string;
   backgroundImage: string;
+  backgroundOpacity: number;
   currentDisplayName: string;
   currentAvatar: string;
   setDisplayName: (name: string) => Promise<void>;
@@ -16,6 +17,7 @@ type ProfileContextValue = {
   resetDisplayAvatar: () => void;
   setBackgroundImage: (image: string) => void;
   resetBackgroundImage: () => void;
+  setBackgroundOpacity: (opacity: number) => void;
   resolveName: (login: string) => string;
   resolveAvatar: (login: string, fallback?: string) => string;
 };
@@ -23,6 +25,7 @@ type ProfileContextValue = {
 const ProfileContext = createContext<ProfileContextValue | null>(null);
 
 const BG_KEY = 'story-bg-image';
+const BG_OPACITY_KEY = 'story-bg-opacity';
 
 type ProfileProviderProps = {
   user: AuthUser | null;
@@ -34,6 +37,7 @@ export function ProfileProvider({ user, children }: ProfileProviderProps) {
   const [displayName, setDisplayNameState] = useState('');
   const [displayAvatar, setDisplayAvatarState] = useState('');
   const [backgroundImage, setBackgroundImageState] = useState('');
+  const [backgroundOpacity, setBackgroundOpacityRaw] = useState(1);
 
   useEffect(() => {
     if (!user) {
@@ -49,6 +53,8 @@ export function ProfileProvider({ user, children }: ProfileProviderProps) {
     if (typeof window === 'undefined') return;
     try {
       setBackgroundImageState(localStorage.getItem(BG_KEY) ?? '');
+      const savedOpacity = localStorage.getItem(BG_OPACITY_KEY);
+      if (savedOpacity !== null) setBackgroundOpacityRaw(Number(savedOpacity) || 1);
     } catch {
       setBackgroundImageState('');
     }
@@ -62,7 +68,8 @@ export function ProfileProvider({ user, children }: ProfileProviderProps) {
     } else {
       root.style.setProperty('--page-bg-image', 'none');
     }
-  }, [backgroundImage]);
+    root.style.setProperty('--page-bg-opacity', String(backgroundOpacity));
+  }, [backgroundImage, backgroundOpacity]);
 
   const updateProfile = useCallback(
     async (payload: { displayName?: string; avatarUrl?: string }) => {
@@ -127,6 +134,17 @@ export function ProfileProvider({ user, children }: ProfileProviderProps) {
 
   const resetBackgroundImage = useCallback(() => setBackgroundImage(''), [setBackgroundImage]);
 
+  const setBackgroundOpacity = useCallback((opacity: number) => {
+    const clamped = Math.max(0.1, Math.min(1, opacity));
+    setBackgroundOpacityRaw(clamped);
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(BG_OPACITY_KEY, String(clamped));
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const resolveName = useCallback(
     (login: string) => {
       if (!login) return '';
@@ -157,6 +175,7 @@ export function ProfileProvider({ user, children }: ProfileProviderProps) {
       displayName,
       displayAvatar,
       backgroundImage,
+      backgroundOpacity,
       currentDisplayName,
       currentAvatar,
       setDisplayName,
@@ -165,6 +184,7 @@ export function ProfileProvider({ user, children }: ProfileProviderProps) {
       resetDisplayAvatar,
       setBackgroundImage,
       resetBackgroundImage,
+      setBackgroundOpacity,
       resolveName,
       resolveAvatar,
     }),
@@ -173,6 +193,7 @@ export function ProfileProvider({ user, children }: ProfileProviderProps) {
       displayName,
       displayAvatar,
       backgroundImage,
+      backgroundOpacity,
       currentDisplayName,
       currentAvatar,
       setDisplayName,
@@ -181,6 +202,7 @@ export function ProfileProvider({ user, children }: ProfileProviderProps) {
       resetDisplayAvatar,
       setBackgroundImage,
       resetBackgroundImage,
+      setBackgroundOpacity,
       resolveName,
       resolveAvatar,
     ]

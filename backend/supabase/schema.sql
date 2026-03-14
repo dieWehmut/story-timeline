@@ -103,12 +103,15 @@ create table if not exists public.users (
   login text primary key,
   provider text not null,
   provider_id text not null default '',
+  display_name text not null default '',
   avatar_url text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create index if not exists users_provider_idx on public.users (provider);
+
+alter table public.users add column if not exists display_name text not null default '';
 
 create or replace view public.user_logins as
 select distinct login from public.users where login <> ''

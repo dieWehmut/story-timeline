@@ -56,15 +56,23 @@
 
   body {
     @apply m-0 min-h-screen bg-[var(--page-bg)] font-sans text-[var(--text-main)] antialiased;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
     background-image: var(--page-bg-image);
     background-repeat: no-repeat;
     background-position: center;
     background-size: cover;
-    background-attachment: fixed;
+    opacity: var(--page-bg-opacity, 1);
+    pointer-events: none;
   }
 
   #root {
-    @apply min-h-screen;
+    @apply relative min-h-screen;
+    isolation: isolate;
   }
 
   button,
@@ -228,14 +236,14 @@
   }
 
   .page-transition {
-    animation: page-fade 260ms ease-out both;
+    animation: page-fade 120ms ease-out both;
     will-change: opacity;
   }
 
   .image-card-reveal {
     opacity: 0;
-    transform: translateY(14px);
-    transition: opacity 260ms ease, transform 260ms ease;
+    transform: translateY(8px);
+    transition: opacity 100ms ease, transform 100ms ease;
   }
 
   .image-card-reveal.is-visible {
