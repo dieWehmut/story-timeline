@@ -204,11 +204,27 @@ type CommentPayloadOptions = {
 
 export const api = {
   getSession: async () => normalizeSession(await request<AuthSession>(`${API_BASE}/api/auth/session`)),
-  requestEmailLogin: (email: string, endpoint?: string) =>
+  requestEmailLogin: (email: string, endpoint?: string, options?: { returnTo?: string; client?: 'web' | 'app' }) =>
     request<{ ok: boolean }>(endpoint ?? `${API_BASE}/api/auth/email/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({
+        email,
+        returnTo: options?.returnTo,
+        client: options?.client,
+      }),
+    }),
+  exchangeSession: (token: string) =>
+    request<{ ok: boolean }>(`${API_BASE}/api/auth/exchange`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    }),
+  exchangeEmailLogin: (token: string) =>
+    request<{ ok: boolean }>(`${API_BASE}/api/auth/email/exchange`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
     }),
   logout: () => request<{ ok: boolean }>(`${API_BASE}/api/auth/logout`, { method: 'POST' }),
   getFeed: async () => (await request<ImageItem[]>(`${API_BASE}/api/feed`)).map(normalizeImageItem),

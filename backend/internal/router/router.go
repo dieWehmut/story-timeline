@@ -60,6 +60,7 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 			auth.POST("/email/login", deps.AuthController.EmailLogin)
 			auth.GET("/email/callback", deps.AuthController.EmailCallback)
 			auth.POST("/email/exchange", deps.AuthController.EmailExchange)
+			auth.POST("/email/verify", deps.AuthController.EmailVerify)
 			auth.POST("/exchange", deps.AuthController.ExchangeSession)
 			auth.GET("/session", deps.AuthController.Session)
 			auth.POST("/logout", deps.AuthController.Logout)

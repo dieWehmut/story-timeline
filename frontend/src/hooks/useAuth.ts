@@ -59,7 +59,32 @@ export const useAuth = () => {
     return () => {
       cancelled = true;
     };
-  }, [refreshSession]);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('email_token');
+    if (!token) return;
+
+    const run = async () => {
+      try {
+        await api.exchangeEmailLogin(token, '/api/auth/email/exchange');
+        const nextSession = await api.getSession();
+        setSession(nextSession);
+        setLoading(false);
+      } catch {
+        // ignore token exchange errors
+      } finally {
+        params.delete('email_token');
+        const search = params.toString();
+        const nextUrl = `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`;
+        window.history.replaceState(null, '', nextUrl);
+      }
+    };
+
+    void run();
+  }, []);
 
   useEffect(() => {
     const cleanup = subscribeAuthRefresh(() => {

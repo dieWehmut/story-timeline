@@ -71,6 +71,7 @@ export function LoginModal({
   const [email, setEmail] = useState('');
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [sending, setSending] = useState(false);
+  const lockClose = showEmailForm && email.trim().length > 0;
 
   useEffect(() => {
     if (!open) {
@@ -100,8 +101,24 @@ export function LoginModal({
   };
 
   return (
-    <Modal visible={open} animationType="fade" transparent onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
+    <Modal
+      visible={open}
+      animationType="fade"
+      transparent
+      onRequestClose={() => {
+        if (!lockClose) {
+          onClose();
+        }
+      }}
+    >
+      <Pressable
+        style={styles.overlay}
+        onPress={() => {
+          if (!lockClose) {
+            onClose();
+          }
+        }}
+      >
         <Pressable
           style={[
             styles.card,

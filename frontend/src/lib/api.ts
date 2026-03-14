@@ -294,8 +294,14 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),
     }),
-  exchangeEmailLogin: (token: string) =>
-    request<{ ok: boolean }>(`${API_BASE}/api/auth/email/exchange`, {
+  exchangeEmailLogin: (token: string, endpoint?: string) =>
+    request<{ ok: boolean }>(endpoint ?? `${API_BASE}/api/auth/email/exchange`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    }),
+  verifyEmailLogin: (token: string) =>
+    request<{ ok: boolean }>(`${API_BASE}/api/auth/email/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),

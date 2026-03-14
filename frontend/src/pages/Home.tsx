@@ -91,22 +91,45 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
       <header className="px-4 pt-3">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
           <div className="flex items-center gap-3">
-            <AuthButton
-              authenticated={authAuthenticated}
-              loading={authLoading}
-              loginUrl={authLoginUrl}
-              googleLoginUrl={authGoogleLoginUrl}
-              emailLoginUrl={authEmailLoginUrl}
-              onLogin={onLogin}
-              onEmailLogin={onEmailLogin}
-              onLogout={onLogout}
-              user={authUser}
-            />
-            {authUser ? (
-              <span className="text-sm font-medium text-[var(--text-main)]">{authUser.login}</span>
-            ) : null}
+            {authAuthenticated && authUser ? (
+              <>
+                <img
+                  alt={authUser.login}
+                  className="h-9 w-9 rounded-full border border-[var(--panel-border)] object-cover"
+                  src={authUser.avatarUrl}
+                />
+                <span className="text-sm font-medium text-[var(--text-main)]">{authUser.login}</span>
+              </>
+            ) : (
+              <AuthButton
+                authenticated={authAuthenticated}
+                loading={authLoading}
+                loginUrl={authLoginUrl}
+                googleLoginUrl={authGoogleLoginUrl}
+                emailLoginUrl={authEmailLoginUrl}
+                onLogin={onLogin}
+                onEmailLogin={onEmailLogin}
+                onLogout={onLogout}
+                user={authUser}
+              />
+            )}
           </div>
-          <ThemeButton onToggle={onThemeToggle} theme={theme} />
+          <div className="flex items-center gap-2">
+            {authAuthenticated && authUser ? (
+              <AuthButton
+                authenticated={authAuthenticated}
+                loading={authLoading}
+                loginUrl={authLoginUrl}
+                googleLoginUrl={authGoogleLoginUrl}
+                emailLoginUrl={authEmailLoginUrl}
+                onLogin={onLogin}
+                onEmailLogin={onEmailLogin}
+                onLogout={onLogout}
+                user={authUser}
+              />
+            ) : null}
+            <ThemeButton onToggle={onThemeToggle} theme={theme} />
+          </div>
         </div>
       </header>
 

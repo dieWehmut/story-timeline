@@ -233,6 +233,28 @@ func (controller *AuthController) EmailExchange(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
+func (controller *AuthController) EmailVerify(c *gin.Context) {
+	if controller.emailService == nil || !controller.emailService.Enabled() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "email login not configured"})
+		return
+	}
+
+	var payload struct {
+		Token string `json:"token"`
+	}
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	if err := controller.emailService.VerifyToken(c.Request.Context(), payload.Token); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
 func (controller *AuthController) Session(c *gin.Context) {
 	emailLoginURL := ""
 	if controller.emailService != nil && controller.emailService.Enabled() {
@@ -415,16 +437,19 @@ func (controller *AuthController) appAuthURL(path string, token string, returnTo
 }
 
 func (controller *AuthController) emailLinkBaseURL(r *http.Request, client string, returnTo string) string {
-	if client == "app" {
-		return controller.appAuthBase("/email", returnTo)
-	}
 	base := strings.TrimRight(controller.publicBaseURL(r), "/") + "/auth/email"
-	if returnTo == "" {
+	params := url.Values{}
+	if returnTo != "" {
+		params.Set("return", returnTo)
+	}
+	if client != "" {
+		params.Set("client", client)
+	}
+	if client == "app" {
+		params.Set("appScheme", controller.appScheme())
+	}
+	if len(params) == 0 {
 		return base
 	}
-	sep := "?"
-	if strings.Contains(base, "?") {
-		sep = "&"
-	}
-	return base + sep + "return=" + url.QueryEscape(returnTo)
+	return base + "?" + params.Encode()
 }
