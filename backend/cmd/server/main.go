@@ -85,12 +85,13 @@ func main() {
 	server := &http.Server{
 		Addr: ":" + env.Port,
 		Handler: router.New(router.Dependencies{
-			AuthController:   controller.NewAuthController(authService, userService, emailService, loginLimiter, redisStore, env.FrontendBaseURL, env.AppURLScheme),
-			FollowController: controller.NewFollowController(userService),
-			ImageController:  controller.NewImageController(imageService, userService, authService, interactionService, cloudinaryStorage),
-			HealthController: controller.NewHealthController(env.GitHubRepoOwner, authService, userService),
-			UploadController: controller.NewUploadController(cloudinaryStorage),
-			AuthService:      authService,
+			AuthController:         controller.NewAuthController(authService, userService, emailService, loginLimiter, redisStore, env.FrontendBaseURL, env.AppURLScheme),
+			FollowController:       controller.NewFollowController(userService),
+			ImageController:        controller.NewImageController(imageService, userService, authService, interactionService, cloudinaryStorage),
+			HealthController:       controller.NewHealthController(env.GitHubRepoOwner, authService, userService),
+			UploadController:       controller.NewUploadController(cloudinaryStorage),
+			NotificationController: controller.NewNotificationController(supabaseStorage),
+			AuthService:            authService,
 		}, config.AllowedOrigins(env)),
 		ReadHeaderTimeout: 5 * time.Second,
 		// Support large uploads (videos <= 200MB).

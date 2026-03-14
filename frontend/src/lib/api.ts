@@ -544,4 +544,11 @@ export const api = {
   },
   getStats: () => request<HealthStats>(`${API_BASE}/api/health/stats`),
   pingStats: () => request<{ ok: boolean }>(`${API_BASE}/api/health/ping`, { method: 'POST' }),
+  getNotification: () => request<{ enabled: boolean; title: string; content: string }>(`${API_BASE}/api/notification`),
+  updateNotification: (payload: { enabled: boolean; title: string; content: string }) =>
+    request<{ enabled: boolean; title: string; content: string }>(`${API_BASE}/api/notification`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
 };

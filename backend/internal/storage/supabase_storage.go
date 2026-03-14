@@ -843,3 +843,33 @@ func (storage *SupabaseStorage) GetUsersByLogins(ctx context.Context, logins []s
 	}
 	return users, nil
 }
+
+// GetSetting reads a JSON value from the settings table by key.
+func (storage *SupabaseStorage) GetSetting(ctx context.Context, key string) (json.RawMessage, error) {
+	params := url.Values{}
+	params.Set("select", "value")
+	params.Set("key", "eq."+key)
+	params.Set("limit", "1")
+
+	var records []struct {
+		Value json.RawMessage `json:"value"`
+	}
+	if err := storage.requestJSON(ctx, http.MethodGet, "/settings", params, nil, &records, nil); err != nil {
+		return nil, err
+	}
+	if len(records) == 0 {
+		return nil, nil
+	}
+	return records[0].Value, nil
+}
+
+// UpsertSetting writes a JSON value to the settings table.
+func (storage *SupabaseStorage) UpsertSetting(ctx context.Context, key string, value json.RawMessage) error {
+	payload := []map[string]any{{
+		"key":        key,
+		"value":      value,
+		"updated_at": time.Now().UTC(),
+	}}
+	prefer := []string{"resolution=merge-duplicates"}
+	return storage.requestJSON(ctx, http.MethodPost, "/settings", url.Values{"on_conflict": []string{"key"}}, payload, nil, prefer)
+}

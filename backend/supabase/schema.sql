@@ -136,3 +136,9 @@ create table if not exists public.email_logins (
 
 create index if not exists email_logins_email_idx on public.email_logins (email);
 create index if not exists email_logins_expires_idx on public.email_logins (expires_at desc);
+
+create table if not exists public.settings (
+  key text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);

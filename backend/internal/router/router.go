@@ -14,12 +14,13 @@ import (
 )
 
 type Dependencies struct {
-	AuthController   *controller.AuthController
-	FollowController *controller.FollowController
-	ImageController  *controller.ImageController
-	HealthController *controller.HealthController
-	UploadController *controller.UploadController
-	AuthService      *service.AuthService
+	AuthController         *controller.AuthController
+	FollowController       *controller.FollowController
+	ImageController        *controller.ImageController
+	HealthController       *controller.HealthController
+	UploadController       *controller.UploadController
+	NotificationController *controller.NotificationController
+	AuthService            *service.AuthService
 }
 
 func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
@@ -116,6 +117,9 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 			comments.GET("/:commenterLogin/:postOwner/:postID/:commentID/asset/:assetIndex", deps.ImageController.CommentAsset)
 			comments.GET("/:commenterLogin/:postOwner/:postID/:commentID/asset", deps.ImageController.CommentAsset)
 		}
+
+		api.GET("/notification", deps.NotificationController.Get)
+		api.PATCH("/notification", middleware.RequireAdmin(deps.AuthService), deps.NotificationController.Update)
 
 		api.GET("/health/stats", deps.HealthController.Stats)
 		api.POST("/health/ping", deps.HealthController.Ping)

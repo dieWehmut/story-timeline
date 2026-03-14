@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AuthButton } from '../layouts/AuthButton';
 import { ThemeButton } from '../layouts/ThemeButton';
 import { SettingsButton } from '../layouts/SettingsButton';
+import { NotificationButton } from '../layouts/NotificationButton';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
 import { useFollows } from '../hooks/useFollows';
@@ -136,6 +137,7 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
                 emailPolling={emailPolling}
               />
             ) : null}
+            <NotificationButton isAdmin={auth.isAdmin} />
             <SettingsButton />
             <ThemeButton onToggle={onThemeToggle} theme={theme} />
           </div>
@@ -144,7 +146,7 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center px-4 pb-14 pt-0 text-center">
         <h1 className="font-serif text-4xl font-semibold tracking-wide text-[var(--text-main)] md:text-5xl">物语集</h1>
-        <p className="mt-1 text-sm text-soft">记录故事</p>
+        <p className="mt-1 text-sm text-soft">  記錄一下  </p>
 
         <div className="mt-6 grid w-full max-w-xl grid-cols-2 gap-4">
           <div className="nav-card-enter"><NavCard icon={BookOpen} label="物语" to="/story" /></div>
