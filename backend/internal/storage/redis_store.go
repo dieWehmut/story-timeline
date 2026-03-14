@@ -17,6 +17,7 @@ const (
 	TimelineCacheTTL    = 30 * time.Second
 	EmailPendingTTL     = 10 * time.Minute
 	EmailConfirmedTTL   = 5 * time.Minute
+	AppOAuthPendingTTL  = 10 * time.Minute
 )
 
 var (
@@ -318,6 +319,10 @@ func emailConfirmedKey(tokenHash string) string {
 	return "email:confirmed:" + tokenHash
 }
 
+func appOAuthPendingKey(nonce string) string {
+	return "app:oauth:pending:" + nonce
+}
+
 func (store *Store) SetEmailPendingLogin(ctx context.Context, loginId string, tokenHash string) error {
 	client, err := store.ensureClient()
 	if err != nil {
@@ -380,6 +385,34 @@ func (store *Store) ConsumeEmailConfirmedSession(ctx context.Context, tokenHash 
 		return "", ErrMissingToken
 	}
 	value, err := client.GetDel(ctx, emailConfirmedKey(tokenHash)).Result()
+	if err == redis.Nil {
+		return "", ErrCacheMiss
+	}
+	return value, err
+}
+
+func (store *Store) SetAppOAuthPending(ctx context.Context, nonce string, exchangeToken string) error {
+	client, err := store.ensureClient()
+	if err != nil {
+		return err
+	}
+	nonce = strings.TrimSpace(nonce)
+	if nonce == "" {
+		return ErrMissingToken
+	}
+	return client.Set(ctx, appOAuthPendingKey(nonce), exchangeToken, AppOAuthPendingTTL).Err()
+}
+
+func (store *Store) ConsumeAppOAuthPending(ctx context.Context, nonce string) (string, error) {
+	client, err := store.ensureClient()
+	if err != nil {
+		return "", err
+	}
+	nonce = strings.TrimSpace(nonce)
+	if nonce == "" {
+		return "", ErrMissingToken
+	}
+	value, err := client.GetDel(ctx, appOAuthPendingKey(nonce)).Result()
 	if err == redis.Nil {
 		return "", ErrCacheMiss
 	}

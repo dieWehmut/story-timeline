@@ -63,6 +63,7 @@ func (service *AuthService) NewState() string {
 type OAuthStatePayload struct {
 	Client   string `json:"client,omitempty"`
 	ReturnTo string `json:"returnTo,omitempty"`
+	Nonce    string `json:"nonce,omitempty"`
 }
 
 func (service *AuthService) LoginURL(provider string, state string, redirectURL string) string {

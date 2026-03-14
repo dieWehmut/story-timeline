@@ -354,6 +354,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ loginId }),
     }),
+  pollAppOAuth: (nonce: string) =>
+    request<{ ok: boolean; authenticated: boolean }>(`${API_BASE}/api/auth/app/poll`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nonce }),
+    }),
   updateProfile: (payload: { displayName?: string; avatarUrl?: string }) =>
     request<{ ok: boolean }>(`${API_BASE}/api/auth/profile`, {
       method: 'PATCH',

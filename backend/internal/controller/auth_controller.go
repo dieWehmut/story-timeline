@@ -92,11 +92,13 @@ func (controller *AuthController) EmailLogin(c *gin.Context) {
 func (controller *AuthController) login(c *gin.Context, provider string) {
 	returnTo := sanitizeReturnPath(c.Query("return"))
 	client := normalizeClient(c.Query("client"))
+	nonce := strings.TrimSpace(c.Query("nonce"))
 	state := controller.authService.NewState()
 	controller.authService.SetOAuthStateCookie(c.Writer, state)
 	controller.authService.StoreOAuthState(c.Request.Context(), state, service.OAuthStatePayload{
 		Client:   client,
 		ReturnTo: returnTo,
+		Nonce:    nonce,
 	})
 	c.Redirect(http.StatusTemporaryRedirect, controller.authService.LoginURL(provider, state, controller.callbackURL(c.Request, provider)))
 }
@@ -151,9 +153,11 @@ func (controller *AuthController) callback(c *gin.Context, provider string) {
 
 	returnTo := ""
 	client := "web"
+	nonce := ""
 	if statePayload != nil {
 		returnTo = sanitizeReturnPath(statePayload.ReturnTo)
 		client = normalizeClient(statePayload.Client)
+		nonce = strings.TrimSpace(statePayload.Nonce)
 	}
 
 	if client == "app" {
@@ -164,6 +168,10 @@ func (controller *AuthController) callback(c *gin.Context, provider string) {
 				if session.User.Provider == "github" {
 					_ = controller.userService.SyncGitHubFollows(c.Request.Context(), session.AccessToken, session.User.Login)
 				}
+			}
+			// Store exchange token indexed by nonce so the app can poll for it
+			if nonce != "" && controller.redisStore != nil && controller.redisStore.Enabled() {
+				_ = controller.redisStore.SetAppOAuthPending(c.Request.Context(), nonce, exchangeToken)
 			}
 			deepLink := controller.appAuthURL("/callback", exchangeToken, returnTo)
 			controller.renderAppRedirect(c, deepLink)
@@ -302,6 +310,50 @@ func (controller *AuthController) EmailConfirm(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func (controller *AuthController) AppOAuthPoll(c *gin.Context) {
+	var payload struct {
+		Nonce string `json:"nonce"`
+	}
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	nonce := strings.TrimSpace(payload.Nonce)
+	if nonce == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing nonce"})
+		return
+	}
+
+	if controller.redisStore == nil || !controller.redisStore.Enabled() {
+		c.JSON(http.StatusOK, gin.H{"ok": true, "authenticated": false})
+		return
+	}
+
+	exchangeToken, err := controller.redisStore.ConsumeAppOAuthPending(c.Request.Context(), nonce)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"ok": true, "authenticated": false})
+		return
+	}
+
+	session, err := controller.authService.ConsumeExchangeToken(c.Request.Context(), exchangeToken)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"ok": true, "authenticated": false})
+		return
+	}
+
+	if err := controller.authService.SetSessionCookie(c.Writer, session); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if controller.userService != nil {
+		_ = controller.userService.UpsertUser(c.Request.Context(), session.User)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "authenticated": true})
 }
 
 func (controller *AuthController) EmailPoll(c *gin.Context) {

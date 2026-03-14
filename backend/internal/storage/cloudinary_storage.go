@@ -10,8 +10,8 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
-	"net/url"
 	"net/textproto"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -269,7 +269,11 @@ func (storage *CloudinaryStorage) URLFor(publicID string) string {
 		return trimmed
 	}
 	resourceType := storage.resourceTypeFor(trimmed, "")
-	return fmt.Sprintf("https://res.cloudinary.com/%s/%s/upload/%s", storage.cloudName, resourceType, escapeCloudinaryPath(trimmed))
+	base := fmt.Sprintf("https://res.cloudinary.com/%s/%s/upload/%s", storage.cloudName, resourceType, escapeCloudinaryPath(trimmed))
+	if resourceType == "video" {
+		base += ".mp4"
+	}
+	return base
 }
 
 // SignUpload returns the signed parameters for a direct upload.

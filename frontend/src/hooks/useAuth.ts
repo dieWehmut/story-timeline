@@ -21,12 +21,15 @@ export const LOGIN_RETURN_KEY = 'story_login_return';
 
 const EMAIL_POLL_INTERVAL = 3000;
 const EMAIL_POLL_TIMEOUT = 10 * 60 * 1000;
+const APP_OAUTH_POLL_INTERVAL = 2000;
+const APP_OAUTH_POLL_TIMEOUT = 10 * 60 * 1000;
 
 export const useAuth = () => {
   const [session, setSession] = useState<AuthSession>(defaultSession);
   const [loading, setLoading] = useState(true);
   const [emailPolling, setEmailPolling] = useState(false);
   const pollRef = useRef<{ timer: ReturnType<typeof setInterval>; timeout: ReturnType<typeof setTimeout> } | null>(null);
+  const appOAuthPollRef = useRef<{ timer: ReturnType<typeof setInterval>; timeout: ReturnType<typeof setTimeout> } | null>(null);
 
   const stopEmailPoll = useCallback(() => {
     if (pollRef.current) {
@@ -35,6 +38,14 @@ export const useAuth = () => {
       pollRef.current = null;
     }
     setEmailPolling(false);
+  }, []);
+
+  const stopAppOAuthPoll = useCallback(() => {
+    if (appOAuthPollRef.current) {
+      clearInterval(appOAuthPollRef.current.timer);
+      clearTimeout(appOAuthPollRef.current.timeout);
+      appOAuthPollRef.current = null;
+    }
   }, []);
 
   const refreshSession = useCallback(async () => {
@@ -152,6 +163,9 @@ export const useAuth = () => {
           return;
         }
 
+        // Deep link succeeded — stop polling fallback
+        stopAppOAuthPoll();
+
         try { await Browser.close(); } catch { /* browser may already be closed */ }
 
         const nextSession = await api.getSession();
@@ -179,8 +193,9 @@ export const useAuth = () => {
   useEffect(() => {
     return () => {
       stopEmailPoll();
+      stopAppOAuthPoll();
     };
-  }, [stopEmailPoll]);
+  }, [stopEmailPoll, stopAppOAuthPoll]);
 
   const startEmailPoll = useCallback(
     (loginId: string) => {
@@ -208,6 +223,32 @@ export const useAuth = () => {
     [stopEmailPoll]
   );
 
+  const startAppOAuthPoll = useCallback(
+    (nonce: string) => {
+      stopAppOAuthPoll();
+
+      const poll = async () => {
+        try {
+          const result = await api.pollAppOAuth(nonce);
+          if (result.authenticated) {
+            stopAppOAuthPoll();
+            try { await Browser.close(); } catch { /* browser may already be closed */ }
+            const nextSession = await api.getSession();
+            setSession(nextSession);
+            setLoading(false);
+          }
+        } catch {
+          // ignore poll errors, keep trying
+        }
+      };
+
+      const timer = setInterval(() => { void poll(); }, APP_OAUTH_POLL_INTERVAL);
+      const timeout = setTimeout(() => { stopAppOAuthPoll(); }, APP_OAUTH_POLL_TIMEOUT);
+      appOAuthPollRef.current = { timer, timeout };
+    },
+    [stopAppOAuthPoll]
+  );
+
   const loginWith = (provider: 'github' | 'google') => {
     const isNative = Capacitor.isNativePlatform();
     const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -232,9 +273,23 @@ export const useAuth = () => {
       const resolved = base ? new URL(raw, base) : new URL(raw);
       resolved.searchParams.set('return', currentPath);
       resolved.searchParams.set('client', isNative ? 'app' : 'web');
+
+      // Generate nonce for app OAuth polling fallback
+      let nonce = '';
+      if (isNative) {
+        const arr = new Uint8Array(16);
+        crypto.getRandomValues(arr);
+        nonce = Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
+        resolved.searchParams.set('nonce', nonce);
+      }
+
       const target = resolved.toString();
       if (isNative) {
         void Browser.open({ url: target }).catch(() => window.location.assign(target));
+        // Start polling as fallback in case deep link doesn't fire
+        if (nonce) {
+          startAppOAuthPoll(nonce);
+        }
         return;
       }
       window.location.assign(target);
@@ -268,6 +323,7 @@ export const useAuth = () => {
 
   const logout = async () => {
     stopEmailPoll();
+    stopAppOAuthPoll();
     await api.logout();
     setSession(defaultSession);
   };
