@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
-import { api, API_BASE } from '../lib/api';
+import { api, API_BASE, HF_SPACE_FALLBACK } from '../lib/api';
 import type { AuthSession } from '../types/image';
+import { subscribeAuthRefresh } from '../utils/authEvents';
 
 const defaultSession: AuthSession = {
   authenticated: false,
@@ -21,6 +22,16 @@ export const LOGIN_RETURN_KEY = 'story_login_return';
 export const useAuth = () => {
   const [session, setSession] = useState<AuthSession>(defaultSession);
   const [loading, setLoading] = useState(true);
+
+  const refreshSession = useCallback(async () => {
+    try {
+      const nextSession = await api.getSession();
+      setSession(nextSession);
+      setLoading(false);
+    } catch {
+      // ignore refresh errors
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,7 +59,31 @@ export const useAuth = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshSession]);
+
+  useEffect(() => {
+    const cleanup = subscribeAuthRefresh(() => {
+      void refreshSession();
+    });
+
+    return cleanup;
+  }, [refreshSession]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshSession();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
+    };
+  }, [refreshSession]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return undefined;
@@ -112,14 +147,19 @@ export const useAuth = () => {
         ? session.googleLoginUrl || `${API_BASE}/api/auth/google/login`
         : session.loginUrl || `${API_BASE}/api/auth/github/login`;
 
-    const base = API_BASE || window.location.origin;
     try {
-      const resolved = new URL(raw, base);
+      const origin = window.location.origin;
+      const hasHttpOrigin = origin.startsWith('http://') || origin.startsWith('https://');
+      const base =
+        API_BASE ||
+        (hasHttpOrigin ? origin : '') ||
+        (isNative ? HF_SPACE_FALLBACK : '');
+      const resolved = base ? new URL(raw, base) : new URL(raw);
       resolved.searchParams.set('return', currentPath);
       resolved.searchParams.set('client', isNative ? 'app' : 'web');
       const target = resolved.toString();
       if (isNative) {
-        void Browser.open({ url: target });
+        void Browser.open({ url: target }).catch(() => window.location.assign(target));
         return;
       }
       window.location.assign(target);

@@ -16,7 +16,7 @@ const normalizeApiBase = (value: string) => value.trim().replace(/\/$/, '');
 // to the current host (e.g. Vercel), where serverless proxy forwards to HF with HF_TOKEN.
 // Set VITE_API_BASE to the HF Space URL only when you need the client to call HF directly
 // (e.g. local dev against public space without proxy).
-const HF_SPACE_FALLBACK = 'https://REDACTED.hf.space';
+export const HF_SPACE_FALLBACK = 'https://REDACTED.hf.space';
 
 export const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE ?? '');
 

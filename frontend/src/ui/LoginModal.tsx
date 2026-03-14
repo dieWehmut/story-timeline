@@ -94,6 +94,8 @@ export function LoginModal({
 
   if (!open) return null;
 
+  const lockClose = showEmailForm && email.trim().length > 0;
+
   const handleEmailSubmit = async () => {
     if (!onEmailLogin) return;
     const trimmed = email.trim();
@@ -117,7 +119,11 @@ export function LoginModal({
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4"
-      onClick={onClose}
+      onClick={() => {
+        if (!lockClose) {
+          onClose();
+        }
+      }}
     >
       <div
         className="relative w-full max-w-sm rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-6 py-5 text-[var(--text-main)] shadow-xl backdrop-blur-xl"

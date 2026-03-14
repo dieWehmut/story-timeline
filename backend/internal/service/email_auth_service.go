@@ -1,4 +1,4 @@
-package service
+﻿package service
 
 import (
 	"context"
@@ -91,7 +91,7 @@ func (service *EmailAuthService) RequestMagicLink(ctx context.Context, email str
 	}
 
 	link := appendToken(callbackURL, token)
-	subject := "欢迎使用物语集喵"
+	subject := "欢迎使用物语集"
 	displayFrom := service.from
 	if !strings.Contains(displayFrom, "<") && strings.Contains(displayFrom, "@") {
 		displayFrom = fmt.Sprintf("hc <%s>", displayFrom)
@@ -105,36 +105,36 @@ func (service *EmailAuthService) RequestMagicLink(ctx context.Context, email str
           <table role="presentation" cellpadding="0" cellspacing="0" width="520" style="max-width:520px;background:#14141b;border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.35);">
             <tr>
               <td style="padding:22px 24px;background:linear-gradient(135deg,#ffb3d1,#ff8ec5);color:#2a0e1a;text-align:center;font-size:20px;font-weight:700;letter-spacing:1px;">
-                欢迎使用物语集喵
+                Welcome to Story-Timeline
               </td>
             </tr>
             <tr>
               <td style="padding:26px 28px 10px;font-size:16px;line-height:1.6;">
-                亲爱的用户：
+                ??? %s?
               </td>
             </tr>
             <tr>
               <td style="padding:0 28px 18px;font-size:15px;line-height:1.7;color:#e8e8ef;">
-                喵呜～我们准备好为你开启故事时间啦！点击下面的按钮即可完成登录并返回刚才的页面。
-                <span style="display:block;margin-top:10px;color:#b7b7c8;font-size:13px;">链接在 %d 分钟内有效，请勿转发给他人。</span>
+                ???????????????????? / App ?????
+                <span style="display:block;margin-top:10px;color:#b7b7c8;font-size:13px;">??? %d ??????????????</span>
               </td>
             </tr>
             <tr>
               <td align="center" style="padding:8px 28px 24px;">
                 <a href="%s" style="display:inline-block;padding:12px 28px;background:#ff7bbd;border-radius:999px;color:#2a0e1a;text-decoration:none;font-weight:700;font-size:15px;">
-                  立即登录
+                  ????
                 </a>
               </td>
             </tr>
             <tr>
               <td style="padding:0 28px 26px;font-size:13px;line-height:1.7;color:#9a9ab0;">
-                如果这不是你的操作，请直接忽略本邮件。
+                ???????????????????
               </td>
             </tr>
             <tr>
               <td style="padding:18px 28px 26px;border-top:1px solid #22222a;font-size:12px;color:#7c7c90;text-align:center;">
-                物语集喵 · 故事正在发生<br />
-                本邮件由系统自动发送，请勿直接回复
+                <br />
+                ????????????????
               </td>
             </tr>
           </table>
@@ -142,7 +142,8 @@ func (service *EmailAuthService) RequestMagicLink(ctx context.Context, email str
       </tr>
     </table>
   </body>
-</html>`, int(service.tokenTTL.Minutes()), link)
+</html>`, login, int(service.tokenTTL.Minutes()), link)
+
 
 _, err = service.client.Emails.Send(&resend.SendEmailRequest{
 		From:    displayFrom,
@@ -347,3 +348,5 @@ func appendToken(baseURL string, token string) string {
 	}
 	return baseURL + sep + "token=" + url.QueryEscape(token)
 }
+
+
