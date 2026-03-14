@@ -257,7 +257,7 @@ function ImageGrid({
 
     }
 
-    return <img alt={label} className="absolute inset-0 h-full w-full object-cover" src={item.url} />;
+    return <img alt={label} className="absolute inset-0 h-full w-full object-cover img-fade-in" loading="lazy" onLoad={(e) => e.currentTarget.classList.add('is-loaded')} src={item.url} />;
 
   };
 
@@ -872,12 +872,22 @@ export function ImageCard({
 
         {/* Full-width images */}
 
-        {imageUrls.length > 0 ? (
+        {imageUrls.length > 0 && revealed ? (
 
           <div className="mt-2 cursor-pointer px-2" onClick={() => onOpenDetail?.()}>
 
             <ImageGrid alt={item.description} onImageClick={setViewerIndex} items={mediaItems} />
 
+          </div>
+
+        ) : imageUrls.length > 0 ? (
+
+          <div className="mt-2 px-2">
+            <div className={`grid gap-0.5 ${Math.min(imageUrls.length, 9) <= 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+              {Array.from({ length: Math.min(imageUrls.length, 9) }).map((_, i) => (
+                <div key={i} className="aspect-square bg-slate-950/20" />
+              ))}
+            </div>
           </div>
 
         ) : null}
@@ -1035,6 +1045,8 @@ export function ImageCard({
                                   alt="comment media"
 
                                   className="absolute inset-0 h-full w-full object-cover"
+
+                                  loading="lazy"
 
                                   src={media.url}
 

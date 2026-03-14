@@ -152,6 +152,8 @@ export const useAuth = () => {
           return;
         }
 
+        try { await Browser.close(); } catch { /* browser may already be closed */ }
+
         const nextSession = await api.getSession();
         setSession(nextSession);
         setLoading(false);

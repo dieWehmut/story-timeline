@@ -650,7 +650,26 @@ func (controller *AuthController) emailLinkBaseURL(r *http.Request, client strin
 	return base + "?" + params.Encode()
 }
 
+func (controller *AuthController) buildIntentURL(deepLink string) string {
+	parsed, err := url.Parse(deepLink)
+	if err != nil {
+		return ""
+	}
+	scheme := controller.appScheme()
+	hostPath := parsed.Host
+	if parsed.Path != "" {
+		hostPath += parsed.Path
+	}
+	intentURL := fmt.Sprintf("intent://%s", hostPath)
+	if parsed.RawQuery != "" {
+		intentURL += "?" + parsed.RawQuery
+	}
+	intentURL += fmt.Sprintf("#Intent;scheme=%s;package=%s;end", scheme, scheme)
+	return intentURL
+}
+
 func (controller *AuthController) renderAppRedirect(c *gin.Context, deepLink string) {
+	intentURL := controller.buildIntentURL(deepLink)
 	html := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -659,9 +678,19 @@ func (controller *AuthController) renderAppRedirect(c *gin.Context, deepLink str
 <p style="font-size:16px;margin-bottom:16px;">正在跳转到 App...</p>
 <a href="%s" style="display:inline-block;padding:12px 28px;background:#ff7bbd;border-radius:999px;color:#2a0e1a;text-decoration:none;font-weight:700;font-size:15px;">如果没有自动跳转，请点击这里</a>
 </div>
-<script>window.location.href=%q;</script>
+<script>
+(function(){
+  var deep=%q;
+  var intent=%q;
+  if(/android/i.test(navigator.userAgent)&&intent){
+    window.location.href=intent;
+  }else{
+    window.location.href=deep;
+  }
+})();
+</script>
 </body>
-</html>`, deepLink, deepLink)
+</html>`, deepLink, deepLink, intentURL)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
 }
 
