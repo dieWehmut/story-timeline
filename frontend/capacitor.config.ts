@@ -13,7 +13,10 @@ const config: CapacitorConfig = {
     allowNavigation: [
       "story-timeline.hc-dsw-nexus.me",
       "github.com",
-      "api.github.com"
+      "api.github.com",
+      "accounts.google.com",
+      "*.google.com",
+      "*.googleusercontent.com"
     ]
   }
 };

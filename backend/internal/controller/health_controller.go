@@ -87,7 +87,7 @@ func (controller *HealthController) touchUser(c *gin.Context) {
 }
 
 func (controller *HealthController) cleanupLocked() {
-	cutoff := utils.NowBeijing().Add(-90 * time.Second)
+	cutoff := utils.NowBeijing().Add(-10 * time.Second)
 	for login, seenAt := range controller.online {
 		if seenAt.Before(cutoff) {
 			delete(controller.online, login)

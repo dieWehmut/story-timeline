@@ -71,7 +71,7 @@ export function Header({
   return (
     <header className="fixed left-0 right-0 top-0 z-40 px-2 pt-2 md:px-3 md:pt-3">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5">
           {isDetailView ? (
             <button
               aria-label="返回"
@@ -92,7 +92,7 @@ export function Header({
             </>
           )}
         </div>
-        <div className="flex items-center gap-0">
+        <div className="flex items-center -space-x-1">
           {isDetailView ? (
             <>
               <HomeButton />

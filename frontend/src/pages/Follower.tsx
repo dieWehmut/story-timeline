@@ -48,7 +48,7 @@ export default function Follower({ auth, follows, theme, onThemeToggle }: Follow
             <span className="text-sm font-medium text-[var(--text-main)]">粉丝</span>
             <span className="text-xs text-soft">{count}</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center -space-x-1">
             <HomeButton />
             <SettingsButton />
             <ThemeButton onToggle={onThemeToggle} theme={theme} />

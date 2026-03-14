@@ -44,7 +44,7 @@ const CACHE_KEY_FEED = 'story_feed_cache';
 const CACHE_KEY_USERS = 'story_users_cache';
 const CACHE_KEY_STATS = 'story_stats_cache';
 const CACHE_KEY_SORT = 'story_time_order';
-const STATS_CACHE_TTL = 1000 * 120;
+const STATS_CACHE_TTL = 1000 * 10;
 
 const sortByDate = (itemsList: ImageItem[], order: TimeSortOrder) =>
   [...itemsList].sort((left, right) => {
@@ -185,7 +185,7 @@ export const useImages = () => {
           saveCacheStats(nextStats);
         }).catch(() => undefined);
       }
-    }, 30000);
+    }, 10000);
 
     return () => {
       cancelled = true;

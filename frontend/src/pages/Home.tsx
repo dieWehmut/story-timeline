@@ -28,7 +28,7 @@ interface NavCardProps {
 
 function NavCard({ icon: Icon, label, subLabel, to, href, external, disabled }: NavCardProps) {
   const baseClass =
-    'group flex h-28 w-full flex-col items-center justify-center gap-2 rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg)] text-[var(--text-main)] shadow-[var(--panel-shadow)] transition hover:-translate-y-0.5 hover:border-[var(--text-accent)]';
+    'group flex h-28 w-full flex-col items-center justify-center gap-2 rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg)] text-[var(--text-main)] shadow-[var(--panel-shadow)] transition-all duration-300 hover:-translate-y-1 hover:border-[var(--text-accent)] hover:shadow-[0_8px_30px_rgba(125,211,252,0.12)]';
 
   if (disabled) {
     return (
@@ -47,7 +47,7 @@ function NavCard({ icon: Icon, label, subLabel, to, href, external, disabled }: 
   if (to) {
     return (
       <Link className={baseClass} to={to}>
-        <Icon className="home-nav-icon text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={26} />
+        <Icon className="home-nav-icon text-cyan-300 transition-transform duration-300 group-hover:scale-110 group-hover:text-[var(--text-accent)]" size={26} />
         <span className="text-sm">{label}</span>
         {subLabel ? <span className="text-xs text-soft">{subLabel}</span> : null}
       </Link>
@@ -61,7 +61,7 @@ function NavCard({ icon: Icon, label, subLabel, to, href, external, disabled }: 
       rel={external ? 'noopener noreferrer' : undefined}
       target={external ? '_blank' : undefined}
     >
-      <Icon className="home-nav-icon text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={26} />
+      <Icon className="home-nav-icon text-cyan-300 transition-transform duration-300 group-hover:scale-110 group-hover:text-[var(--text-accent)]" size={26} />
       <span className="text-sm">{label}</span>
       {subLabel ? <span className="text-xs text-soft">{subLabel}</span> : null}
     </a>
@@ -121,7 +121,7 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
               />
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center -space-x-1">
             {authAuthenticated && authUser ? (
               <AuthButton
                 authenticated={authAuthenticated}
@@ -147,13 +147,13 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
         <p className="mt-1 text-sm text-soft">记录故事</p>
 
         <div className="mt-6 grid w-full max-w-xl grid-cols-2 gap-4">
-          <NavCard icon={BookOpen} label="物语" to="/story" />
-          <NavCard icon={ImageIcon} label="相册" to={albumUrl} disabled={albumDisabled} />
-          <NavCard icon={UserCheck} label="关注" to="/following" disabled={followsDisabled} subLabel={auth.authenticated ? `${followingCount} 人` : undefined} />
-          <NavCard icon={Users} label="粉丝" to="/follower" disabled={followsDisabled} subLabel={auth.authenticated ? `${followerCount} 人` : undefined} />
+          <div className="nav-card-enter"><NavCard icon={BookOpen} label="物语" to="/story" /></div>
+          <div className="nav-card-enter"><NavCard icon={ImageIcon} label="相册" to={albumUrl} disabled={albumDisabled} /></div>
+          <div className="nav-card-enter"><NavCard icon={UserCheck} label="关注" to="/following" disabled={followsDisabled} subLabel={auth.authenticated ? `${followingCount} 人` : undefined} /></div>
+          <div className="nav-card-enter"><NavCard icon={Users} label="粉丝" to="/follower" disabled={followsDisabled} subLabel={auth.authenticated ? `${followerCount} 人` : undefined} /></div>
 
-          <NavCard icon={Github} label="賞個star喵" href={repoUrl} external />
-          <NavCard icon={Download} label="Android" href={androidUrl} external />
+          <div className="nav-card-enter"><NavCard icon={Github} label="賞個star喵" href={repoUrl} external /></div>
+          <div className="nav-card-enter"><NavCard icon={Download} label="Android" href={androidUrl} external /></div>
         </div>
       </main>
     </div>

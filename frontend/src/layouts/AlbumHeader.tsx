@@ -41,7 +41,7 @@ export function AlbumHeader({
           {subtitle ? <p className="text-xs text-soft">{subtitle}</p> : null}
         </div>
 
-        <div className="flex items-center gap-0">
+        <div className="flex items-center -space-x-1">
           <HomeButton />
           <SettingsButton />
           <ThemeButton onToggle={onThemeToggle} theme={theme} />

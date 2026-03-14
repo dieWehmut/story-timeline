@@ -94,11 +94,11 @@ export function ConfigModal({ open, onClose }: ConfigModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 px-4 py-6"
+      className="modal-backdrop-enter fixed inset-0 z-[120] flex items-center justify-center bg-black/50 px-4 py-6"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-5 py-4 text-[var(--text-main)] shadow-xl backdrop-blur-xl"
+        className="modal-panel-enter w-full max-w-xl rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-5 py-4 text-[var(--text-main)] shadow-xl backdrop-blur-xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -146,11 +146,9 @@ export function ConfigModal({ open, onClose }: ConfigModalProps) {
             </div>
 
             <div className="rounded-xl border border-[var(--panel-border)] bg-white/5 p-3">
-              <p className="text-xs font-medium">显示名</p>
+              <p className="text-xs font-medium">用户名</p>
               <p className="text-[10px] text-soft">
-                {user?.provider === 'github'
-                  ? '仅设置显示名，GitHub 名用于同步'
-                  : '同步到云端'}
+                云端同步
               </p>
               <input
                 className="mt-1.5 w-full rounded-lg border border-[var(--panel-border)] bg-transparent px-2.5 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)] disabled:opacity-40"
