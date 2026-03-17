@@ -18,24 +18,26 @@ import (
 )
 
 type AuthController struct {
-	authService     *service.AuthService
-	userService     *service.UserService
-	emailService    *service.EmailAuthService
-	loginLimiter    *service.LoginLimiter
-	redisStore      *storage.Store
-	frontendBaseURL string
-	appURLScheme    string
+	authService         *service.AuthService
+	userService         *service.UserService
+	emailService        *service.EmailAuthService
+	registrationService *service.RegistrationService
+	loginLimiter        *service.LoginLimiter
+	redisStore          *storage.Store
+	frontendBaseURL     string
+	appURLScheme        string
 }
 
-func NewAuthController(authService *service.AuthService, userService *service.UserService, emailService *service.EmailAuthService, loginLimiter *service.LoginLimiter, redisStore *storage.Store, frontendBaseURL string, appURLScheme string) *AuthController {
+func NewAuthController(authService *service.AuthService, userService *service.UserService, emailService *service.EmailAuthService, registrationService *service.RegistrationService, loginLimiter *service.LoginLimiter, redisStore *storage.Store, frontendBaseURL string, appURLScheme string) *AuthController {
 	return &AuthController{
-		authService:     authService,
-		userService:     userService,
-		emailService:    emailService,
-		loginLimiter:    loginLimiter,
-		redisStore:      redisStore,
-		frontendBaseURL: frontendBaseURL,
-		appURLScheme:    appURLScheme,
+		authService:         authService,
+		userService:         userService,
+		emailService:        emailService,
+		registrationService: registrationService,
+		loginLimiter:        loginLimiter,
+		redisStore:          redisStore,
+		frontendBaseURL:     frontendBaseURL,
+		appURLScheme:        appURLScheme,
 	}
 }
 
@@ -124,6 +126,14 @@ func (controller *AuthController) EmailCallback(c *gin.Context) {
 		return
 	}
 
+	// Check registration status for email login — skip for admin
+	if controller.registrationService != nil && controller.registrationService.Enabled() && !controller.authService.IsAdmin(session.User.Login) {
+		userStatus := controller.checkUserRegistrationStatus(c, session.User)
+		if userStatus != "" && userStatus != "active" {
+			return
+		}
+	}
+
 	if err := controller.authService.SetSessionCookie(c.Writer, session); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -149,6 +159,14 @@ func (controller *AuthController) callback(c *gin.Context, provider string) {
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Check registration status — skip check for admin
+	if controller.registrationService != nil && controller.registrationService.Enabled() && !controller.authService.IsAdmin(session.User.Login) {
+		userStatus := controller.checkUserRegistrationStatus(c, session.User)
+		if userStatus != "" && userStatus != "active" {
+			return // response already sent by checkUserRegistrationStatus
+		}
 	}
 
 	returnTo := ""
@@ -529,6 +547,47 @@ func (controller *AuthController) Session(c *gin.Context) {
 func (controller *AuthController) Logout(c *gin.Context) {
 	controller.authService.ClearSession(c.Writer)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// checkUserRegistrationStatus checks if a user is registered and approved.
+// Returns the status string ("pending", "rejected", "active", or "" if not registered).
+// If the user is blocked, it sends the response and returns the status.
+func (controller *AuthController) checkUserRegistrationStatus(c *gin.Context, user model.AuthUser) string {
+	if controller.registrationService == nil {
+		return "active"
+	}
+	// Try to find user by login first
+	status, _ := controller.registrationService.GetUserStatus(c.Request.Context(), user.Login)
+	if status == "" {
+		// Try by email (for OAuth users whose login may differ)
+		email := user.ID // For email provider, ID is the email
+		if user.Provider != "email" {
+			email = "" // OAuth providers don't have email in ID directly
+		}
+		if email != "" {
+			existing, _ := controller.registrationService.GetUserByEmail(c.Request.Context(), email)
+			if existing != nil {
+				status, _ = existing["status"].(string)
+			}
+		}
+	}
+	switch status {
+	case "active":
+		return "active"
+	case "pending":
+		base := strings.TrimRight(controller.frontendBaseURL, "/")
+		c.Redirect(http.StatusTemporaryRedirect, base+"/login?error=pending")
+		return "pending"
+	case "rejected":
+		base := strings.TrimRight(controller.frontendBaseURL, "/")
+		c.Redirect(http.StatusTemporaryRedirect, base+"/login?error=rejected")
+		return "rejected"
+	default:
+		// User not found in registration system — redirect to login with not_registered error
+		base := strings.TrimRight(controller.frontendBaseURL, "/")
+		c.Redirect(http.StatusTemporaryRedirect, base+"/login?error=not_registered")
+		return "not_found"
+	}
 }
 
 func (controller *AuthController) checkLoginLimit(c *gin.Context) bool {

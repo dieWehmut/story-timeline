@@ -367,6 +367,12 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   logout: () => request<{ ok: boolean }>(`${API_BASE}/api/auth/logout`, { method: 'POST' }),
+  register: (payload: { username: string; email: string; purpose: string; inviteCode: string; registerMethod: string }) =>
+    request<{ ok: boolean; message?: string; error?: string }>(`${API_BASE}/api/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
   getFeed: async () => (await request<ImageItem[]>(`${API_BASE}/api/feed`)).map(normalizeImageItem),
   getFeedUsers: () => request<FeedUser[]>(`${API_BASE}/api/feed/users`),
   getFollowing: () => request<FeedUser[]>(`${API_BASE}/api/following`),

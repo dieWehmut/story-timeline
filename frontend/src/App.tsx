@@ -12,8 +12,11 @@ import Following from './pages/Following';
 import Follower from './pages/Follower';
 import AuthEmail from './pages/AuthEmail';
 import Login from './pages/Login';
+import Register from './pages/Register';
+import InviteRedirect from './pages/InviteRedirect';
 import { ToastProvider } from './ui/Toast';
 import { ProfileProvider } from './context/ProfileContext';
+import { isPublicPath } from './utils/AuthGuard';
 import type { TimelineMonth } from './types/image';
 
 const resolveTheme = (): 'dark' | 'light' => {
@@ -82,21 +85,37 @@ function App() {
     return null;
   };
 
+  const RequireAuth = ({ children }: { children: React.ReactNode }) => {
+    const location = useLocation();
+
+    if (isPublicPath(location.pathname)) return <>{children}</>;
+    if (auth.loading) return null;
+    if (!auth.authenticated) return <Navigate to="/login" replace />;
+
+    return <>{children}</>;
+  };
+
   return (
     <ToastProvider>
       <ProfileProvider user={auth.user}>
         <BrowserRouter>
           <LoginReturnHandler authenticated={auth.authenticated} />
-          <Routes>
-            <Route element={<AppLayout footerStats={footerStats} />}>
-              <Route
-                path="/"
-                element={<Home auth={auth} images={images} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
-              />
-              <Route
-                path="/login"
-                element={<Login auth={auth} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
-              />
+          <RequireAuth>
+            <Routes>
+              <Route element={<AppLayout footerStats={footerStats} />}>
+                <Route
+                  path="/"
+                  element={<Home auth={auth} images={images} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+                />
+                <Route
+                  path="/login"
+                  element={<Login auth={auth} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+                />
+                <Route
+                  path="/register"
+                  element={<Register auth={auth} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+                />
+                <Route path="/invites/:code" element={<InviteRedirect />} />
               <Route
                 path="/story"
                 element={
@@ -151,6 +170,7 @@ function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
+          </RequireAuth>
         </BrowserRouter>
       </ProfileProvider>
     </ToastProvider>

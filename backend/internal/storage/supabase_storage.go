@@ -873,3 +873,96 @@ func (storage *SupabaseStorage) UpsertSetting(ctx context.Context, key string, v
 	prefer := []string{"resolution=merge-duplicates"}
 	return storage.requestJSON(ctx, http.MethodPost, "/settings", url.Values{"on_conflict": []string{"key"}}, payload, nil, prefer)
 }
+
+// --- Registration system ---
+
+func (storage *SupabaseStorage) CreatePendingUser(ctx context.Context, login, provider, providerID, email, purpose, inviteCode, registerMethod, avatarURL, displayName string) error {
+	now := time.Now()
+	payload := []map[string]any{{
+		"login":           login,
+		"provider":        provider,
+		"provider_id":     providerID,
+		"email":           email,
+		"purpose":         purpose,
+		"status":          "pending",
+		"invite_code":     inviteCode,
+		"register_method": registerMethod,
+		"avatar_url":      avatarURL,
+		"display_name":    displayName,
+		"created_at":      now,
+		"updated_at":      now,
+	}}
+	return storage.requestJSON(ctx, http.MethodPost, "/users", nil, payload, nil, nil)
+}
+
+func (storage *SupabaseStorage) GetUserByEmail(ctx context.Context, email string) (map[string]any, error) {
+	params := url.Values{}
+	params.Set("select", "login,provider,provider_id,email,purpose,status,invite_code,register_method,avatar_url,display_name,created_at,updated_at")
+	params.Set("email", "eq."+email)
+	params.Set("limit", "1")
+
+	var records []map[string]any
+	if err := storage.requestJSON(ctx, http.MethodGet, "/users", params, nil, &records, nil); err != nil {
+		return nil, err
+	}
+	if len(records) == 0 {
+		return nil, nil
+	}
+	return records[0], nil
+}
+
+func (storage *SupabaseStorage) UpdateUserStatus(ctx context.Context, login string, status string) error {
+	params := url.Values{}
+	params.Set("login", "eq."+login)
+	return storage.requestJSON(ctx, http.MethodPatch, "/users", params, map[string]any{
+		"status":     status,
+		"updated_at": time.Now(),
+	}, nil, nil)
+}
+
+func (storage *SupabaseStorage) ListPendingUsers(ctx context.Context) ([]map[string]any, error) {
+	params := url.Values{}
+	params.Set("select", "login,provider,email,purpose,status,register_method,avatar_url,display_name,created_at")
+	params.Set("status", "eq.pending")
+	params.Set("order", "created_at.desc")
+
+	var records []map[string]any
+	if err := storage.requestJSON(ctx, http.MethodGet, "/users", params, nil, &records, nil); err != nil {
+		return nil, err
+	}
+	return records, nil
+}
+
+func (storage *SupabaseStorage) GetUserStatus(ctx context.Context, login string) (string, error) {
+	params := url.Values{}
+	params.Set("select", "status")
+	params.Set("login", "eq."+login)
+	params.Set("limit", "1")
+
+	var records []struct {
+		Status string `json:"status"`
+	}
+	if err := storage.requestJSON(ctx, http.MethodGet, "/users", params, nil, &records, nil); err != nil {
+		return "", err
+	}
+	if len(records) == 0 {
+		return "", nil
+	}
+	return records[0].Status, nil
+}
+
+func (storage *SupabaseStorage) GetUserFullByLogin(ctx context.Context, login string) (map[string]any, error) {
+	params := url.Values{}
+	params.Set("select", "login,provider,provider_id,email,purpose,status,invite_code,register_method,avatar_url,display_name,created_at,updated_at")
+	params.Set("login", "eq."+login)
+	params.Set("limit", "1")
+
+	var records []map[string]any
+	if err := storage.requestJSON(ctx, http.MethodGet, "/users", params, nil, &records, nil); err != nil {
+		return nil, err
+	}
+	if len(records) == 0 {
+		return nil, nil
+	}
+	return records[0], nil
+}

@@ -418,3 +418,51 @@ func (store *Store) ConsumeAppOAuthPending(ctx context.Context, nonce string) (s
 	}
 	return value, err
 }
+
+// --- Invite code management ---
+
+const inviteCodeKey = "invite:code:global"
+
+func (store *Store) SetInviteCode(ctx context.Context, code string, ttl time.Duration) error {
+	client, err := store.ensureClient()
+	if err != nil {
+		return err
+	}
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return ErrMissingToken
+	}
+	if ttl <= 0 {
+		// No expiry (persist indefinitely)
+		return client.Set(ctx, inviteCodeKey, code, 0).Err()
+	}
+	return client.Set(ctx, inviteCodeKey, code, ttl).Err()
+}
+
+func (store *Store) GetInviteCode(ctx context.Context) (string, error) {
+	client, err := store.ensureClient()
+	if err != nil {
+		return "", err
+	}
+	value, err := client.Get(ctx, inviteCodeKey).Result()
+	if err == redis.Nil {
+		return "", ErrCacheMiss
+	}
+	return value, err
+}
+
+func (store *Store) DeleteInviteCode(ctx context.Context) error {
+	client, err := store.ensureClient()
+	if err != nil {
+		return err
+	}
+	return client.Del(ctx, inviteCodeKey).Err()
+}
+
+func (store *Store) GetInviteCodeTTL(ctx context.Context) (time.Duration, error) {
+	client, err := store.ensureClient()
+	if err != nil {
+		return 0, err
+	}
+	return client.TTL(ctx, inviteCodeKey).Result()
+}

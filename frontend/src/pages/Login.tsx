@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Globe, MoonStar, Settings, SunMedium } from 'lucide-react';
 
 import { useToast } from '../utils/useToast';
@@ -49,7 +50,9 @@ const iconBtnCls =
 
 export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
   const { toast } = useToast();
-  
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [email, setEmail] = useState('');
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [sending, setSending] = useState(false);
@@ -58,6 +61,26 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
   const emailFormRef = useRef<HTMLDivElement>(null);
 
   const showGoogle = !!auth.googleLoginUrl;
+
+  // Handle error query params from backend redirects
+  useEffect(() => {
+    const error = searchParams.get('error');
+    if (!error) return;
+    switch (error) {
+      case 'pending':
+        toast('账号审核中喵~', 'error');
+        break;
+      case 'rejected':
+        toast('账号审核未通过喵~', 'error');
+        break;
+      case 'not_registered':
+        toast('你还没有注册过喵~', 'error');
+        break;
+    }
+    // Clear error param after showing toast
+    searchParams.delete('error');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams, toast]);
 
   // Click outside email form to collapse (but keep email cached)
   useEffect(() => {
@@ -223,6 +246,25 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
                 </div>
               </div>
             )}
+          </div>
+
+
+
+          {/* Switch to register */}
+          <div className="mt-3">
+            <button
+              className="flex w-full items-center justify-center gap-3 rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 py-3 text-sm backdrop-blur-xl transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)]"
+              onClick={() => navigate('/register')}
+              type="button"
+            >
+              <svg aria-hidden="true" height={20} viewBox="0 0 24 24" width={20} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <line x1="19" y1="8" x2="19" y2="14" />
+                <line x1="22" y1="11" x2="16" y2="11" />
+              </svg>
+              <span>没有账户？注册喵~</span>
+            </button>
           </div>
         </div>
       </div>

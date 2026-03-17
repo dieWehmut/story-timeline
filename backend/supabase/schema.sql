@@ -142,3 +142,13 @@ create table if not exists public.settings (
   value jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now()
 );
+
+-- Registration system: add columns for invite-based registration + admin approval
+alter table public.users add column if not exists email text not null default '';
+alter table public.users add column if not exists purpose text not null default '';
+alter table public.users add column if not exists status text not null default 'active';
+alter table public.users add column if not exists invite_code text not null default '';
+alter table public.users add column if not exists register_method text not null default '';
+
+create index if not exists users_email_idx on public.users (email);
+create index if not exists users_status_idx on public.users (status);

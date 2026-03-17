@@ -14,13 +14,14 @@ import (
 )
 
 type Dependencies struct {
-	AuthController         *controller.AuthController
-	FollowController       *controller.FollowController
-	ImageController        *controller.ImageController
-	HealthController       *controller.HealthController
-	UploadController       *controller.UploadController
-	NotificationController *controller.NotificationController
-	AuthService            *service.AuthService
+	AuthController           *controller.AuthController
+	FollowController         *controller.FollowController
+	ImageController          *controller.ImageController
+	HealthController         *controller.HealthController
+	UploadController         *controller.UploadController
+	NotificationController   *controller.NotificationController
+	RegistrationController   *controller.RegistrationController
+	AuthService              *service.AuthService
 }
 
 func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
@@ -123,6 +124,22 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 
 		api.GET("/health/stats", deps.HealthController.Stats)
 		api.POST("/health/ping", deps.HealthController.Ping)
+
+		// Registration (public)
+		api.POST("/register", deps.RegistrationController.Register)
+
+		// Admin registration management
+		admin := api.Group("/admin", middleware.RequireAdmin(deps.AuthService))
+		{
+			admin.POST("/invite-code", deps.RegistrationController.GenerateInviteCode)
+			admin.GET("/invite-code", deps.RegistrationController.GetInviteCode)
+			admin.DELETE("/invite-code", deps.RegistrationController.DeleteInviteCode)
+			admin.GET("/pending-users", deps.RegistrationController.ListPendingUsers)
+			admin.POST("/users/:login/approve", deps.RegistrationController.ApproveUser)
+			admin.POST("/users/:login/reject", deps.RegistrationController.RejectUser)
+			admin.POST("/email", deps.RegistrationController.SetAdminEmail)
+			admin.GET("/email", deps.RegistrationController.GetAdminEmail)
+		}
 	}
 
 	r.GET("/", rootJSON)

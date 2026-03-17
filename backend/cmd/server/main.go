@@ -82,15 +82,18 @@ func main() {
 
 	interactionService := service.NewInteractionService(supabaseStorage, cloudinaryStorage)
 
+	registrationService := service.NewRegistrationService(supabaseStorage, redisStore, env.ResendAPIKey, env.ResendEmailFrom, env.FrontendBaseURL)
+
 	server := &http.Server{
 		Addr: ":" + env.Port,
 		Handler: router.New(router.Dependencies{
-			AuthController:         controller.NewAuthController(authService, userService, emailService, loginLimiter, redisStore, env.FrontendBaseURL, env.AppURLScheme),
+			AuthController:         controller.NewAuthController(authService, userService, emailService, registrationService, loginLimiter, redisStore, env.FrontendBaseURL, env.AppURLScheme),
 			FollowController:       controller.NewFollowController(userService),
 			ImageController:        controller.NewImageController(imageService, userService, authService, interactionService, cloudinaryStorage),
 			HealthController:       controller.NewHealthController(env.GitHubRepoOwner, authService, userService),
 			UploadController:       controller.NewUploadController(cloudinaryStorage),
 			NotificationController: controller.NewNotificationController(supabaseStorage),
+			RegistrationController: controller.NewRegistrationController(registrationService),
 			AuthService:            authService,
 		}, config.AllowedOrigins(env)),
 		ReadHeaderTimeout: 5 * time.Second,
