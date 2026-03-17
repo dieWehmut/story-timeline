@@ -74,6 +74,27 @@ func (controller *AuthController) EmailLogin(c *gin.Context) {
 		return
 	}
 
+	// Check if user exists before sending email
+	if controller.registrationService != nil && controller.registrationService.Enabled() {
+		email := strings.TrimSpace(payload.Email)
+		if !controller.authService.IsAdminEmail(email) {
+			user, _ := controller.registrationService.GetUserByEmail(c.Request.Context(), email)
+			if user == nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "user_not_registered"})
+				return
+			}
+			status, _ := user["status"].(string)
+			if status == "pending" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "user_pending"})
+				return
+			}
+			if status == "rejected" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "user_rejected"})
+				return
+			}
+		}
+	}
+
 	returnTo := sanitizeReturnPath(payload.ReturnTo)
 	client := normalizeClient(payload.Client)
 	linkBase := controller.emailLinkBaseURL(c.Request, client, returnTo)

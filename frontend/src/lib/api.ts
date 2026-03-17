@@ -567,4 +567,12 @@ export const api = {
     }),
   deleteInviteCode: () =>
     request<{ ok: boolean }>(`${API_BASE}/api/admin/invite-code`, { method: 'DELETE' }),
+  getAdminEmail: () =>
+    request<{ ok: boolean; email: string }>(`${API_BASE}/api/admin/email`),
+  setAdminEmail: (email: string) =>
+    request<{ ok: boolean }>(`${API_BASE}/api/admin/email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }),
 };

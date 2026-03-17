@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Copy, RefreshCw, Trash2, X } from 'lucide-react';
+import { Copy, Link, RefreshCw, Trash2, X } from 'lucide-react';
 import { useProfile } from '../context/ProfileContext';
 import { api } from '../lib/api';
+import { useToast } from '../utils/useToast';
 
 interface ConfigModalProps {
   open: boolean;
@@ -50,7 +51,7 @@ function InviteCodeSection() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [ttlDays, setTtlDays] = useState(0);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'code' | 'link' | false>(false);
 
   const fetchCode = useCallback(async () => {
     try {
@@ -98,7 +99,19 @@ function InviteCodeSection() {
     if (!code) return;
     try {
       await navigator.clipboard.writeText(code);
-      setCopied(true);
+      setCopied('code');
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (!code) return;
+    try {
+      const link = `${window.location.origin}/invites/${code}`;
+      await navigator.clipboard.writeText(link);
+      setCopied('link');
       setTimeout(() => setCopied(false), 1500);
     } catch {
       // ignore
@@ -127,8 +140,11 @@ function InviteCodeSection() {
           <code className="flex-1 truncate rounded-lg bg-black/20 px-2.5 py-1.5 font-mono text-xs text-[var(--text-accent)]">
             {code}
           </code>
-          <button aria-label="复制" className={iconBtnCls} onClick={() => void handleCopy()} title="复制" type="button">
+          <button aria-label="复制邀请码" className={iconBtnCls} onClick={() => void handleCopy()} title="复制邀请码" type="button">
             <Copy size={12} />
+          </button>
+          <button aria-label="复制邀请链接" className={iconBtnCls} onClick={() => void handleCopyLink()} title="复制邀请链接" type="button">
+            <Link size={12} />
           </button>
           <button aria-label="刷新" className={iconBtnCls} disabled={busy} onClick={() => void handleGenerate()} title="重新生成" type="button">
             <RefreshCw size={12} />
@@ -143,7 +159,7 @@ function InviteCodeSection() {
 
       {code && (
         <p className="text-[10px] text-soft">
-          {copied ? '已复制!' : `有效期: ${formatExpiry(expiresAt)}`}
+          {copied ? (copied === 'link' ? '邀请链接已复制!' : '邀请码已复制!') : `有效期: ${formatExpiry(expiresAt)}`}
         </p>
       )}
 
@@ -165,6 +181,78 @@ function InviteCodeSection() {
             生成邀请码
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function AdminEmailSection() {
+  const { toast } = useToast();
+  const [email, setEmail] = useState('');
+  const [savedEmail, setSavedEmail] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetch = async () => {
+      try {
+        const res = await api.getAdminEmail();
+        if (!cancelled) {
+          setEmail(res.email || '');
+          setSavedEmail(res.email || '');
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void fetch();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleSave = async () => {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      toast('请输入邮箱', 'error');
+      return;
+    }
+    try {
+      setSaving(true);
+      await api.setAdminEmail(trimmed);
+      setSavedEmail(trimmed);
+      toast('绑定邮箱已保存', 'success');
+    } catch {
+      toast('保存失败', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-3">
+        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[var(--text-accent)] border-t-transparent" />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <p className="text-[10px] text-soft">用于接收新用户注册通知</p>
+      <input
+        className="mt-1.5 w-full rounded-lg border border-[var(--panel-border)] bg-transparent px-2.5 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)]"
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="admin@example.com"
+        type="email"
+        value={email}
+      />
+      <div className="mt-1.5 flex items-center gap-1.5">
+        <button className={btnCls} disabled={saving || email.trim() === savedEmail} onClick={() => void handleSave()} type="button">
+          {saving ? '保存中..' : '保存'}
+        </button>
+        {savedEmail && <span className="text-[10px] text-soft">当前: {savedEmail}</span>}
       </div>
     </div>
   );
@@ -346,6 +434,13 @@ export function ConfigModal({ open, onClose, isAdmin }: ConfigModalProps) {
             <div className="rounded-xl border border-[var(--panel-border)] bg-white/5 p-3">
               <p className="mb-2 text-xs font-medium">邀请码管理</p>
               <InviteCodeSection />
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="rounded-xl border border-[var(--panel-border)] bg-white/5 p-3">
+              <p className="mb-2 text-xs font-medium">绑定邮箱</p>
+              <AdminEmailSection />
             </div>
           )}
         </div>

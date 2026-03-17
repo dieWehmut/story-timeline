@@ -63,13 +63,6 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
 
   const showGoogle = !!auth.googleLoginUrl;
 
-  // Redirect authenticated users away from login page
-  useEffect(() => {
-    if (auth.authenticated) {
-      navigate('/', { replace: true });
-    }
-  }, [auth.authenticated, navigate]);
-
   // Handle error query params from backend redirects
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -116,7 +109,15 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
       setEmailSent(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : '发送失败';
-      toast(message, 'error');
+      if (message.includes('user_not_registered')) {
+        toast('该邮箱还没有注册过喵~', 'error');
+      } else if (message.includes('user_pending')) {
+        toast('账号审核中，请耐心等待喵~', 'error');
+      } else if (message.includes('user_rejected')) {
+        toast('账号审核未通过喵~', 'error');
+      } else {
+        toast(message, 'error');
+      }
     } finally {
       setSending(false);
     }

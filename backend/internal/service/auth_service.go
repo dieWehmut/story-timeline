@@ -353,6 +353,14 @@ func (service *AuthService) IsAdmin(login string) bool {
 	return strings.EqualFold(strings.TrimSpace(login), service.adminLogin)
 }
 
+// IsAdminEmail checks whether the given email matches the admin login.
+func (service *AuthService) IsAdminEmail(email string) bool {
+	if service.adminLogin == "" {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(email), service.adminLogin)
+}
+
 func (service *AuthService) sameSiteMode() http.SameSite {
 	if service.secureCookies {
 		return http.SameSiteNoneMode
