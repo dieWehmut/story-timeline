@@ -208,9 +208,6 @@ export default function Story({
       <Header
         activeMonth={activeMonth}
         authAuthenticated={auth.authenticated}
-        authLoginUrl={auth.loginUrl}
-        authGoogleLoginUrl={auth.googleLoginUrl}
-        authEmailLoginUrl={auth.emailLoginUrl}
         authLoading={auth.loading}
         authUser={auth.user}
         canPost={auth.canPost}
@@ -219,9 +216,6 @@ export default function Story({
         isDetailView={selectedItemId !== null}
         onBack={() => navigate(`/story${location.search}`)}
         onFilterUser={handleUserSelect}
-        onLogin={auth.loginWith}
-        onEmailLogin={auth.requestEmailLogin}
-        emailPolling={auth.emailPolling}
         onLogout={auth.logout}
         onTagSelect={handleTagSelect}
         onThemeToggle={onThemeToggle}

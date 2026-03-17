@@ -1,4 +1,4 @@
-﻿import { ArrowLeft, CalendarRange } from 'lucide-react';
+import { ArrowLeft, CalendarRange } from 'lucide-react';
 import { ThemeButton } from './ThemeButton';
 import { AuthButton } from './AuthButton';
 import { HomeButton } from './HomeButton';
@@ -13,9 +13,6 @@ interface HeaderProps {
   activeMonth: TimelineMonth | null;
   authAuthenticated: boolean;
   authLoading: boolean;
-  authLoginUrl?: string;
-  authGoogleLoginUrl?: string;
-  authEmailLoginUrl?: string;
   authUser: AuthUser | null;
   canPost: boolean;
   feedUsers: FeedUser[];
@@ -23,10 +20,7 @@ interface HeaderProps {
   isDetailView?: boolean;
   onBack?: () => void;
   onFilterUser: (login: string | null) => void;
-  onLogin: (provider: 'github' | 'google') => void;
-  onEmailLogin?: (email: string) => Promise<void> | void;
   onLogout: () => Promise<void>;
-  emailPolling?: boolean;
   onTagSelect: (tag: string | null) => void;
   onThemeToggle: () => void;
   onTimelineToggle: () => void;
@@ -42,9 +36,6 @@ export function Header({
   activeMonth,
   authAuthenticated,
   authLoading,
-  authLoginUrl,
-  authGoogleLoginUrl,
-  authEmailLoginUrl,
   authUser,
   canPost,
   feedUsers,
@@ -52,10 +43,7 @@ export function Header({
   isDetailView,
   onBack,
   onFilterUser,
-  onLogin,
-  onEmailLogin,
   onLogout,
-  emailPolling,
   onTagSelect,
   onThemeToggle,
   onTimelineToggle,
@@ -101,14 +89,8 @@ export function Header({
                 <AuthButton
                   authenticated={authAuthenticated}
                   loading={authLoading}
-                  loginUrl={authLoginUrl}
-                  googleLoginUrl={authGoogleLoginUrl}
-                  emailLoginUrl={authEmailLoginUrl}
-                  onLogin={onLogin}
-                  onEmailLogin={onEmailLogin}
                   onLogout={onLogout}
                   user={authUser}
-                  emailPolling={emailPolling}
                 />
               ) : null}
               <ThemeButton onToggle={onThemeToggle} theme={theme} />
@@ -121,14 +103,8 @@ export function Header({
                 <AuthButton
                   authenticated={authAuthenticated}
                   loading={authLoading}
-                  loginUrl={authLoginUrl}
-                  googleLoginUrl={authGoogleLoginUrl}
-                  emailLoginUrl={authEmailLoginUrl}
-                  onLogin={onLogin}
-                  onEmailLogin={onEmailLogin}
                   onLogout={onLogout}
                   user={authUser}
-                  emailPolling={emailPolling}
                 />
               ) : null}
               {authUser && canPost && showUploadButton ? <UploadButton busy={uploadBusy} /> : null}

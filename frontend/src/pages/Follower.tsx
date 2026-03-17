@@ -1,11 +1,9 @@
-import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { HomeButton } from '../layouts/HomeButton';
 import { ThemeButton } from '../layouts/ThemeButton';
 import { SettingsButton } from '../layouts/SettingsButton';
 import { FollowButton } from '../ui/FollowButton';
-import { LoginModal } from '../ui/LoginModal';
 import { useAuth } from '../hooks/useAuth';
 import { useFollows } from '../hooks/useFollows';
 import { useProfile } from '../context/ProfileContext';
@@ -20,7 +18,6 @@ interface FollowerProps {
 export default function Follower({ auth, follows, theme, onThemeToggle }: FollowerProps) {
   const profile = useProfile();
   const navigate = useNavigate();
-  const [loginOpen, setLoginOpen] = useState(false);
   const list = follows.followers;
   const count = list.length;
 
@@ -67,7 +64,7 @@ export default function Follower({ auth, follows, theme, onThemeToggle }: Follow
             <p>请先登录查看粉丝列表</p>
             <button
               className="rounded-full border border-[var(--panel-border)] px-4 py-2 text-sm text-[var(--text-main)] transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)]"
-              onClick={() => setLoginOpen(true)}
+              onClick={() => navigate('/login')}
               type="button"
             >
               登录
@@ -113,15 +110,6 @@ export default function Follower({ auth, follows, theme, onThemeToggle }: Follow
         )}
       </main>
 
-      <LoginModal
-        open={loginOpen}
-        onClose={() => setLoginOpen(false)}
-        onSelect={auth.loginWith}
-        onEmailLogin={auth.requestEmailLogin}
-        emailPolling={auth.emailPolling}
-        showGoogle={!!auth.googleLoginUrl}
-        showEmail={!!auth.requestEmailLogin}
-      />
     </div>
   );
 }

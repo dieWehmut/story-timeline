@@ -11,6 +11,7 @@ import Post from './pages/Post';
 import Following from './pages/Following';
 import Follower from './pages/Follower';
 import AuthEmail from './pages/AuthEmail';
+import Login from './pages/Login';
 import { ToastProvider } from './ui/Toast';
 import { ProfileProvider } from './context/ProfileContext';
 import type { TimelineMonth } from './types/image';
@@ -91,6 +92,10 @@ function App() {
               <Route
                 path="/"
                 element={<Home auth={auth} images={images} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+              />
+              <Route
+                path="/login"
+                element={<Login auth={auth} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
               />
               <Route
                 path="/story"

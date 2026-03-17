@@ -57,7 +57,7 @@ export function Footer({ stats }: FooterProps) {
         </div>
         <p className="flex items-center gap-1 text-[var(--text-main)] whitespace-nowrap">
           <Copyright className="footer-icon text-cyan-300" size={12} />
-          <span>2025-2026</span>
+          <span>2026</span>
           <a
             href={`https://github.com/${stats.githubOwner}`}
             rel="noopener noreferrer"

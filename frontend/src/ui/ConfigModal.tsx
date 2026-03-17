@@ -114,9 +114,9 @@ export function ConfigModal({ open, onClose }: ConfigModalProps) {
         </div>
 
         <div className="mt-3 space-y-3">
-          {/* Avatar + Username */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex items-center gap-3 rounded-xl border border-[var(--panel-border)] bg-white/5 p-3">
+          {/* Avatar + Username + Background */}
+          <div className="rounded-xl border border-[var(--panel-border)] bg-white/5 p-3">
+            <div className="flex items-center gap-3">
               <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-[var(--panel-border)] bg-black/20">
                 {avatarPreview ? (
                   <img alt={currentDisplayName} className="h-full w-full object-cover" src={avatarPreview} />
@@ -145,11 +145,11 @@ export function ConfigModal({ open, onClose }: ConfigModalProps) {
               />
             </div>
 
-            <div className="rounded-xl border border-[var(--panel-border)] bg-white/5 p-3">
+            <div className="my-2.5 h-px bg-[var(--panel-border)]" />
+
+            <div>
               <p className="text-xs font-medium">用户名</p>
-              <p className="text-[10px] text-soft">
-                云端同步
-              </p>
+              <p className="text-[10px] text-soft">云端同步</p>
               <input
                 className="mt-1.5 w-full rounded-lg border border-[var(--panel-border)] bg-transparent px-2.5 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)] disabled:opacity-40"
                 disabled={nameDisabled}
@@ -163,10 +163,9 @@ export function ConfigModal({ open, onClose }: ConfigModalProps) {
                 <button className={`${btnCls} text-soft`} disabled={nameDisabled || !displayName} onClick={resetDisplayName} type="button">恢复</button>
               </div>
             </div>
-          </div>
 
-          {/* Background */}
-          <div className="rounded-xl border border-[var(--panel-border)] bg-white/5 p-3">
+            <div className="my-2.5 h-px bg-[var(--panel-border)]" />
+
             <div className="flex items-start gap-3">
               <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-[var(--panel-border)] bg-black/20">
                 {bgPreview ? (

@@ -82,16 +82,10 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
   const followerCount = follows.followers.length;
   const authAuthenticated = auth.authenticated;
   const authLoading = auth.loading;
-  const authLoginUrl = auth.loginUrl;
-  const authGoogleLoginUrl = auth.googleLoginUrl;
-  const authEmailLoginUrl = auth.emailLoginUrl;
   const authUser = auth.user;
   const displayName = authUser ? profile.resolveName(authUser.login) : '';
   const displayAvatar = authUser ? profile.resolveAvatar(authUser.login, authUser.avatarUrl) : '';
-  const onLogin = auth.loginWith;
-  const onEmailLogin = auth.requestEmailLogin;
   const onLogout = auth.logout;
-  const emailPolling = auth.emailPolling;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -111,14 +105,8 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
               <AuthButton
                 authenticated={authAuthenticated}
                 loading={authLoading}
-                loginUrl={authLoginUrl}
-                googleLoginUrl={authGoogleLoginUrl}
-                emailLoginUrl={authEmailLoginUrl}
-                onLogin={onLogin}
-                onEmailLogin={onEmailLogin}
                 onLogout={onLogout}
                 user={authUser}
-                emailPolling={emailPolling}
               />
             )}
           </div>
@@ -127,14 +115,8 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
               <AuthButton
                 authenticated={authAuthenticated}
                 loading={authLoading}
-                loginUrl={authLoginUrl}
-                googleLoginUrl={authGoogleLoginUrl}
-                emailLoginUrl={authEmailLoginUrl}
-                onLogin={onLogin}
-                onEmailLogin={onEmailLogin}
                 onLogout={onLogout}
                 user={authUser}
-                emailPolling={emailPolling}
               />
             ) : null}
             <NotificationButton isAdmin={auth.isAdmin} />

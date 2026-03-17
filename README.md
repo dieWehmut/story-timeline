@@ -13,7 +13,6 @@ frontend/                 React SPA + Capacitor Android app
 
 backend/                  Go API 伺服器（Gin）
   ├── cmd/server/         主入口
-  ├── cmd/migrate_github_data/  歷史資料遷移工具
   ├── internal/           controller / service / storage / middleware
   └── supabase/           資料庫 schema
 
