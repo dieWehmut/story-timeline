@@ -23,10 +23,10 @@ import (
 	"github.com/dieWehmut/story-timeline/backend/internal/storage"
 )
 
-//go:embed magic_link_email.html
+//go:embed templates/magic_link_email.html
 var magicLinkFS embed.FS
 
-var magicLinkTmpl = template.Must(template.ParseFS(magicLinkFS, "magic_link_email.html"))
+var magicLinkTmpl = template.Must(template.ParseFS(magicLinkFS, "templates/magic_link_email.html"))
 
 const defaultEmailTokenTTL = storage.MagicLinkTokenTTL
 

@@ -148,7 +148,7 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
             )}
 
             {/* or divider */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
               <div className="h-px flex-1 bg-[var(--panel-border)]" />
               <span className="text-xs text-soft">or</span>
               <div className="h-px flex-1 bg-[var(--panel-border)]" />
@@ -166,7 +166,7 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
             ) : (
               <div
                 ref={emailFormRef}
-                className={`flex cursor-pointer items-center rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 py-3 backdrop-blur-xl transition-all duration-300 hover:border-[var(--text-accent)] ${showEmailForm ? '' : 'justify-center'}`}
+                className={`flex h-[46px] cursor-pointer items-center rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 backdrop-blur-xl transition-all duration-300 hover:border-[var(--text-accent)] ${showEmailForm ? '' : 'justify-center'}`}
                 onClick={() => { if (!showEmailForm) setShowEmailForm(true); }}
                 role={showEmailForm ? undefined : 'button'}
               >
