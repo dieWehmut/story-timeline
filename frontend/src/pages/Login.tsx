@@ -4,7 +4,7 @@ import { Globe, MoonStar, Settings, SunMedium } from 'lucide-react';
 
 import { useToast } from '../utils/useToast';
 import { ConfigModal } from '../ui/ConfigModal';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth, LOGIN_RETURN_KEY } from '../hooks/useAuth';
 
 interface LoginProps {
   auth: ReturnType<typeof useAuth>;
@@ -62,6 +62,22 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
   const emailFormRef = useRef<HTMLDivElement>(null);
 
   const showGoogle = !!auth.googleLoginUrl;
+
+  // Redirect away from login page once authenticated (e.g. after email polling succeeds)
+  useEffect(() => {
+    if (!auth.authenticated || auth.loading) return;
+    let target = '/';
+    try {
+      const saved = localStorage.getItem(LOGIN_RETURN_KEY);
+      if (saved && saved.startsWith('/') && !saved.startsWith('//')) {
+        target = saved;
+        localStorage.removeItem(LOGIN_RETURN_KEY);
+      }
+    } catch {
+      // ignore storage errors
+    }
+    navigate(target, { replace: true });
+  }, [auth.authenticated, auth.loading, navigate]);
 
   // Handle error query params from backend redirects
   useEffect(() => {

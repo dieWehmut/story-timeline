@@ -33,13 +33,14 @@ var (
 )
 
 type RegistrationService struct {
-	storage    *storage.SupabaseStorage
-	resend     *resend.Client
-	from       string
+	storage     *storage.SupabaseStorage
+	resend      *resend.Client
+	from        string
 	frontendURL string
+	adminLogin  string
 }
 
-func NewRegistrationService(supabaseStorage *storage.SupabaseStorage, redisStore *storage.Store, resendAPIKey string, resendFrom string, frontendURL string) *RegistrationService {
+func NewRegistrationService(supabaseStorage *storage.SupabaseStorage, redisStore *storage.Store, resendAPIKey string, resendFrom string, frontendURL string, adminLogin string) *RegistrationService {
 	trimmedKey := strings.TrimSpace(resendAPIKey)
 	trimmedFrom := strings.TrimSpace(resendFrom)
 	var client *resend.Client
@@ -51,6 +52,7 @@ func NewRegistrationService(supabaseStorage *storage.SupabaseStorage, redisStore
 		resend:      client,
 		from:        trimmedFrom,
 		frontendURL: strings.TrimRight(frontendURL, "/"),
+		adminLogin:  strings.TrimSpace(adminLogin),
 	}
 }
 
@@ -361,14 +363,24 @@ func (s *RegistrationService) getAdminEmail(ctx context.Context) (string, error)
 	if err != nil {
 		return "", err
 	}
-	if raw == nil {
-		return "", nil
+	if raw != nil {
+		var email string
+		if err := json.Unmarshal(raw, &email); err != nil {
+			email = strings.Trim(strings.TrimSpace(string(raw)), `"`)
+		}
+		email = strings.TrimSpace(email)
+		if email != "" {
+			return email, nil
+		}
 	}
-	var email string
-	if err := json.Unmarshal(raw, &email); err != nil {
-		return strings.Trim(strings.TrimSpace(string(raw)), `"`), nil
+	// Fallback: look up admin user's email from users table
+	if s.adminLogin != "" {
+		email, err := s.storage.GetUserEmail(ctx, s.adminLogin)
+		if err == nil && email != "" {
+			return email, nil
+		}
 	}
-	return strings.TrimSpace(email), nil
+	return "", nil
 }
 
 func randomCode(length int) (string, error) {

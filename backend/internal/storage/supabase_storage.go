@@ -973,3 +973,29 @@ func (storage *SupabaseStorage) GetUserFullByLogin(ctx context.Context, login st
 	}
 	return records[0], nil
 }
+
+func (storage *SupabaseStorage) GetUserEmail(ctx context.Context, login string) (string, error) {
+	params := url.Values{}
+	params.Set("select", "email")
+	params.Set("login", "eq."+login)
+	params.Set("limit", "1")
+
+	var records []map[string]any
+	if err := storage.requestJSON(ctx, http.MethodGet, "/users", params, nil, &records, nil); err != nil {
+		return "", err
+	}
+	if len(records) == 0 {
+		return "", nil
+	}
+	email, _ := records[0]["email"].(string)
+	return strings.TrimSpace(email), nil
+}
+
+func (storage *SupabaseStorage) UpdateUserEmail(ctx context.Context, login string, email string) error {
+	params := url.Values{}
+	params.Set("login", "eq."+login)
+	return storage.requestJSON(ctx, http.MethodPatch, "/users", params, map[string]any{
+		"email":      email,
+		"updated_at": time.Now().UTC().Format(time.RFC3339),
+	}, nil, nil)
+}

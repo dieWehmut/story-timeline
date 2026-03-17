@@ -69,6 +69,8 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 			auth.POST("/exchange", deps.AuthController.ExchangeSession)
 			auth.GET("/session", deps.AuthController.Session)
 			auth.PATCH("/profile", deps.AuthController.UpdateProfile)
+			auth.GET("/email-binding", middleware.RequireAuth(deps.AuthService), deps.AuthController.GetEmailBinding)
+			auth.POST("/email-binding", middleware.RequireAuth(deps.AuthService), deps.AuthController.SetEmailBinding)
 			auth.POST("/logout", deps.AuthController.Logout)
 		}
 

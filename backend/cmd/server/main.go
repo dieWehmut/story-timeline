@@ -82,7 +82,7 @@ func main() {
 
 	interactionService := service.NewInteractionService(supabaseStorage, cloudinaryStorage)
 
-	registrationService := service.NewRegistrationService(supabaseStorage, redisStore, env.ResendAPIKey, env.ResendEmailFrom, env.FrontendBaseURL)
+	registrationService := service.NewRegistrationService(supabaseStorage, redisStore, env.ResendAPIKey, env.ResendEmailFrom, env.FrontendBaseURL, env.GitHubRepoOwner)
 
 	server := &http.Server{
 		Addr: ":" + env.Port,

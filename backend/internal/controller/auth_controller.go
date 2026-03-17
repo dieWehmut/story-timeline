@@ -508,6 +508,60 @@ func (controller *AuthController) UpdateProfile(c *gin.Context) {
 	})
 }
 
+func (controller *AuthController) GetEmailBinding(c *gin.Context) {
+	session, err := controller.authService.ReadSession(c.Request)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing session"})
+		return
+	}
+
+	if controller.userService == nil {
+		c.JSON(http.StatusOK, gin.H{"ok": true, "email": ""})
+		return
+	}
+
+	email, err := controller.userService.GetEmail(c.Request.Context(), session.User.Login)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "email": email})
+}
+
+func (controller *AuthController) SetEmailBinding(c *gin.Context) {
+	session, err := controller.authService.ReadSession(c.Request)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing session"})
+		return
+	}
+
+	var payload struct {
+		Email string `json:"email"`
+	}
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+	email := strings.TrimSpace(payload.Email)
+	if email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email required"})
+		return
+	}
+
+	if controller.userService == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "user service unavailable"})
+		return
+	}
+
+	if err := controller.userService.UpdateEmail(c.Request.Context(), session.User.Login, email); err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
 func (controller *AuthController) Session(c *gin.Context) {
 	emailLoginURL := ""
 	if controller.emailService != nil && controller.emailService.Enabled() {

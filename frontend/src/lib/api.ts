@@ -575,4 +575,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     }),
+  getUserEmail: () =>
+    request<{ ok: boolean; email: string }>(`${API_BASE}/api/auth/email-binding`),
+  setUserEmail: (email: string) =>
+    request<{ ok: boolean }>(`${API_BASE}/api/auth/email-binding`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }),
 };

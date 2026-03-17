@@ -115,6 +115,20 @@ func (service *UserService) UpdateProfile(ctx context.Context, login string, dis
 	return service.database.UpdateUserProfile(ctx, login, displayName, avatarURL)
 }
 
+func (service *UserService) GetEmail(ctx context.Context, login string) (string, error) {
+	if service.database == nil {
+		return "", fmt.Errorf("user storage unavailable")
+	}
+	return service.database.GetUserEmail(ctx, login)
+}
+
+func (service *UserService) UpdateEmail(ctx context.Context, login string, email string) error {
+	if service.database == nil {
+		return fmt.Errorf("user storage unavailable")
+	}
+	return service.database.UpdateUserEmail(ctx, login, email)
+}
+
 func (service *UserService) CountUsers(ctx context.Context) (int, error) {
 	return service.database.CountUsers(ctx)
 }

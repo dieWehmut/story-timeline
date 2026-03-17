@@ -197,7 +197,7 @@ function AdminEmailSection() {
     let cancelled = false;
     const fetch = async () => {
       try {
-        const res = await api.getAdminEmail();
+        const res = await api.getUserEmail();
         if (!cancelled) {
           setEmail(res.email || '');
           setSavedEmail(res.email || '');
@@ -220,7 +220,7 @@ function AdminEmailSection() {
     }
     try {
       setSaving(true);
-      await api.setAdminEmail(trimmed);
+      await api.setUserEmail(trimmed);
       setSavedEmail(trimmed);
       toast('绑定邮箱已保存', 'success');
     } catch {
@@ -437,7 +437,7 @@ export function ConfigModal({ open, onClose, isAdmin }: ConfigModalProps) {
             </div>
           )}
 
-          {isAdmin && (
+          {user && (
             <div className="rounded-xl border border-[var(--panel-border)] bg-white/5 p-3">
               <p className="mb-2 text-xs font-medium">绑定邮箱</p>
               <AdminEmailSection />
