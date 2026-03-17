@@ -681,6 +681,10 @@ func sanitizeReturnPath(value string) string {
 	if strings.Contains(trimmed, "\\") {
 		return ""
 	}
+	// Don't redirect back to auth pages after successful login
+	if trimmed == "/login" || trimmed == "/register" || strings.HasPrefix(trimmed, "/login?") || strings.HasPrefix(trimmed, "/register?") {
+		return ""
+	}
 	return trimmed
 }
 

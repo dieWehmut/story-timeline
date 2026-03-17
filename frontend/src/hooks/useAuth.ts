@@ -258,10 +258,12 @@ export const useAuth = () => {
   const loginWith = (provider: 'github' | 'google') => {
     const isNative = Capacitor.isNativePlatform();
     const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    try {
-      localStorage.setItem(LOGIN_RETURN_KEY, currentPath);
-    } catch {
-      // ignore storage errors
+    if (currentPath !== '/login' && currentPath !== '/register') {
+      try {
+        localStorage.setItem(LOGIN_RETURN_KEY, currentPath);
+      } catch {
+        // ignore storage errors
+      }
     }
 
     const raw =
@@ -313,10 +315,12 @@ export const useAuth = () => {
   const requestEmailLogin = async (email: string) => {
     const isNative = Capacitor.isNativePlatform();
     const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    try {
-      localStorage.setItem(LOGIN_RETURN_KEY, currentPath);
-    } catch {
-      // ignore storage errors
+    if (currentPath !== '/login' && currentPath !== '/register') {
+      try {
+        localStorage.setItem(LOGIN_RETURN_KEY, currentPath);
+      } catch {
+        // ignore storage errors
+      }
     }
 
     const endpoint = session.emailLoginUrl || `${API_BASE}/api/auth/email/login`;

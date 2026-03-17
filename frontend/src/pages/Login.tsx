@@ -63,6 +63,13 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
 
   const showGoogle = !!auth.googleLoginUrl;
 
+  // Redirect authenticated users away from login page
+  useEffect(() => {
+    if (auth.authenticated) {
+      navigate('/', { replace: true });
+    }
+  }, [auth.authenticated, navigate]);
+
   // Handle error query params from backend redirects
   useEffect(() => {
     const params = new URLSearchParams(location.search);
