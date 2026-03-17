@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+﻿import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Globe, MoonStar, Settings, SunMedium } from 'lucide-react';
 
 import { useToast } from '../utils/useToast';
@@ -51,7 +51,8 @@ const iconBtnCls =
 export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [, setSearchParams] = useSearchParams();
+  const location = useLocation();
 
   const [email, setEmail] = useState('');
   const [showEmailForm, setShowEmailForm] = useState(false);
@@ -64,7 +65,8 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
 
   // Handle error query params from backend redirects
   useEffect(() => {
-    const error = searchParams.get('error');
+    const params = new URLSearchParams(location.search);
+    const error = params.get('error');
     if (!error) return;
     switch (error) {
       case 'pending':
@@ -77,10 +79,10 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
         toast('你还没有注册过喵~', 'error');
         break;
     }
-    // Clear error param after showing toast
-    searchParams.delete('error');
-    setSearchParams(searchParams, { replace: true });
-  }, [searchParams, setSearchParams, toast]);
+    // Clear error param after showing toast.
+    params.delete('error');
+    setSearchParams(params, { replace: true });
+  }, [location.search, setSearchParams, toast]);
 
   // Click outside email form to collapse (but keep email cached)
   useEffect(() => {
@@ -182,7 +184,7 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
               <div className="space-y-2 text-center">
                 <div className="flex items-center justify-center gap-2 text-sm text-soft">
                   <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[var(--text-accent)] border-t-transparent" />
-                  等待邮件确认中...
+                  等待邮件确认中..
                 </div>
                 <p className="text-xs text-soft">请打开邮箱，点击登录链接确认。确认后此页面会自动登录。</p>
               </div>
@@ -269,7 +271,7 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
         </div>
       </div>
 
-      <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />
+      <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} isAdmin={auth.isAdmin} />
     </div>
   );
 }

@@ -121,18 +121,24 @@ export const useAuth = () => {
   }, [refreshSession]);
 
   useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const debouncedRefresh = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
         void refreshSession();
-      }
+      }, 300);
     };
 
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('focus', handleVisibility);
+    document.addEventListener('visibilitychange', debouncedRefresh);
+    window.addEventListener('focus', debouncedRefresh);
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('focus', handleVisibility);
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', debouncedRefresh);
+      window.removeEventListener('focus', debouncedRefresh);
     };
   }, [refreshSession]);
 

@@ -113,7 +113,7 @@ const getReplyTargetLabel = (comment: CommentItem) => {
 
   if (normalizeLogin(target) === normalizeLogin(comment.authorLogin)) {
 
-    return '鑷繁';
+    return '自己';
 
   }
 
@@ -804,7 +804,7 @@ export function ImageCard({
 
                 <button
 
-                  aria-label="缂栬緫鍗＄墖"
+                  aria-label="编辑卡片"
 
                   className={`${actionButtonBaseClass} text-soft hover:text-[var(--text-main)]`}
 
@@ -826,7 +826,7 @@ export function ImageCard({
 
                 <button
 
-                  aria-label="鍒犻櫎鍗＄墖"
+                  aria-label="删除卡片"
 
                   className={`${actionButtonBaseClass} text-rose-300 hover:text-rose-200`}
 

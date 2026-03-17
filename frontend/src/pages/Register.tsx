@@ -292,7 +292,7 @@ export default function Register({ auth, theme, onThemeToggle }: RegisterProps) 
         </div>
       </div>
 
-      <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} />
+      <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} isAdmin={auth.isAdmin} />
     </div>
   );
 }

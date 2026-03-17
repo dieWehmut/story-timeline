@@ -17,6 +17,7 @@ interface HeaderProps {
   canPost: boolean;
   feedUsers: FeedUser[];
   filterUser: string | null;
+  isAdmin?: boolean;
   isDetailView?: boolean;
   onBack?: () => void;
   onFilterUser: (login: string | null) => void;
@@ -40,6 +41,7 @@ export function Header({
   canPost,
   feedUsers,
   filterUser,
+  isAdmin = false,
   isDetailView,
   onBack,
   onFilterUser,
@@ -84,7 +86,7 @@ export function Header({
           {isDetailView ? (
             <>
               <HomeButton />
-              <SettingsButton />
+              <SettingsButton isAdmin={isAdmin} />
               {!authAuthenticated ? (
                 <AuthButton
                   authenticated={authAuthenticated}
@@ -98,7 +100,7 @@ export function Header({
           ) : (
             <>
               <HomeButton />
-              <SettingsButton />
+              <SettingsButton isAdmin={isAdmin} />
               {!authAuthenticated ? (
                 <AuthButton
                   authenticated={authAuthenticated}

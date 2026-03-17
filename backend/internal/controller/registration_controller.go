@@ -76,26 +76,30 @@ func (ctrl *RegistrationController) GenerateInviteCode(c *gin.Context) {
 	}
 	_ = c.ShouldBindJSON(&payload)
 
-	code, err := ctrl.registrationService.GenerateInviteCode(c.Request.Context(), payload.TTLSeconds)
+	code, expiresAt, err := ctrl.registrationService.GenerateInviteCode(c.Request.Context(), payload.TTLSeconds)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"ok": true, "code": code})
+	resp := gin.H{"ok": true, "code": code}
+	if !expiresAt.IsZero() {
+		resp["expiresAt"] = expiresAt.Format("2006-01-02T15:04:05Z")
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // GetInviteCode handles GET /api/admin/invite-code
 func (ctrl *RegistrationController) GetInviteCode(c *gin.Context) {
-	code, ttl, err := ctrl.registrationService.GetInviteCode(c.Request.Context())
+	code, expiresAt, err := ctrl.registrationService.GetInviteCode(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	ttlSeconds := int(ttl.Seconds())
-	if ttlSeconds < 0 {
-		ttlSeconds = -1 // no expiry
+	resp := gin.H{"ok": true, "code": code}
+	if !expiresAt.IsZero() {
+		resp["expiresAt"] = expiresAt.Format("2006-01-02T15:04:05Z")
 	}
-	c.JSON(http.StatusOK, gin.H{"ok": true, "code": code, "ttlSeconds": ttlSeconds})
+	c.JSON(http.StatusOK, resp)
 }
 
 // DeleteInviteCode handles DELETE /api/admin/invite-code

@@ -557,4 +557,14 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }),
+  getInviteCode: () =>
+    request<{ ok: boolean; code: string; expiresAt?: string }>(`${API_BASE}/api/admin/invite-code`),
+  generateInviteCode: (ttlSeconds?: number) =>
+    request<{ ok: boolean; code: string; expiresAt?: string }>(`${API_BASE}/api/admin/invite-code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ttlSeconds: ttlSeconds ?? 0 }),
+    }),
+  deleteInviteCode: () =>
+    request<{ ok: boolean }>(`${API_BASE}/api/admin/invite-code`, { method: 'DELETE' }),
 };

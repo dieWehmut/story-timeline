@@ -34,7 +34,6 @@ var (
 
 type RegistrationService struct {
 	storage    *storage.SupabaseStorage
-	redis      *storage.Store
 	resend     *resend.Client
 	from       string
 	frontendURL string
@@ -49,7 +48,6 @@ func NewRegistrationService(supabaseStorage *storage.SupabaseStorage, redisStore
 	}
 	return &RegistrationService{
 		storage:     supabaseStorage,
-		redis:       redisStore,
 		resend:      client,
 		from:        trimmedFrom,
 		frontendURL: strings.TrimRight(frontendURL, "/"),
@@ -64,65 +62,100 @@ type RegisterRequest struct {
 	RegisterMethod string `json:"registerMethod"` // "github", "google", "email"
 }
 
-// GenerateInviteCode creates a new global invite code and stores it in Redis.
-func (s *RegistrationService) GenerateInviteCode(ctx context.Context, ttlSeconds int) (string, error) {
-	if s.redis == nil || !s.redis.Enabled() {
-		return "", errors.New("redis not configured")
-	}
-	code, err := randomCode(10)
-	if err != nil {
-		return "", err
-	}
-	var ttl time.Duration
-	if ttlSeconds > 0 {
-		ttl = time.Duration(ttlSeconds) * time.Second
-	}
-	if err := s.redis.SetInviteCode(ctx, code, ttl); err != nil {
-		return "", err
-	}
-	return code, nil
+const settingKeyInviteCode = "invite_code"
+
+type inviteCodeEntry struct {
+	Code      string     `json:"code"`
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
 }
 
-// GetInviteCode returns the current global invite code and TTL.
-func (s *RegistrationService) GetInviteCode(ctx context.Context) (string, time.Duration, error) {
-	if s.redis == nil || !s.redis.Enabled() {
-		return "", 0, errors.New("redis not configured")
-	}
-	code, err := s.redis.GetInviteCode(ctx)
+func (s *RegistrationService) loadInviteCode(ctx context.Context) (*inviteCodeEntry, error) {
+	raw, err := s.storage.GetSetting(ctx, settingKeyInviteCode)
 	if err != nil {
-		if storage.IsCacheMiss(err) {
-			return "", 0, nil
-		}
-		return "", 0, err
+		return nil, err
 	}
-	ttl, err := s.redis.GetInviteCodeTTL(ctx)
+	if raw == nil {
+		return nil, nil
+	}
+	var entry inviteCodeEntry
+	if err := json.Unmarshal(raw, &entry); err != nil {
+		return nil, err
+	}
+	if entry.Code == "" {
+		return nil, nil
+	}
+	return &entry, nil
+}
+
+// GenerateInviteCode creates a new global invite code and stores it in Supabase settings.
+func (s *RegistrationService) GenerateInviteCode(ctx context.Context, ttlSeconds int) (string, time.Time, error) {
+	code, err := randomCode(10)
 	if err != nil {
-		return code, 0, nil
+		return "", time.Time{}, err
 	}
-	return code, ttl, nil
+
+	entry := inviteCodeEntry{Code: code}
+	if ttlSeconds > 0 {
+		exp := time.Now().Add(time.Duration(ttlSeconds) * time.Second)
+		entry.ExpiresAt = &exp
+	}
+
+	raw, err := json.Marshal(entry)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	if err := s.storage.UpsertSetting(ctx, settingKeyInviteCode, raw); err != nil {
+		return "", time.Time{}, err
+	}
+
+	var expiresAt time.Time
+	if entry.ExpiresAt != nil {
+		expiresAt = *entry.ExpiresAt
+	}
+	return code, expiresAt, nil
+}
+
+// GetInviteCode returns the current global invite code and its expiry.
+func (s *RegistrationService) GetInviteCode(ctx context.Context) (string, time.Time, error) {
+	entry, err := s.loadInviteCode(ctx)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	if entry == nil {
+		return "", time.Time{}, nil
+	}
+	// Check if expired
+	if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
+		// Expired — clean up
+		_ = s.storage.DeleteSetting(ctx, settingKeyInviteCode)
+		return "", time.Time{}, nil
+	}
+	var expiresAt time.Time
+	if entry.ExpiresAt != nil {
+		expiresAt = *entry.ExpiresAt
+	}
+	return entry.Code, expiresAt, nil
 }
 
 // DeleteInviteCode removes the current global invite code.
 func (s *RegistrationService) DeleteInviteCode(ctx context.Context) error {
-	if s.redis == nil || !s.redis.Enabled() {
-		return errors.New("redis not configured")
-	}
-	return s.redis.DeleteInviteCode(ctx)
+	return s.storage.DeleteSetting(ctx, settingKeyInviteCode)
 }
 
 // ValidateInviteCode checks whether the given code matches the stored one.
 func (s *RegistrationService) ValidateInviteCode(ctx context.Context, code string) error {
-	if s.redis == nil || !s.redis.Enabled() {
-		return errors.New("redis not configured")
-	}
-	stored, err := s.redis.GetInviteCode(ctx)
+	entry, err := s.loadInviteCode(ctx)
 	if err != nil {
-		if storage.IsCacheMiss(err) {
-			return errors.New("no active invite code")
-		}
 		return err
 	}
-	if stored != code {
+	if entry == nil {
+		return errors.New("no active invite code")
+	}
+	if entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
+		_ = s.storage.DeleteSetting(ctx, settingKeyInviteCode)
+		return errors.New("invite code expired")
+	}
+	if entry.Code != code {
 		return errors.New("invalid invite code")
 	}
 	return nil

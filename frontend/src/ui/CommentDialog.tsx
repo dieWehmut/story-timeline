@@ -179,7 +179,7 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
       replaceFiles([]);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : '璇勮澶辫触');
+      setError(e instanceof Error ? e.message : '发送失败');
     }
   };
 

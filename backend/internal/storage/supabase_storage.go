@@ -874,6 +874,13 @@ func (storage *SupabaseStorage) UpsertSetting(ctx context.Context, key string, v
 	return storage.requestJSON(ctx, http.MethodPost, "/settings", url.Values{"on_conflict": []string{"key"}}, payload, nil, prefer)
 }
 
+// DeleteSetting removes a setting row by key.
+func (storage *SupabaseStorage) DeleteSetting(ctx context.Context, key string) error {
+	params := url.Values{}
+	params.Set("key", "eq."+key)
+	return storage.requestJSON(ctx, http.MethodDelete, "/settings", params, nil, nil, nil)
+}
+
 // --- Registration system ---
 
 func (storage *SupabaseStorage) CreatePendingUser(ctx context.Context, login, provider, providerID, email, purpose, inviteCode, registerMethod, avatarURL, displayName string) error {

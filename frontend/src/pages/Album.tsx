@@ -455,6 +455,7 @@ export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps
   return (
     <div className="min-h-screen pb-24">
       <AlbumHeader
+        isAdmin={auth.isAdmin}
         onBack={() => navigate(-1)}
         onThemeToggle={onThemeToggle}
         onTimelineToggle={() => setTimelineOpen((open) => !open)}

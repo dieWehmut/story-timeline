@@ -213,6 +213,7 @@ export default function Story({
         canPost={auth.canPost}
         feedUsers={images.feedUsers}
         filterUser={activeUser}
+        isAdmin={auth.isAdmin}
         isDetailView={selectedItemId !== null}
         onBack={() => navigate(`/story${location.search}`)}
         onFilterUser={handleUserSelect}
@@ -343,4 +344,3 @@ export default function Story({
     </div>
   );
 }
-

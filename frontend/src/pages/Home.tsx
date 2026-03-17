@@ -120,7 +120,7 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
               />
             ) : null}
             <NotificationButton isAdmin={auth.isAdmin} />
-            <SettingsButton />
+            <SettingsButton isAdmin={auth.isAdmin} />
             <ThemeButton onToggle={onThemeToggle} theme={theme} />
           </div>
         </div>

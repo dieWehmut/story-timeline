@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Copy, RefreshCw, Trash2, X } from 'lucide-react';
 import { useProfile } from '../context/ProfileContext';
+import { api } from '../lib/api';
 
 interface ConfigModalProps {
   open: boolean;
   onClose: () => void;
+  isAdmin?: boolean;
 }
 
 const readAsDataUrl = (file: File) =>
@@ -39,7 +41,136 @@ const resizeImageToDataUrl = (file: File, maxSize = 128): Promise<string> =>
 const btnCls =
   'rounded-full border border-[var(--panel-border)] px-2.5 py-1 text-[10px] transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)] disabled:opacity-40';
 
-export function ConfigModal({ open, onClose }: ConfigModalProps) {
+const iconBtnCls =
+  'inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--panel-border)] text-soft transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)] disabled:opacity-40';
+
+function InviteCodeSection() {
+  const [code, setCode] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [ttlDays, setTtlDays] = useState(0);
+  const [copied, setCopied] = useState(false);
+
+  const fetchCode = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.getInviteCode();
+      setCode(res.code || '');
+      setExpiresAt(res.expiresAt || '');
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void fetchCode(); }, [fetchCode]);
+
+  const handleGenerate = async () => {
+    try {
+      setBusy(true);
+      const ttlSeconds = ttlDays > 0 ? ttlDays * 86400 : 0;
+      const res = await api.generateInviteCode(ttlSeconds);
+      setCode(res.code || '');
+      setExpiresAt(res.expiresAt || '');
+    } catch {
+      // ignore
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      setBusy(true);
+      await api.deleteInviteCode();
+      setCode('');
+      setExpiresAt('');
+    } catch {
+      // ignore
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // ignore
+    }
+  };
+
+  const formatExpiry = (iso: string) => {
+    if (!iso) return '无限期';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '无限期';
+    return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-3">
+        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[var(--text-accent)] border-t-transparent" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {code ? (
+        <div className="flex items-center gap-2">
+          <code className="flex-1 truncate rounded-lg bg-black/20 px-2.5 py-1.5 font-mono text-xs text-[var(--text-accent)]">
+            {code}
+          </code>
+          <button aria-label="复制" className={iconBtnCls} onClick={() => void handleCopy()} title="复制" type="button">
+            <Copy size={12} />
+          </button>
+          <button aria-label="刷新" className={iconBtnCls} disabled={busy} onClick={() => void handleGenerate()} title="重新生成" type="button">
+            <RefreshCw size={12} />
+          </button>
+          <button aria-label="删除" className={iconBtnCls} disabled={busy} onClick={() => void handleDelete()} title="删除" type="button">
+            <Trash2 size={12} />
+          </button>
+        </div>
+      ) : (
+        <p className="text-[10px] text-soft">当前无有效邀请码</p>
+      )}
+
+      {code && (
+        <p className="text-[10px] text-soft">
+          {copied ? '已复制!' : `有效期: ${formatExpiry(expiresAt)}`}
+        </p>
+      )}
+
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-soft">有效期</span>
+        <select
+          className="rounded-lg border border-[var(--panel-border)] bg-transparent px-2 py-1 text-[10px] text-[var(--text-main)] outline-none"
+          disabled={busy}
+          onChange={(e) => setTtlDays(Number(e.target.value))}
+          value={ttlDays}
+        >
+          <option value={0}>无限期</option>
+          <option value={1}>1 天</option>
+          <option value={7}>7 天</option>
+          <option value={30}>30 天</option>
+        </select>
+        {!code && (
+          <button className={btnCls} disabled={busy} onClick={() => void handleGenerate()} type="button">
+            生成邀请码
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function ConfigModal({ open, onClose, isAdmin }: ConfigModalProps) {
   const {
     user,
     displayName,
@@ -210,6 +341,13 @@ export function ConfigModal({ open, onClose }: ConfigModalProps) {
               type="file"
             />
           </div>
+
+          {isAdmin && (
+            <div className="rounded-xl border border-[var(--panel-border)] bg-white/5 p-3">
+              <p className="mb-2 text-xs font-medium">邀请码管理</p>
+              <InviteCodeSection />
+            </div>
+          )}
         </div>
       </div>
     </div>
