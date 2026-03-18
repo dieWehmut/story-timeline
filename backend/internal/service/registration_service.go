@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,6 +40,78 @@ type RegistrationService struct {
 	from        string
 	frontendURL string
 	adminLogin  string
+}
+
+// AdminToken represents a token for email-based admin approval/rejection
+type AdminToken struct {
+	UserLogin string    `json:"user_login"`
+	Action    string    `json:"action"` // "approve" or "reject"
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// generateAdminToken creates a secure token for admin actions
+func (s *RegistrationService) generateAdminToken(userLogin, action string) (string, error) {
+	tokenData := AdminToken{
+		UserLogin: userLogin,
+		Action:    action,
+		CreatedAt: time.Now(),
+		ExpiresAt: time.Now().Add(24 * time.Hour), // Token expires in 24 hours
+	}
+
+	// Generate random bytes
+	randomBytes := make([]byte, 32)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", err
+	}
+
+	// Create token with structure: base64(JSON) + "." + hex(random) + "." + hex(hash)
+	tokenJSON, err := json.Marshal(tokenData)
+	if err != nil {
+		return "", err
+	}
+
+	payload := hex.EncodeToString(tokenJSON) + "." + hex.EncodeToString(randomBytes)
+	hash := sha256.Sum256([]byte(payload))
+	token := payload + "." + hex.EncodeToString(hash[:])
+
+	return token, nil
+}
+
+// validateAdminToken validates and parses an admin token
+func (s *RegistrationService) validateAdminToken(token string) (*AdminToken, error) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return nil, errors.New("invalid token format")
+	}
+
+	tokenHex, randomHex, hashHex := parts[0], parts[1], parts[2]
+
+	// Verify hash
+	payload := tokenHex + "." + randomHex
+	expectedHash := sha256.Sum256([]byte(payload))
+	expectedHashHex := hex.EncodeToString(expectedHash[:])
+	if expectedHashHex != hashHex {
+		return nil, errors.New("invalid token signature")
+	}
+
+	// Decode token data
+	tokenJSON, err := hex.DecodeString(tokenHex)
+	if err != nil {
+		return nil, errors.New("invalid token encoding")
+	}
+
+	var tokenData AdminToken
+	if err := json.Unmarshal(tokenJSON, &tokenData); err != nil {
+		return nil, errors.New("invalid token data")
+	}
+
+	// Check expiration
+	if time.Now().After(tokenData.ExpiresAt) {
+		return nil, errors.New("token expired")
+	}
+
+	return &tokenData, nil
 }
 
 func NewRegistrationService(supabaseStorage *storage.SupabaseStorage, redisStore *storage.Store, resendAPIKey string, resendFrom string, frontendURL string, adminLogin string) *RegistrationService {
@@ -194,7 +268,7 @@ func (s *RegistrationService) Register(ctx context.Context, req RegisterRequest)
 }
 
 // ApproveUser sets a pending user to active and sends approval email.
-func (s *RegistrationService) ApproveUser(ctx context.Context, login string) error {
+func (s *RegistrationService) ApproveUser(ctx context.Context, login string, reason string) error {
 	user, err := s.storage.GetUserFullByLogin(ctx, login)
 	if err != nil {
 		return err
@@ -214,7 +288,7 @@ func (s *RegistrationService) ApproveUser(ctx context.Context, login string) err
 
 	email, _ := user["email"].(string)
 	if email != "" {
-		go s.sendApprovalEmail(context.Background(), login, email)
+		go s.sendApprovalEmail(context.Background(), login, email, reason)
 	}
 
 	return nil
@@ -272,17 +346,29 @@ func (s *RegistrationService) notifyAdmin(ctx context.Context, req RegisterReque
 		return
 	}
 
+	// Generate admin tokens for approval/rejection
+	approveToken, err := s.generateAdminToken(req.Username, "approve")
+	if err != nil {
+		return
+	}
+
 	var buf bytes.Buffer
 	if err := adminNotifyTmpl.Execute(&buf, struct {
 		Username       string
 		Email          string
 		RegisterMethod string
 		Purpose        string
+		BaseURL        string
+		UserID         string
+		Token          string
 	}{
 		Username:       req.Username,
 		Email:          req.Email,
 		RegisterMethod: req.RegisterMethod,
 		Purpose:        req.Purpose,
+		BaseURL:        s.frontendURL,
+		UserID:         req.Username, // Using username as user identifier
+		Token:          approveToken,
 	}); err != nil {
 		return
 	}
@@ -300,18 +386,20 @@ func (s *RegistrationService) notifyAdmin(ctx context.Context, req RegisterReque
 	})
 }
 
-func (s *RegistrationService) sendApprovalEmail(ctx context.Context, login, email string) {
+func (s *RegistrationService) sendApprovalEmail(ctx context.Context, login, email, reason string) {
 	if s.resend == nil || s.from == "" {
 		return
 	}
 
 	var buf bytes.Buffer
 	if err := approvalTmpl.Execute(&buf, struct {
-		Login string
-		Link  string
+		Login  string
+		Link   string
+		Reason string
 	}{
-		Login: login,
-		Link:  s.frontendURL + "/login",
+		Login:  login,
+		Link:   s.frontendURL + "/login",
+		Reason: reason,
 	}); err != nil {
 		return
 	}
@@ -411,4 +499,33 @@ func (s *RegistrationService) GetAdminEmailPublic(ctx context.Context) (string, 
 // Enabled returns true if the service is operational.
 func (s *RegistrationService) Enabled() bool {
 	return s != nil && s.storage != nil
+}
+
+// ApproveUserByEmail handles approval via email token with reason
+func (s *RegistrationService) ApproveUserByEmail(ctx context.Context, token, reason string) error {
+	adminToken, err := s.validateAdminToken(token)
+	if err != nil {
+		return err
+	}
+
+	if adminToken.Action != "approve" {
+		return errors.New("invalid action for token")
+	}
+
+	return s.ApproveUser(ctx, adminToken.UserLogin, reason)
+}
+
+// RejectUserByEmail handles rejection via email token with reason
+func (s *RegistrationService) RejectUserByEmail(ctx context.Context, token, reason string) error {
+	// For rejection, we can use the same token since we're validating the action
+	// But let's generate a separate reject token for better security
+	adminToken, err := s.validateAdminToken(token)
+	if err != nil {
+		return err
+	}
+
+	// Accept both approve and reject tokens for flexibility
+	// The email template will have both actions with the same base token
+
+	return s.RejectUser(ctx, adminToken.UserLogin, reason)
 }

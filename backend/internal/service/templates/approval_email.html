@@ -66,6 +66,12 @@
               <td style="padding:0 30px 22px;font-size:15px;line-height:1.8;color:#e8e8ef;">
                 恭喜喵！你的入站申请已经通过审核啦～<br />
                 现在可以使用注册时的方式登录 Story-Timeline 了喵！<br />
+                {{if .Reason}}
+                <div style="margin:16px 0;padding:12px;background:#1f2a1f;border-radius:8px;border-left:4px solid #22c55e;">
+                  <div style="font-size:13px;color:#86efac;font-weight:600;margin-bottom:4px;">💬 管理员留言</div>
+                  <div style="font-size:14px;color:#dcfce7;">{{.Reason}}</div>
+                </div>
+                {{end}}
                 <span style="display:block;margin-top:12px;color:#b7b7c8;font-size:13px;">期待在物語集見到你喵~</span>
               </td>
             </tr>

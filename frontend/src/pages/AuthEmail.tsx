@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
+import { broadcastAuthRefresh } from '../utils/authEvents';
+import { LOGIN_RETURN_KEY } from '../hooks/useAuth';
 
 const sanitizeReturn = (value: string | null) => {
   const trimmed = (value ?? '').trim();
@@ -21,6 +23,7 @@ const buildAppLink = (scheme: string, token: string, returnTo: string) => {
 
 export default function AuthEmail() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
 
@@ -45,6 +48,29 @@ export default function AuthEmail() {
       try {
         await api.confirmEmailLogin(token);
         setStatus('success');
+
+        // Broadcast auth refresh to notify other tabs
+        broadcastAuthRefresh();
+
+        // Handle redirection after successful login
+        setTimeout(() => {
+          let target = '/';
+          try {
+            const saved = localStorage.getItem(LOGIN_RETURN_KEY);
+            if (saved && saved.startsWith('/') && !saved.startsWith('//')) {
+              target = saved;
+              localStorage.removeItem(LOGIN_RETURN_KEY);
+            }
+          } catch {
+            // ignore storage errors
+          }
+
+          // If this is for the app client, don't redirect automatically
+          if (client !== 'app') {
+            navigate(target, { replace: true });
+          }
+        }, 2000); // Give user a moment to see success message
+
       } catch (err) {
         const nextMessage = err instanceof Error ? err.message : '登录失败，请重试。';
         setStatus('error');
@@ -53,7 +79,7 @@ export default function AuthEmail() {
     };
 
     void run();
-  }, [token]);
+  }, [token, client, navigate]);
 
   const title = status === 'loading' ? '正在确认登录...' : status === 'success' ? '已登录喵' : '登录失败';
   const detail =
@@ -62,7 +88,7 @@ export default function AuthEmail() {
       : status === 'success'
         ? client === 'app'
           ? '登录成功！请返回 App 继续使用。'
-          : '登录成功！请返回原来的浏览器标签页，页面会自动登录。'
+          : '登录成功！页面即将自动跳转...'
         : message;
 
   return (

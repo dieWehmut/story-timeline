@@ -341,6 +341,12 @@ func (controller *AuthController) EmailConfirm(c *gin.Context) {
 		_ = controller.userService.UpsertUser(c.Request.Context(), session.User)
 	}
 
+	// Set session cookie immediately so user is logged in right away
+	if err := controller.authService.SetSessionCookie(c.Writer, session); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	if controller.redisStore != nil && controller.redisStore.Enabled() {
 		sessionJSON, err := json.Marshal(session)
 		if err == nil {

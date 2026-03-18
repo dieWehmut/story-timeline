@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -128,7 +129,13 @@ func (ctrl *RegistrationController) ApproveUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing login"})
 		return
 	}
-	if err := ctrl.registrationService.ApproveUser(c.Request.Context(), login); err != nil {
+
+	var payload struct {
+		Reason string `json:"reason"`
+	}
+	_ = c.ShouldBindJSON(&payload)
+
+	if err := ctrl.registrationService.ApproveUser(c.Request.Context(), login, strings.TrimSpace(payload.Reason)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -183,4 +190,170 @@ func (ctrl *RegistrationController) GetAdminEmail(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true, "email": email})
+}
+
+// EmailApproveUser handles POST /api/admin/approve/:userID (from email)
+func (ctrl *RegistrationController) EmailApproveUser(c *gin.Context) {
+	userID := c.Param("userID")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing userID"})
+		return
+	}
+
+	token := c.PostForm("token")
+	reason := c.PostForm("reason")
+
+	if token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing token"})
+		return
+	}
+
+	if err := ctrl.registrationService.ApproveUserByEmail(c.Request.Context(), token, strings.TrimSpace(reason)); err != nil {
+		// Return a user-friendly HTML page for email clicks
+		c.HTML(http.StatusBadRequest, "", fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>审核失败</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+               background: #f5f5f5; margin: 0; padding: 40px 20px; text-align: center; }
+        .container { max-width: 400px; margin: 0 auto; background: white;
+                    padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .error { color: #dc2626; }
+        h1 { color: #111827; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>😿 审核失败</h1>
+        <p class="error">%s</p>
+    </div>
+</body>
+</html>`, err.Error()))
+		return
+	}
+
+	// Success - return user-friendly HTML page
+	c.HTML(http.StatusOK, "", `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>审核成功</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+               background: #f5f5f5; margin: 0; padding: 40px 20px; text-align: center; }
+        .container { max-width: 400px; margin: 0 auto; background: white;
+                    padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .success { color: #16a34a; }
+        h1 { color: #111827; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✅ 审核通过</h1>
+        <p class="success">用户申请已通过，已发送通知邮件喵~</p>
+    </div>
+</body>
+</html>`)
+}
+
+// EmailRejectUser handles POST /api/admin/reject/:userID (from email)
+func (ctrl *RegistrationController) EmailRejectUser(c *gin.Context) {
+	userID := c.Param("userID")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing userID"})
+		return
+	}
+
+	token := c.PostForm("token")
+	reason := c.PostForm("reason")
+
+	if token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing token"})
+		return
+	}
+
+	if strings.TrimSpace(reason) == "" {
+		c.HTML(http.StatusBadRequest, "", `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>审核失败</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+               background: #f5f5f5; margin: 0; padding: 40px 20px; text-align: center; }
+        .container { max-width: 400px; margin: 0 auto; background: white;
+                    padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .error { color: #dc2626; }
+        h1 { color: #111827; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>😿 审核失败</h1>
+        <p class="error">拒绝理由不能为空喵~</p>
+    </div>
+</body>
+</html>`)
+		return
+	}
+
+	if err := ctrl.registrationService.RejectUserByEmail(c.Request.Context(), token, strings.TrimSpace(reason)); err != nil {
+		c.HTML(http.StatusBadRequest, "", fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>审核失败</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+               background: #f5f5f5; margin: 0; padding: 40px 20px; text-align: center; }
+        .container { max-width: 400px; margin: 0 auto; background: white;
+                    padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .error { color: #dc2626; }
+        h1 { color: #111827; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>😿 审核失败</h1>
+        <p class="error">%s</p>
+    </div>
+</body>
+</html>`, err.Error()))
+		return
+	}
+
+	// Success
+	c.HTML(http.StatusOK, "", `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>审核完成</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+               background: #f5f5f5; margin: 0; padding: 40px 20px; text-align: center; }
+        .container { max-width: 400px; margin: 0 auto; background: white;
+                    padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .info { color: #dc2626; }
+        h1 { color: #111827; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>❌ 申请已拒绝</h1>
+        <p class="info">用户申请已拒绝，已发送通知邮件喵~</p>
+    </div>
+</body>
+</html>`)
 }
