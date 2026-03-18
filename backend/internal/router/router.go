@@ -131,7 +131,9 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 		api.POST("/register", deps.RegistrationController.Register)
 
 		// Email-based approval/rejection (public, token-secured)
+		api.GET("/admin/approve/:userID", deps.RegistrationController.EmailApproveUserPage)
 		api.POST("/admin/approve/:userID", deps.RegistrationController.EmailApproveUser)
+		api.GET("/admin/reject/:userID", deps.RegistrationController.EmailRejectUserPage)
 		api.POST("/admin/reject/:userID", deps.RegistrationController.EmailRejectUser)
 
 		// Admin registration management

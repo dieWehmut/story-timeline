@@ -91,41 +91,29 @@
             </tr>
             <tr>
               <td style="padding:0 30px 20px;">
-                <!-- Approval Form -->
-                <form action="{{.BaseURL}}/api/admin/approve/{{.UserID}}" method="POST" style="margin-bottom:16px;">
-                  <input type="hidden" name="token" value="{{.Token}}" />
-                  <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-                    <tr>
-                      <td style="padding:8px 0;">
-                        <label style="display:block;font-size:13px;color:#b7b7c8;margin-bottom:6px;">欢迎理由 (选填)：</label>
-                        <textarea name="reason" placeholder="欢迎理由..." style="width:100%;padding:10px;border:1px solid #3a3a4a;border-radius:8px;background:#1a1a22;color:#f5f5f5;font-size:13px;font-family:inherit;resize:vertical;min-height:60px;" rows="3"></textarea>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style="padding:12px 0 0;">
-                        <input type="submit" value="✅ 通过申请" style="background:linear-gradient(135deg,#4ade80,#22c55e);color:white;border:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;width:100%;font-family:inherit;" />
-                      </td>
-                    </tr>
-                  </table>
-                </form>
+                <!-- Approval Link -->
+                <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:16px;">
+                  <tr>
+                    <td style="padding:12px 0;">
+                      <a href="{{.BaseURL}}/api/admin/approve/{{.UserID}}?token={{.Token}}&action=approve"
+                         style="display:block;background:linear-gradient(135deg,#4ade80,#22c55e);color:white;text-decoration:none;padding:14px 24px;border-radius:8px;font-size:14px;font-weight:600;text-align:center;font-family:inherit;">
+                        ✅ 通过申请
+                      </a>
+                    </td>
+                  </tr>
+                </table>
 
-                <!-- Rejection Form -->
-                <form action="{{.BaseURL}}/api/admin/reject/{{.UserID}}" method="POST">
-                  <input type="hidden" name="token" value="{{.Token}}" />
-                  <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-                    <tr>
-                      <td style="padding:8px 0;">
-                        <label style="display:block;font-size:13px;color:#b7b7c8;margin-bottom:6px;">拒绝理由：</label>
-                        <textarea name="reason" placeholder="请说明拒绝理由..." required style="width:100%;padding:10px;border:1px solid #3a3a4a;border-radius:8px;background:#1a1a22;color:#f5f5f5;font-size:13px;font-family:inherit;resize:vertical;min-height:60px;" rows="3"></textarea>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style="padding:12px 0 0;">
-                        <input type="submit" value="❌ 拒绝申请" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:white;border:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;width:100%;font-family:inherit;" />
-                      </td>
-                    </tr>
-                  </table>
-                </form>
+                <!-- Rejection Link -->
+                <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                  <tr>
+                    <td style="padding:12px 0;">
+                      <a href="{{.BaseURL}}/api/admin/reject/{{.UserID}}?token={{.Token}}&action=reject"
+                         style="display:block;background:linear-gradient(135deg,#ef4444,#dc2626);color:white;text-decoration:none;padding:14px 24px;border-radius:8px;font-size:14px;font-weight:600;text-align:center;font-family:inherit;">
+                        ❌ 拒绝申请
+                      </a>
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
             <tr>
