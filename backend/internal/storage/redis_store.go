@@ -466,3 +466,52 @@ func (store *Store) GetInviteCodeTTL(ctx context.Context) (time.Duration, error)
 	}
 	return client.TTL(ctx, inviteCodeKey).Result()
 }
+
+// --- Email binding token methods ---
+
+const emailBindingKeyPrefix = "email_binding:"
+const emailBindingTTL = 15 * time.Minute
+
+func (store *Store) SetEmailBindingToken(ctx context.Context, token string, payload string) error {
+	client, err := store.ensureClient()
+	if err != nil {
+		return err
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return ErrMissingToken
+	}
+	return client.Set(ctx, emailBindingKeyPrefix+token, payload, emailBindingTTL).Err()
+}
+
+func (store *Store) GetEmailBindingToken(ctx context.Context, token string) (string, error) {
+	client, err := store.ensureClient()
+	if err != nil {
+		return "", err
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return "", ErrMissingToken
+	}
+	value, err := client.Get(ctx, emailBindingKeyPrefix+token).Result()
+	if err == redis.Nil {
+		return "", ErrCacheMiss
+	}
+	return value, err
+}
+
+func (store *Store) ConsumeEmailBindingToken(ctx context.Context, token string) (string, error) {
+	client, err := store.ensureClient()
+	if err != nil {
+		return "", err
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return "", ErrMissingToken
+	}
+	value, err := client.GetDel(ctx, emailBindingKeyPrefix+token).Result()
+	if err == redis.Nil {
+		return "", ErrCacheMiss
+	}
+	return value, err
+}

@@ -3,6 +3,7 @@ import { Copy, Link, RefreshCw, Trash2, X } from 'lucide-react';
 import { useProfile } from '../context/ProfileContext';
 import { api } from '../lib/api';
 import { useToast } from '../utils/useToast';
+import type { Identity } from '../types/image';
 
 interface ConfigModalProps {
   open: boolean;
@@ -186,7 +187,7 @@ function InviteCodeSection() {
   );
 }
 
-function AdminEmailSection() {
+function AdminNotificationEmailSection() {
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [savedEmail, setSavedEmail] = useState('');
@@ -197,7 +198,7 @@ function AdminEmailSection() {
     let cancelled = false;
     const fetch = async () => {
       try {
-        const res = await api.getUserEmail();
+        const res = await api.getAdminEmail();
         if (!cancelled) {
           setEmail(res.email || '');
           setSavedEmail(res.email || '');
@@ -220,9 +221,9 @@ function AdminEmailSection() {
     }
     try {
       setSaving(true);
-      await api.setUserEmail(trimmed);
+      await api.setAdminEmail(trimmed);
       setSavedEmail(trimmed);
-      toast('绑定邮箱已保存', 'success');
+      toast('管理员邮箱已保存', 'success');
     } catch {
       toast('保存失败', 'error');
     } finally {
@@ -254,6 +255,142 @@ function AdminEmailSection() {
         </button>
         {savedEmail && <span className="text-[10px] text-soft">当前: {savedEmail}</span>}
       </div>
+    </div>
+  );
+}
+
+function AccountBindingSection({ provider }: { provider?: string }) {
+  const { toast } = useToast();
+  const [identities, setIdentities] = useState<Identity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [bindingInProgress, setBingingInProgress] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchIdentities = async () => {
+      try {
+        const res = await api.getIdentities();
+        setIdentities(res.identities || []);
+      } catch (err) {
+        console.error('Failed to fetch identities:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    void fetchIdentities();
+  }, []);
+
+  const handleBind = async (targetProvider: string) => {
+    if (bindingInProgress) return;
+
+    try {
+      setBingingInProgress(targetProvider);
+
+      if (targetProvider === 'github') {
+        const res = await api.startBindGitHub();
+        window.location.href = res.url;
+      } else if (targetProvider === 'google') {
+        const res = await api.startBindGoogle();
+        window.location.href = res.url;
+      } else if (targetProvider === 'email') {
+        const email = prompt('请输入要绑定的邮箱地址:');
+        if (email && email.trim()) {
+          await api.bindEmail(email.trim());
+          toast('验证邮件已发送，请查收邮箱', 'success');
+        }
+      }
+    } catch (err) {
+      toast('绑定失败', 'error');
+    } finally {
+      setBingingInProgress(null);
+    }
+  };
+
+  const handleUnbind = async (targetProvider: string) => {
+    if (identities.length <= 1) {
+      toast('不能解绑唯一的登录方式', 'error');
+      return;
+    }
+
+    if (!confirm(`确定要解绑 ${getProviderName(targetProvider)} 吗？`)) {
+      return;
+    }
+
+    try {
+      await api.unbindProvider(targetProvider);
+      setIdentities(identities.filter(id => id.provider !== targetProvider));
+      toast('解绑成功', 'success');
+    } catch (err) {
+      toast('解绑失败', 'error');
+    }
+  };
+
+  const getProviderName = (prov: string) => {
+    switch (prov) {
+      case 'github': return 'GitHub';
+      case 'google': return 'Google';
+      case 'email': return '邮箱';
+      default: return prov;
+    }
+  };
+
+  const isBound = (prov: string) => identities.some(id => id.provider === prov);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-3">
+        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[var(--text-accent)] border-t-transparent" />
+      </div>
+    );
+  }
+
+  const availableProviders = ['github', 'google', 'email'].filter(p => p !== provider);
+
+  return (
+    <div className="space-y-3">
+      {availableProviders.map(targetProvider => {
+        const bound = isBound(targetProvider);
+        const identity = identities.find(id => id.provider === targetProvider);
+
+        return (
+          <div key={targetProvider} className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs">{getProviderName(targetProvider)}</span>
+              {bound && identity && (
+                <span className="text-[10px] text-soft">
+                  {identity.email || identity.providerId}
+                </span>
+              )}
+            </div>
+            {bound ? (
+              <button
+                className={`${btnCls} text-soft`}
+                disabled={identities.length <= 1}
+                onClick={() => void handleUnbind(targetProvider)}
+                type="button"
+              >
+                解绑
+              </button>
+            ) : (
+              <button
+                className={btnCls}
+                disabled={bindingInProgress === targetProvider}
+                onClick={() => void handleBind(targetProvider)}
+                type="button"
+              >
+                {bindingInProgress === targetProvider ? '绑定中..' : '绑定'}
+              </button>
+            )}
+          </div>
+        );
+      })}
+
+      {identities.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-[var(--panel-border)]">
+          <p className="text-[10px] text-soft">
+            已绑定 {identities.length} 种登录方式
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -437,10 +574,18 @@ export function ConfigModal({ open, onClose, isAdmin }: ConfigModalProps) {
             </div>
           )}
 
+          {isAdmin && (
+            <div className="rounded-xl border border-[var(--panel-border)] bg-white/5 p-3">
+              <p className="mb-2 text-xs font-medium">管理员邮箱</p>
+              <p className="mb-2 text-[10px] text-soft">用于接收新用户注册通知</p>
+              <AdminNotificationEmailSection />
+            </div>
+          )}
+
           {user && (
             <div className="rounded-xl border border-[var(--panel-border)] bg-white/5 p-3">
-              <p className="mb-2 text-xs font-medium">绑定邮箱</p>
-              <AdminEmailSection />
+              <p className="mb-2 text-xs font-medium">账号绑定</p>
+              <AccountBindingSection provider={user.provider} />
             </div>
           )}
         </div>

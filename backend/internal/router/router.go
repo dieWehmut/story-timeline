@@ -72,6 +72,16 @@ func New(deps Dependencies, allowedOrigins []string) *gin.Engine {
 			auth.GET("/email-binding", middleware.RequireAuth(deps.AuthService), deps.AuthController.GetEmailBinding)
 			auth.POST("/email-binding", middleware.RequireAuth(deps.AuthService), deps.AuthController.SetEmailBinding)
 			auth.POST("/logout", deps.AuthController.Logout)
+
+			// Account binding APIs
+			auth.GET("/identities", middleware.RequireAuth(deps.AuthService), deps.AuthController.GetIdentities)
+			auth.POST("/bind/github", middleware.RequireAuth(deps.AuthService), deps.AuthController.StartBindGitHub)
+			auth.POST("/bind/google", middleware.RequireAuth(deps.AuthService), deps.AuthController.StartBindGoogle)
+			auth.GET("/bind/github/callback", deps.AuthController.BindGitHubCallback)
+			auth.GET("/bind/google/callback", deps.AuthController.BindGoogleCallback)
+			auth.POST("/bind/email", middleware.RequireAuth(deps.AuthService), deps.AuthController.BindEmail)
+			auth.GET("/bind/email/verify", deps.AuthController.VerifyEmailBinding)
+			auth.DELETE("/unbind/:provider", middleware.RequireAuth(deps.AuthService), deps.AuthController.Unbind)
 		}
 
 		// Feed endpoints (public read, aggregated from multiple users)

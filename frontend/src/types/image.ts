@@ -106,3 +106,12 @@ export interface LikeToggleResult {
   likeCount: number;
   liked: boolean;
 }
+
+export interface Identity {
+  id: number;
+  userLogin: string;
+  provider: string;      // github/google/email
+  providerId: string;    // 第三方 ID
+  email?: string;        // 对于 email 类型
+  createdAt: string;
+}

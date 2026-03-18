@@ -152,3 +152,26 @@ alter table public.users add column if not exists register_method text not null 
 
 create index if not exists users_email_idx on public.users (email);
 create index if not exists users_status_idx on public.users (status);
+
+-- Rejection history for tracking user registration rejections
+create table if not exists public.rejection_history (
+  id serial primary key,
+  user_login text not null,
+  reason text not null default '',
+  rejected_at timestamptz not null default now()
+);
+create index if not exists rejection_history_login_idx on public.rejection_history (user_login);
+
+-- User identities for multi-provider login binding
+create table if not exists public.user_identities (
+  id serial primary key,
+  user_login text not null,
+  provider text not null,
+  provider_id text not null,
+  email text not null default '',
+  created_at timestamptz not null default now(),
+  unique(provider, provider_id)
+);
+create index if not exists user_identities_login_idx on public.user_identities (user_login);
+create index if not exists user_identities_provider_idx on public.user_identities (provider, provider_id);
+create index if not exists user_identities_email_idx on public.user_identities (email) where email <> '';

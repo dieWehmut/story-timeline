@@ -182,6 +182,15 @@ func (controller *AuthController) callback(c *gin.Context, provider string) {
 		return
 	}
 
+	// Check if this identity is linked to an existing user via user_identities
+	if controller.userService != nil {
+		linkedLogin, found, _ := controller.userService.FindUserByIdentity(c.Request.Context(), provider, session.User.ID)
+		if found && linkedLogin != "" {
+			// Use the linked user's login instead
+			session.User.Login = linkedLogin
+		}
+	}
+
 	// Check registration status — skip check for admin
 	if controller.registrationService != nil && controller.registrationService.Enabled() && !controller.authService.IsAdmin(session.User.Login) {
 		userStatus := controller.checkUserRegistrationStatus(c, session.User)
@@ -891,6 +900,238 @@ func (controller *AuthController) renderAppRedirect(c *gin.Context, deepLink str
 }
 
 func newLoginId() string {
+	raw := make([]byte, 16)
+	_, _ = rand.Read(raw)
+	return hex.EncodeToString(raw)
+}
+
+// --- Account Binding APIs ---
+
+// GetIdentities returns all linked identities for the current user
+func (controller *AuthController) GetIdentities(c *gin.Context) {
+	session, err := controller.authService.ReadSession(c.Request)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not logged in"})
+		return
+	}
+
+	identities, err := controller.userService.GetUserIdentities(c.Request.Context(), session.User.Login)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "identities": identities})
+}
+
+// StartBindGitHub initiates GitHub account binding
+func (controller *AuthController) StartBindGitHub(c *gin.Context) {
+	controller.startBind(c, "github")
+}
+
+// StartBindGoogle initiates Google account binding
+func (controller *AuthController) StartBindGoogle(c *gin.Context) {
+	controller.startBind(c, "google")
+}
+
+func (controller *AuthController) startBind(c *gin.Context, provider string) {
+	session, err := controller.authService.ReadSession(c.Request)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not logged in"})
+		return
+	}
+
+	// Generate state with bind marker
+	state := generateRandomState()
+	statePayload := service.OAuthStatePayload{
+		ReturnTo: "/settings",
+		Client:   "web",
+		Nonce:    "",
+		Bind:     true,
+		BindUser: session.User.Login,
+	}
+
+	if controller.redisStore != nil && controller.redisStore.Enabled() {
+		controller.authService.StoreOAuthState(c.Request.Context(), state, statePayload)
+	}
+	controller.authService.SetOAuthStateCookie(c.Writer, state)
+
+	authURL := controller.authService.LoginURL(provider, controller.callbackURL(c.Request, provider)+"/bind", state)
+	c.JSON(http.StatusOK, gin.H{"ok": true, "url": authURL})
+}
+
+// BindGitHubCallback handles GitHub binding callback
+func (controller *AuthController) BindGitHubCallback(c *gin.Context) {
+	controller.bindCallback(c, "github")
+}
+
+// BindGoogleCallback handles Google binding callback
+func (controller *AuthController) BindGoogleCallback(c *gin.Context) {
+	controller.bindCallback(c, "google")
+}
+
+func (controller *AuthController) bindCallback(c *gin.Context, provider string) {
+	stateValue := c.Query("state")
+	statePayload, stateOK := controller.authService.ConsumeOAuthState(c.Request.Context(), stateValue)
+
+	if !stateOK || statePayload == nil || !statePayload.Bind {
+		c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL+"/settings?error=invalid_state")
+		return
+	}
+
+	// Get the user info from OAuth provider
+	session, err := controller.authService.CompleteLogin(c.Request.Context(), provider, c.Query("code"), controller.callbackURL(c.Request, provider)+"/bind")
+	if err != nil {
+		c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL+"/settings?error=oauth_failed")
+		return
+	}
+
+	// Check if this identity is already bound to another user
+	existingLogin, found, err := controller.userService.FindUserByIdentity(c.Request.Context(), provider, session.User.ID)
+	if err != nil {
+		c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL+"/settings?error=db_error")
+		return
+	}
+	if found {
+		if existingLogin == statePayload.BindUser {
+			// Already bound to the same user
+			c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL+"/settings?bind=already")
+			return
+		}
+		// Bound to a different user
+		c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL+"/settings?error=already_bound")
+		return
+	}
+
+	// Create the identity binding
+	email := ""
+	if provider == "google" {
+		// For Google, we might want to store the email
+		// But we don't have it here since CompleteLogin doesn't return it
+	}
+	if err := controller.userService.CreateUserIdentity(c.Request.Context(), statePayload.BindUser, provider, session.User.ID, email); err != nil {
+		c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL+"/settings?error=bind_failed")
+		return
+	}
+
+	c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL+"/settings?bind=success")
+}
+
+// BindEmail starts email binding by sending verification email
+func (controller *AuthController) BindEmail(c *gin.Context) {
+	session, err := controller.authService.ReadSession(c.Request)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not logged in"})
+		return
+	}
+
+	var payload struct {
+		Email string `json:"email"`
+	}
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	email := strings.TrimSpace(payload.Email)
+	if email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email required"})
+		return
+	}
+
+	// Check if this email is already bound
+	existingLogin, found, err := controller.userService.FindUserByIdentityEmail(c.Request.Context(), email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if found && existingLogin != session.User.Login {
+		c.JSON(http.StatusConflict, gin.H{"error": "email_already_bound"})
+		return
+	}
+
+	// Send verification email using email auth service
+	if controller.emailService == nil || !controller.emailService.Enabled() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "email service not configured"})
+		return
+	}
+
+	// Create a special bind token
+	linkBase := controller.frontendBaseURL + "/api/auth/bind/email/verify"
+	err = controller.emailService.SendBindingEmail(c.Request.Context(), email, session.User.Login, linkBase)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "message": "verification email sent"})
+}
+
+// VerifyEmailBinding completes email binding
+func (controller *AuthController) VerifyEmailBinding(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL+"/settings?error=invalid_token")
+		return
+	}
+
+	if controller.emailService == nil {
+		c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL+"/settings?error=service_unavailable")
+		return
+	}
+
+	login, email, err := controller.emailService.VerifyBindingToken(c.Request.Context(), token)
+	if err != nil {
+		c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL+"/settings?error="+url.QueryEscape(err.Error()))
+		return
+	}
+
+	// Create the identity binding
+	if err := controller.userService.CreateUserIdentity(c.Request.Context(), login, "email", email, email); err != nil {
+		c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL+"/settings?error=bind_failed")
+		return
+	}
+
+	c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL+"/settings?bind=success")
+}
+
+// Unbind removes a linked identity
+func (controller *AuthController) Unbind(c *gin.Context) {
+	session, err := controller.authService.ReadSession(c.Request)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not logged in"})
+		return
+	}
+
+	provider := c.Param("provider")
+	if provider == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "provider required"})
+		return
+	}
+
+	// Check that user has at least 2 identities
+	count, err := controller.userService.CountUserIdentities(c.Request.Context(), session.User.Login)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Also count the original provider in users table
+	// If user has 0 identities but has users.provider, they still have 1 login method
+	if count <= 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot_unbind_last_identity"})
+		return
+	}
+
+	if err := controller.userService.DeleteUserIdentity(c.Request.Context(), session.User.Login, provider); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func generateRandomState() string {
 	raw := make([]byte, 16)
 	_, _ = rand.Read(raw)
 	return hex.EncodeToString(raw)

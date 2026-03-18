@@ -72,6 +72,16 @@
                   <div style="font-size:14px;color:#dcfce7;">{{.Reason}}</div>
                 </div>
                 {{end}}
+                {{if .HasHistory}}
+                <div style="margin:16px 0;padding:12px;background:#1a1a22;border-radius:8px;border-left:4px solid #6b7280;">
+                  <div style="font-size:13px;color:#9ca3af;font-weight:600;margin-bottom:8px;">📋 之前的申请记录</div>
+                  {{range .History}}
+                  <div style="font-size:13px;color:#d1d5db;padding:6px 0;border-bottom:1px solid #2a2a32;">
+                    <span style="color:#6b7280;">{{.RejectedAt}}</span> - {{.Reason}}
+                  </div>
+                  {{end}}
+                </div>
+                {{end}}
                 <span style="display:block;margin-top:12px;color:#b7b7c8;font-size:13px;">期待在物語集見到你喵~</span>
               </td>
             </tr>

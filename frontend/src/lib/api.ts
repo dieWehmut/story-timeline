@@ -4,6 +4,7 @@ import type {
   CreateImagePayload,
   FeedUser,
   HealthStats,
+  Identity,
   ImageItem,
   LikeToggleResult,
   UpdateImagePayload,
@@ -582,5 +583,30 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
+    }),
+  // Account binding APIs
+  getIdentities: () =>
+    request<{ ok: boolean; identities: Identity[] }>(`${API_BASE}/api/auth/identities`),
+  startBindGitHub: () =>
+    request<{ ok: boolean; url: string }>(`${API_BASE}/api/auth/bind/github`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }),
+  startBindGoogle: () =>
+    request<{ ok: boolean; url: string }>(`${API_BASE}/api/auth/bind/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }),
+  bindEmail: (email: string) =>
+    request<{ ok: boolean; message: string }>(`${API_BASE}/api/auth/bind/email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }),
+  unbindProvider: (provider: string) =>
+    request<{ ok: boolean }>(`${API_BASE}/api/auth/unbind/${provider}`, {
+      method: 'DELETE',
     }),
 };

@@ -353,3 +353,91 @@ func appendToken(baseURL string, token string) string {
 	return baseURL + sep + "token=" + url.QueryEscape(token)
 }
 
+// --- Email binding methods ---
+
+// BindingToken contains binding information
+type BindingToken struct {
+	Login     string    `json:"login"`
+	Email     string    `json:"email"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// SendBindingEmail sends a verification email for account binding
+func (service *EmailAuthService) SendBindingEmail(ctx context.Context, email, login, linkBase string) error {
+	if service.client == nil || service.from == "" {
+		return errors.New("email service not configured")
+	}
+
+	email = strings.TrimSpace(email)
+	if _, err := mail.ParseAddress(email); err != nil {
+		return fmt.Errorf("invalid email: %w", err)
+	}
+
+	// Generate token
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return err
+	}
+	token := hex.EncodeToString(raw)
+
+	// Store token in Redis
+	if service.redis != nil && service.redis.Enabled() {
+		bindingToken := BindingToken{
+			Login:     login,
+			Email:     email,
+			ExpiresAt: time.Now().Add(15 * time.Minute),
+		}
+		data, _ := json.Marshal(bindingToken)
+		_ = service.redis.SetEmailBindingToken(ctx, token, string(data))
+	} else {
+		return errors.New("redis not configured for email binding")
+	}
+
+	// Send email
+	link := appendToken(linkBase, token)
+	var buf bytes.Buffer
+	if err := magicLinkTmpl.Execute(&buf, struct {
+		Link string
+	}{
+		Link: link,
+	}); err != nil {
+		return err
+	}
+
+	from := service.from
+	if !strings.Contains(from, "<") && strings.Contains(from, "@") {
+		from = fmt.Sprintf("Story-Timeline <%s>", from)
+	}
+
+	_, err := service.client.Emails.Send(&resend.SendEmailRequest{
+		From:    from,
+		To:      []string{email},
+		Subject: "Story-Timeline 邮箱绑定验证",
+		Html:    buf.String(),
+	})
+	return err
+}
+
+// VerifyBindingToken verifies the email binding token and returns login and email
+func (service *EmailAuthService) VerifyBindingToken(ctx context.Context, token string) (login, email string, err error) {
+	if service.redis == nil || !service.redis.Enabled() {
+		return "", "", errors.New("redis not configured")
+	}
+
+	data, err := service.redis.ConsumeEmailBindingToken(ctx, token)
+	if err != nil || data == "" {
+		return "", "", errors.New("invalid or expired token")
+	}
+
+	var bindingToken BindingToken
+	if err := json.Unmarshal([]byte(data), &bindingToken); err != nil {
+		return "", "", errors.New("invalid token data")
+	}
+
+	if time.Now().After(bindingToken.ExpiresAt) {
+		return "", "", errors.New("token expired")
+	}
+
+	return bindingToken.Login, bindingToken.Email, nil
+}
+

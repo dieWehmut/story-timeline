@@ -227,3 +227,53 @@ func (service *UserService) SyncGitHubFollows(ctx context.Context, token string,
 
 	return nil
 }
+
+// --- Account binding methods ---
+
+// GetUserIdentities returns all identities linked to a user
+func (service *UserService) GetUserIdentities(ctx context.Context, login string) ([]storage.UserIdentity, error) {
+	if service.database == nil {
+		return nil, fmt.Errorf("database not configured")
+	}
+	return service.database.GetUserIdentities(ctx, login)
+}
+
+// FindUserByIdentity finds a user by provider and provider ID
+func (service *UserService) FindUserByIdentity(ctx context.Context, provider, providerID string) (string, bool, error) {
+	if service.database == nil {
+		return "", false, fmt.Errorf("database not configured")
+	}
+	return service.database.FindUserByIdentity(ctx, provider, providerID)
+}
+
+// FindUserByIdentityEmail finds a user by email identity
+func (service *UserService) FindUserByIdentityEmail(ctx context.Context, email string) (string, bool, error) {
+	if service.database == nil {
+		return "", false, fmt.Errorf("database not configured")
+	}
+	return service.database.FindUserByIdentityEmail(ctx, email)
+}
+
+// CreateUserIdentity links a new identity to a user
+func (service *UserService) CreateUserIdentity(ctx context.Context, login, provider, providerID, email string) error {
+	if service.database == nil {
+		return fmt.Errorf("database not configured")
+	}
+	return service.database.CreateUserIdentity(ctx, login, provider, providerID, email)
+}
+
+// DeleteUserIdentity removes an identity from a user
+func (service *UserService) DeleteUserIdentity(ctx context.Context, login, provider string) error {
+	if service.database == nil {
+		return fmt.Errorf("database not configured")
+	}
+	return service.database.DeleteUserIdentity(ctx, login, provider)
+}
+
+// CountUserIdentities returns the number of identities a user has
+func (service *UserService) CountUserIdentities(ctx context.Context, login string) (int, error) {
+	if service.database == nil {
+		return 0, fmt.Errorf("database not configured")
+	}
+	return service.database.CountUserIdentities(ctx, login)
+}

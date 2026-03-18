@@ -999,3 +999,132 @@ func (storage *SupabaseStorage) UpdateUserEmail(ctx context.Context, login strin
 		"updated_at": time.Now().UTC().Format(time.RFC3339),
 	}, nil, nil)
 }
+
+// --- Rejection history ---
+
+type RejectionRecord struct {
+	ID         int       `json:"id"`
+	UserLogin  string    `json:"user_login"`
+	Reason     string    `json:"reason"`
+	RejectedAt time.Time `json:"rejected_at"`
+}
+
+func (storage *SupabaseStorage) SaveRejectionHistory(ctx context.Context, login, reason string) error {
+	payload := []map[string]any{{
+		"user_login":  login,
+		"reason":      reason,
+		"rejected_at": time.Now().UTC(),
+	}}
+	return storage.requestJSON(ctx, http.MethodPost, "/rejection_history", nil, payload, nil, nil)
+}
+
+func (storage *SupabaseStorage) GetRejectionHistory(ctx context.Context, login string) ([]RejectionRecord, error) {
+	params := url.Values{}
+	params.Set("select", "id,user_login,reason,rejected_at")
+	params.Set("user_login", "eq."+login)
+	params.Set("order", "rejected_at.asc")
+
+	var records []RejectionRecord
+	if err := storage.requestJSON(ctx, http.MethodGet, "/rejection_history", params, nil, &records, nil); err != nil {
+		return nil, err
+	}
+	return records, nil
+}
+
+// --- User identities (multi-provider binding) ---
+
+type UserIdentity struct {
+	ID         int       `json:"id"`
+	UserLogin  string    `json:"user_login"`
+	Provider   string    `json:"provider"`
+	ProviderID string    `json:"provider_id"`
+	Email      string    `json:"email"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+func (storage *SupabaseStorage) CreateUserIdentity(ctx context.Context, login, provider, providerID, email string) error {
+	payload := []map[string]any{{
+		"user_login":  login,
+		"provider":    provider,
+		"provider_id": providerID,
+		"email":       email,
+		"created_at":  time.Now().UTC(),
+	}}
+	return storage.requestJSON(ctx, http.MethodPost, "/user_identities", nil, payload, nil, nil)
+}
+
+func (storage *SupabaseStorage) GetUserIdentities(ctx context.Context, login string) ([]UserIdentity, error) {
+	params := url.Values{}
+	params.Set("select", "id,user_login,provider,provider_id,email,created_at")
+	params.Set("user_login", "eq."+login)
+	params.Set("order", "created_at.asc")
+
+	var records []UserIdentity
+	if err := storage.requestJSON(ctx, http.MethodGet, "/user_identities", params, nil, &records, nil); err != nil {
+		return nil, err
+	}
+	return records, nil
+}
+
+func (storage *SupabaseStorage) FindUserByIdentity(ctx context.Context, provider, providerID string) (string, bool, error) {
+	params := url.Values{}
+	params.Set("select", "user_login")
+	params.Set("provider", "eq."+provider)
+	params.Set("provider_id", "eq."+providerID)
+	params.Set("limit", "1")
+
+	var records []struct {
+		UserLogin string `json:"user_login"`
+	}
+	if err := storage.requestJSON(ctx, http.MethodGet, "/user_identities", params, nil, &records, nil); err != nil {
+		return "", false, err
+	}
+	if len(records) == 0 {
+		return "", false, nil
+	}
+	return records[0].UserLogin, true, nil
+}
+
+func (storage *SupabaseStorage) FindUserByIdentityEmail(ctx context.Context, email string) (string, bool, error) {
+	params := url.Values{}
+	params.Set("select", "user_login")
+	params.Set("provider", "eq.email")
+	params.Set("email", "eq."+email)
+	params.Set("limit", "1")
+
+	var records []struct {
+		UserLogin string `json:"user_login"`
+	}
+	if err := storage.requestJSON(ctx, http.MethodGet, "/user_identities", params, nil, &records, nil); err != nil {
+		return "", false, err
+	}
+	if len(records) == 0 {
+		return "", false, nil
+	}
+	return records[0].UserLogin, true, nil
+}
+
+func (storage *SupabaseStorage) DeleteUserIdentity(ctx context.Context, login, provider string) error {
+	params := url.Values{}
+	params.Set("user_login", "eq."+login)
+	params.Set("provider", "eq."+provider)
+	return storage.requestJSON(ctx, http.MethodDelete, "/user_identities", params, nil, nil, nil)
+}
+
+func (storage *SupabaseStorage) CountUserIdentities(ctx context.Context, login string) (int, error) {
+	params := url.Values{}
+	params.Set("user_login", "eq."+login)
+	return storage.requestCount(ctx, "/user_identities", params)
+}
+
+// UpdatePendingUser updates purpose and status for a rejected user re-applying
+func (storage *SupabaseStorage) UpdatePendingUser(ctx context.Context, login, purpose, inviteCode string) error {
+	params := url.Values{}
+	params.Set("login", "eq."+login)
+	return storage.requestJSON(ctx, http.MethodPatch, "/users", params, map[string]any{
+		"purpose":     purpose,
+		"invite_code": inviteCode,
+		"status":      "pending",
+		"updated_at":  time.Now().UTC(),
+	}, nil, nil)
+}

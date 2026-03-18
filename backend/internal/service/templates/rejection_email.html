@@ -64,8 +64,18 @@
             </tr>
             <tr>
               <td style="padding:0 30px 22px;font-size:15px;line-height:1.8;color:#e8e8ef;">
-                很遗憾，你的入站申请未能通过审核喵~<br />
+                很遗憾，你的入站申请未能通过审核喵~{{if gt .RejectionCount 1}}（第 {{.RejectionCount}} 次被拒绝）{{end}}<br />
                 {{if .Reason}}<span style="display:block;margin-top:12px;color:#b7b7c8;font-size:13px;">原因：{{.Reason}}</span>{{end}}
+                {{if .HasHistory}}
+                <div style="margin-top:16px;padding:12px;background:#1a1a22;border-radius:8px;border-left:4px solid #6b7280;">
+                  <div style="font-size:13px;color:#9ca3af;font-weight:600;margin-bottom:8px;">📋 之前的申请记录</div>
+                  {{range .History}}
+                  <div style="font-size:13px;color:#d1d5db;padding:6px 0;border-bottom:1px solid #2a2a32;">
+                    <span style="color:#6b7280;">{{.RejectedAt}}</span> - {{.Reason}}
+                  </div>
+                  {{end}}
+                </div>
+                {{end}}
                 <span style="display:block;margin-top:12px;color:#b7b7c8;font-size:13px;">如有疑问可以联系管理员喵~</span>
               </td>
             </tr>

@@ -64,6 +64,8 @@ type OAuthStatePayload struct {
 	Client   string `json:"client,omitempty"`
 	ReturnTo string `json:"returnTo,omitempty"`
 	Nonce    string `json:"nonce,omitempty"`
+	Bind     bool   `json:"bind,omitempty"`     // true if this is an account binding flow
+	BindUser string `json:"bindUser,omitempty"` // the login to bind to
 }
 
 func (service *AuthService) LoginURL(provider string, state string, redirectURL string) string {

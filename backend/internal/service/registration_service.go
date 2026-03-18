@@ -238,6 +238,7 @@ func (s *RegistrationService) ValidateInviteCode(ctx context.Context, code strin
 }
 
 // Register creates a pending user after validating the invite code.
+// If the user was previously rejected, they can re-apply.
 func (s *RegistrationService) Register(ctx context.Context, req RegisterRequest) error {
 	// Validate invite code
 	if err := s.ValidateInviteCode(ctx, req.InviteCode); err != nil {
@@ -249,7 +250,24 @@ func (s *RegistrationService) Register(ctx context.Context, req RegisterRequest)
 	if err != nil {
 		return fmt.Errorf("database error: %w", err)
 	}
+
 	if existing != nil {
+		status, _ := existing["status"].(string)
+		login, _ := existing["login"].(string)
+
+		// Allow re-application if previously rejected
+		if status == "rejected" && login != "" {
+			// Update purpose and reset status to pending
+			if err := s.storage.UpdatePendingUser(ctx, login, req.Purpose, req.InviteCode); err != nil {
+				return fmt.Errorf("failed to update user: %w", err)
+			}
+			// Re-use username from existing record
+			req.Username = login
+			go s.notifyAdmin(context.Background(), req)
+			return nil
+		}
+
+		// For pending or active users, reject re-registration
 		return fmt.Errorf("email_already_registered")
 	}
 
@@ -286,9 +304,12 @@ func (s *RegistrationService) ApproveUser(ctx context.Context, login string, rea
 		return err
 	}
 
+	// Get rejection history for email
+	history, _ := s.storage.GetRejectionHistory(ctx, login)
+
 	email, _ := user["email"].(string)
 	if email != "" {
-		go s.sendApprovalEmail(context.Background(), login, email, reason)
+		go s.sendApprovalEmail(context.Background(), login, email, reason, history)
 	}
 
 	return nil
@@ -309,13 +330,22 @@ func (s *RegistrationService) RejectUser(ctx context.Context, login string, reas
 		return errors.New("user is not pending")
 	}
 
+	// Get existing rejection history before adding new one
+	history, _ := s.storage.GetRejectionHistory(ctx, login)
+
+	// Save rejection history
+	if err := s.storage.SaveRejectionHistory(ctx, login, reason); err != nil {
+		// Log error but continue
+	}
+
 	if err := s.storage.UpdateUserStatus(ctx, login, "rejected"); err != nil {
 		return err
 	}
 
 	email, _ := user["email"].(string)
 	if email != "" {
-		go s.sendRejectionEmail(context.Background(), login, email, reason)
+		// Pass history (before current rejection) to email
+		go s.sendRejectionEmail(context.Background(), login, email, reason, len(history)+1, history)
 	}
 
 	return nil
@@ -386,20 +416,37 @@ func (s *RegistrationService) notifyAdmin(ctx context.Context, req RegisterReque
 	})
 }
 
-func (s *RegistrationService) sendApprovalEmail(ctx context.Context, login, email, reason string) {
+func (s *RegistrationService) sendApprovalEmail(ctx context.Context, login, email, reason string, history []storage.RejectionRecord) {
 	if s.resend == nil || s.from == "" {
 		return
 	}
 
+	// Convert history to template-friendly format
+	type HistoryItem struct {
+		Reason     string
+		RejectedAt string
+	}
+	var historyItems []HistoryItem
+	for _, h := range history {
+		historyItems = append(historyItems, HistoryItem{
+			Reason:     h.Reason,
+			RejectedAt: h.RejectedAt.Format("2006-01-02 15:04"),
+		})
+	}
+
 	var buf bytes.Buffer
 	if err := approvalTmpl.Execute(&buf, struct {
-		Login  string
-		Link   string
-		Reason string
+		Login      string
+		Link       string
+		Reason     string
+		HasHistory bool
+		History    []HistoryItem
 	}{
-		Login:  login,
-		Link:   s.frontendURL + "/login",
-		Reason: reason,
+		Login:      login,
+		Link:       s.frontendURL + "/login",
+		Reason:     reason,
+		HasHistory: len(historyItems) > 0,
+		History:    historyItems,
 	}); err != nil {
 		return
 	}
@@ -417,18 +464,37 @@ func (s *RegistrationService) sendApprovalEmail(ctx context.Context, login, emai
 	})
 }
 
-func (s *RegistrationService) sendRejectionEmail(ctx context.Context, login, email, reason string) {
+func (s *RegistrationService) sendRejectionEmail(ctx context.Context, login, email, reason string, rejectionCount int, history []storage.RejectionRecord) {
 	if s.resend == nil || s.from == "" {
 		return
 	}
 
+	// Convert history to template-friendly format
+	type HistoryItem struct {
+		Reason     string
+		RejectedAt string
+	}
+	var historyItems []HistoryItem
+	for _, h := range history {
+		historyItems = append(historyItems, HistoryItem{
+			Reason:     h.Reason,
+			RejectedAt: h.RejectedAt.Format("2006-01-02 15:04"),
+		})
+	}
+
 	var buf bytes.Buffer
 	if err := rejectionTmpl.Execute(&buf, struct {
-		Login  string
-		Reason string
+		Login          string
+		Reason         string
+		RejectionCount int
+		HasHistory     bool
+		History        []HistoryItem
 	}{
-		Login:  login,
-		Reason: reason,
+		Login:          login,
+		Reason:         reason,
+		RejectionCount: rejectionCount,
+		HasHistory:     len(historyItems) > 0,
+		History:        historyItems,
 	}); err != nil {
 		return
 	}

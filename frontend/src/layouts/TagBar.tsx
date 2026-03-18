@@ -11,7 +11,7 @@ export function TagBar({ tags, selectedTag, onSelect, className }: TagBarProps) 
 
   return (
     <div className={wrapperClass}>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1">
         <button
           className={`tag-chip rounded-full border border-cyan-400/25 px-2.5 py-1 text-xs transition ${
             selectedTag === null ? 'tag-chip-active' : 'text-soft hover:text-[var(--text-main)]'
