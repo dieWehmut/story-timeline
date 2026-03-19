@@ -4,9 +4,12 @@ import { ArrowLeft, Copy, Link, RefreshCw, Trash2 } from 'lucide-react';
 import { HomeButton } from '../layouts/HomeButton';
 import { ThemeButton } from '../layouts/ThemeButton';
 import { useProfile } from '../context/ProfileContext';
+import { useLanguage, type Language } from '../context/LanguageContext';
+import { useTranslation } from '../hooks/useTranslation';
 import { api } from '../lib/api';
 import { useToast } from '../utils/useToast';
 import { useAuth } from '../hooks/useAuth';
+import { ConfirmModal } from '../ui/ConfirmModal';
 import type { Identity } from '../types/image';
 
 interface ConfigProps {
@@ -300,12 +303,14 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function AccountBindingSection() {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [loading, setLoading] = useState(true);
   const [bindingInProgress, setBingingInProgress] = useState<string | null>(null);
   const [emailBindInput, setEmailBindInput] = useState('');
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [unbindConfirm, setUnbindConfirm] = useState<string | null>(null);
+  const emailFormRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchIdentities = async () => {
@@ -320,6 +325,18 @@ function AccountBindingSection() {
     };
     void fetchIdentities();
   }, []);
+
+  // Click outside email form to collapse
+  useEffect(() => {
+    if (!showEmailInput) return;
+    const handler = (e: MouseEvent) => {
+      if (emailFormRef.current && !emailFormRef.current.contains(e.target as Node)) {
+        setShowEmailInput(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showEmailInput]);
 
   const handleBind = async (targetProvider: string) => {
     if (bindingInProgress) return;
@@ -337,8 +354,8 @@ function AccountBindingSection() {
         setShowEmailInput(true);
         setBingingInProgress(null);
       }
-    } catch (err) {
-      toast('绑定失败', 'error');
+    } catch {
+      toast(t('messages.bindFailed'), 'error');
       setBingingInProgress(null);
     }
   };
@@ -346,24 +363,24 @@ function AccountBindingSection() {
   const handleEmailBind = async () => {
     const email = emailBindInput.trim();
     if (!email) {
-      toast('请输入邮箱地址', 'error');
+      toast(t('messages.emailRequired'), 'error');
       return;
     }
     if (!EMAIL_RE.test(email)) {
-      toast('邮箱格式不正确', 'error');
+      toast(t('messages.invalidEmail'), 'error');
       return;
     }
 
     try {
       setBingingInProgress('email');
       await api.bindEmail(email);
-      toast('验证邮件已发送，请查收邮箱', 'success');
+      toast(t('messages.verificationEmailSent'), 'success');
       setShowEmailInput(false);
       setEmailBindInput('');
     } catch (err) {
-      const message = err instanceof Error ? err.message : '绑定失败';
+      const message = err instanceof Error ? err.message : t('messages.bindFailed');
       if (message.includes('email_already_bound')) {
-        toast('该邮箱已被其他账户绑定', 'error');
+        toast(t('messages.emailAlreadyBound'), 'error');
       } else {
         toast(message, 'error');
       }
@@ -374,7 +391,7 @@ function AccountBindingSection() {
 
   const handleUnbind = (targetProvider: string) => {
     if (identities.length <= 1) {
-      toast('不能解绑唯一的登录方式', 'error');
+      toast(t('messages.cannotUnbindOnly'), 'error');
       return;
     }
 
@@ -387,29 +404,33 @@ function AccountBindingSection() {
     try {
       await api.unbindProvider(unbindConfirm);
       setIdentities(identities.filter(id => id.provider !== unbindConfirm));
-      toast('解绑成功', 'success');
-    } catch (err) {
-      toast('解绑失败', 'error');
+      toast(t('messages.unbindSuccess'), 'success');
+    } catch {
+      toast(t('messages.unbindFailed'), 'error');
     } finally {
       setUnbindConfirm(null);
     }
   };
 
-  const getProviderName = (prov: string) => {
+  const getProviderIcon = (prov: string) => {
     switch (prov) {
-      case 'github': return 'GitHub';
-      case 'google': return 'Google';
-      case 'email': return '邮箱';
-      default: return prov;
+      case 'github': return <GitHubIcon size={20} />;
+      case 'google': return <GoogleIcon size={20} />;
+      case 'email': return <EmailIcon size={25} />;
+      default: return null;
     }
   };
 
-  const getProviderIcon = (prov: string) => {
+  const getIdentityDisplayName = (identity: Identity) => {
+    return identity.displayName || identity.email || identity.providerId;
+  };
+
+  const getProviderLabel = (prov: string) => {
     switch (prov) {
-      case 'github': return <GitHubIcon size={14} />;
-      case 'google': return <GoogleIcon size={14} />;
-      case 'email': return <EmailIcon size={14} />;
-      default: return null;
+      case 'github': return 'GitHub';
+      case 'google': return 'Google';
+      case 'email': return t('settings.email');
+      default: return prov;
     }
   };
 
@@ -423,116 +444,171 @@ function AccountBindingSection() {
     );
   }
 
-  const allProviders = ['github', 'google', 'email'];
+  const emailIdentity = identities.find(id => id.provider === 'email');
+  const oauthProviders = ['github', 'google'];
 
   return (
     <div className="space-y-3">
-      {allProviders.map(targetProvider => {
+      {/* Email row - always show since all users have email */}
+      <div className="flex h-[46px] items-center rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 backdrop-blur-xl">
+        <div className="flex items-center gap-3">
+          <EmailIcon size={25} />
+          <span className="text-sm">{emailIdentity?.email || t('settings.noEmailBound')}</span>
+        </div>
+      </div>
+
+      {/* OAuth providers - GitHub and Google */}
+      {oauthProviders.map(targetProvider => {
         const bound = isBound(targetProvider);
         const identity = identities.find(id => id.provider === targetProvider);
 
-        return (
-          <div key={targetProvider} className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {getProviderIcon(targetProvider)}
-              <span className="text-xs">{getProviderName(targetProvider)}</span>
-              {bound && identity && (
-                <span className="text-[10px] text-soft">
-                  {identity.displayName || identity.email || identity.providerId}
-                </span>
-              )}
-            </div>
-            {bound ? (
+        if (bound && identity) {
+          // Show bound state with actual name
+          return (
+            <div
+              key={targetProvider}
+              className="flex h-[46px] items-center justify-between rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 backdrop-blur-xl"
+            >
+              <div className="flex items-center gap-3">
+                {getProviderIcon(targetProvider)}
+                <span className="text-sm">{getIdentityDisplayName(identity)}</span>
+              </div>
               <button
-                className={`${btnCls} text-soft`}
+                className="text-xs text-soft transition hover:text-[var(--text-accent)]"
                 disabled={identities.length <= 1}
                 onClick={() => void handleUnbind(targetProvider)}
-                title={identities.length <= 1 ? '不能解绑唯一的登录方式' : ''}
+                title={identities.length <= 1 ? t('messages.cannotUnbindOnly') : ''}
                 type="button"
               >
-                解绑
+                {t('settings.unbind')}
               </button>
-            ) : (
-              <button
-                className={btnCls}
-                disabled={bindingInProgress === targetProvider}
-                onClick={() => void handleBind(targetProvider)}
-                type="button"
-              >
-                {bindingInProgress === targetProvider ? '绑定中..' : '绑定'}
-              </button>
-            )}
-          </div>
+            </div>
+          );
+        }
+
+        // Show unbound state - clickable to bind
+        return (
+          <button
+            key={targetProvider}
+            className="flex h-[46px] w-full items-center justify-center gap-3 rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 text-sm backdrop-blur-xl transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)] disabled:opacity-40"
+            disabled={bindingInProgress === targetProvider}
+            onClick={() => void handleBind(targetProvider)}
+            type="button"
+          >
+            {getProviderIcon(targetProvider)}
+            <span>
+              {bindingInProgress === targetProvider
+                ? t('settings.binding')
+                : `${t('settings.bind')} ${getProviderLabel(targetProvider)}`}
+            </span>
+          </button>
         );
       })}
 
-      {/* Email binding input */}
-      {showEmailInput && (
-        <div className="mt-2 space-y-2 rounded-lg border border-[var(--panel-border)] bg-black/10 p-2.5">
-          <input
-            className="w-full rounded-lg border border-[var(--panel-border)] bg-transparent px-2.5 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)]"
-            onChange={(e) => setEmailBindInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') void handleEmailBind(); }}
-            placeholder="输入要绑定的邮箱地址"
-            type="email"
-            value={emailBindInput}
-            autoFocus
-          />
-          <div className="flex gap-2">
+      {/* Email binding - expandable like Login.tsx */}
+      {!emailIdentity && (
+        <div
+          ref={emailFormRef}
+          className={`flex h-[46px] cursor-pointer items-center rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 backdrop-blur-xl transition-all duration-300 hover:border-[var(--text-accent)] ${showEmailInput ? '' : 'justify-center'}`}
+          onClick={() => { if (!showEmailInput) setShowEmailInput(true); }}
+          {...(!showEmailInput && { role: 'button' })}
+        >
+          <div className="flex items-center gap-3">
+            <EmailIcon size={25} />
+            <span
+              className="text-sm transition-all duration-300 whitespace-nowrap"
+              style={{
+                maxWidth: showEmailInput ? 0 : '12rem',
+                opacity: showEmailInput ? 0 : 1,
+                overflow: 'hidden',
+              }}
+            >
+              {t('settings.bindEmail')}
+            </span>
+          </div>
+          <div
+            className="flex items-center gap-2 transition-all duration-300"
+            style={{
+              maxWidth: showEmailInput ? '20rem' : 0,
+              opacity: showEmailInput ? 1 : 0,
+              overflow: 'hidden',
+              marginLeft: showEmailInput ? '0.5rem' : 0,
+              flex: showEmailInput ? 1 : 0,
+            }}
+          >
+            <input
+              className="min-w-0 flex-1 bg-transparent text-sm text-[var(--text-main)] outline-none placeholder:text-soft"
+              onChange={(event) => setEmailBindInput(event.target.value)}
+              onFocus={() => setShowEmailInput(true)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  void handleEmailBind();
+                }
+              }}
+              placeholder={t('auth.emailPlaceholder')}
+              ref={(el) => { if (el && showEmailInput) el.focus(); }}
+              type="email"
+              value={emailBindInput}
+            />
             <button
-              className={btnCls}
+              aria-label={t('settings.sendVerification')}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--text-main)] transition-all duration-300 hover:translate-x-1 hover:scale-110 hover:text-[var(--text-accent)] disabled:opacity-40"
               disabled={bindingInProgress === 'email'}
-              onClick={() => void handleEmailBind()}
+              onClick={(e) => { e.stopPropagation(); void handleEmailBind(); }}
               type="button"
             >
-              {bindingInProgress === 'email' ? '发送中..' : '发送验证邮件'}
-            </button>
-            <button
-              className={`${btnCls} text-soft`}
-              onClick={() => { setShowEmailInput(false); setEmailBindInput(''); }}
-              type="button"
-            >
-              取消
+              {bindingInProgress === 'email' ? (
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                <svg aria-hidden="true" height={18} viewBox="0 0 24 24" width={18} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
+              )}
             </button>
           </div>
-        </div>
-      )}
-
-      {identities.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-[var(--panel-border)]">
-          <p className="text-[10px] text-soft">
-            已绑定 {identities.length} 种登录方式
-          </p>
         </div>
       )}
 
       {/* Unbind confirmation modal */}
-      {unbindConfirm && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-sm rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg)] p-4 text-[var(--text-main)] shadow-xl backdrop-blur-xl">
-            <p className="mb-3 text-sm font-medium">确认解绑</p>
-            <p className="mb-4 text-xs text-soft">
-              确定要解绑 {getProviderName(unbindConfirm)} 吗？解绑后将无法使用此方式登录。
-            </p>
-            <div className="flex gap-2">
-              <button
-                className={`${btnCls} flex-1`}
-                onClick={confirmUnbind}
-                type="button"
-              >
-                确认解绑
-              </button>
-              <button
-                className={`${btnCls} text-soft flex-1`}
-                onClick={() => setUnbindConfirm(null)}
-                type="button"
-              >
-                取消
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        open={!!unbindConfirm}
+        title={t('settings.confirmUnbind')}
+        message={t('settings.unbindWarning', { provider: getProviderLabel(unbindConfirm || '') })}
+        confirmText={t('settings.confirmUnbindBtn')}
+        cancelText={t('common.cancel')}
+        onConfirm={confirmUnbind}
+        onCancel={() => setUnbindConfirm(null)}
+      />
+    </div>
+  );
+}
+
+function LanguageSection() {
+  const { language, setLanguage } = useLanguage();
+  const { t } = useTranslation();
+
+  const languages: { code: Language; name: string }[] = [
+    { code: 'zh-CN', name: t('languages.zh-CN') },
+    { code: 'zh-TW', name: t('languages.zh-TW') },
+    { code: 'en', name: t('languages.en') },
+    { code: 'ja', name: t('languages.ja') },
+    { code: 'de', name: t('languages.de') },
+  ];
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {languages.map((lang) => (
+        <button
+          key={lang.code}
+          className={`rounded-full border px-3 py-1.5 text-xs transition ${
+            language === lang.code
+              ? 'border-[var(--text-accent)] text-[var(--text-accent)]'
+              : 'border-[var(--panel-border)] text-[var(--text-main)] hover:border-[var(--text-accent)] hover:text-[var(--text-accent)]'
+          }`}
+          onClick={() => setLanguage(lang.code)}
+          type="button"
+        >
+          {lang.name}
+        </button>
+      ))}
     </div>
   );
 }
@@ -541,6 +617,7 @@ export default function Config({ auth, theme, onThemeToggle }: ConfigProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const {
     user,
     displayName,
@@ -571,25 +648,25 @@ export default function Config({ auth, theme, onThemeToggle }: ConfigProps) {
     const error = searchParams.get('error');
 
     if (bind === 'success') {
-      toast('绑定成功', 'success');
+      toast(t('messages.bindSuccess'), 'success');
     } else if (bind === 'already') {
-      toast('该账号已绑定', 'info');
+      toast(t('messages.alreadyBound'), 'info');
     } else if (error) {
       switch (error) {
         case 'invalid_state':
-          toast('绑定失败：无效的状态', 'error');
+          toast(t('messages.bindFailedInvalidState'), 'error');
           break;
         case 'oauth_failed':
-          toast('绑定失败：OAuth 认证失败', 'error');
+          toast(t('messages.bindFailedOAuth'), 'error');
           break;
         case 'already_bound':
-          toast('该账号已被其他用户绑定', 'error');
+          toast(t('messages.emailAlreadyBound'), 'error');
           break;
         case 'bind_failed':
-          toast('绑定失败', 'error');
+          toast(t('messages.bindFailed'), 'error');
           break;
         default:
-          toast(`绑定失败：${error}`, 'error');
+          toast(`${t('messages.bindFailed')}：${error}`, 'error');
       }
     }
 
@@ -599,7 +676,7 @@ export default function Config({ auth, theme, onThemeToggle }: ConfigProps) {
       searchParams.delete('error');
       setSearchParams(searchParams, { replace: true });
     }
-  }, [searchParams, setSearchParams, toast]);
+  }, [searchParams, setSearchParams, toast, t]);
 
   const avatarPreview = displayAvatar || currentAvatar;
   const bgPreview = backgroundImage;
@@ -631,7 +708,7 @@ export default function Config({ auth, theme, onThemeToggle }: ConfigProps) {
       <header className="fixed left-0 right-0 top-0 z-40 px-3 pt-3">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
           <button
-            aria-label="返回"
+            aria-label={t('common.back')}
             className="inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition hover:text-[var(--text-accent)] active:scale-95"
             onClick={() => navigate(-1)}
             type="button"
@@ -640,7 +717,7 @@ export default function Config({ auth, theme, onThemeToggle }: ConfigProps) {
           </button>
 
           <div className="flex flex-1 flex-col items-center">
-            <p className="text-base font-semibold text-[var(--text-main)]">设置</p>
+            <p className="text-base font-semibold text-[var(--text-main)]">{t('settings.title')}</p>
           </div>
 
           <div className="flex items-center -space-x-1">
@@ -651,128 +728,135 @@ export default function Config({ auth, theme, onThemeToggle }: ConfigProps) {
       </header>
 
       <div className="flex flex-1 items-start justify-center px-4 pt-20 pb-8">
-        <div className="w-full max-w-xl text-[var(--text-main)]">
+        <div className="w-full max-w-xl space-y-6 text-[var(--text-main)]">
 
-          <div className="space-y-3">
-            {/* Avatar + Username + Background */}
-            <div className="rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] p-3 backdrop-blur-xl">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-[var(--panel-border)] bg-black/20">
-                  {avatarPreview ? (
-                    <img alt={currentDisplayName} className="h-full w-full object-cover" src={avatarPreview} />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-[10px] text-soft">--</div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium">头像</p>
-                  <p className="text-[10px] text-soft">{user ? '云端同步' : '登录后可设置'}</p>
-                  <div className="mt-1.5 flex gap-1.5">
-                    <button className={btnCls} disabled={avatarDisabled} onClick={() => avatarInputRef.current?.click()} type="button">上传</button>
-                    <button className={`${btnCls} text-soft`} disabled={avatarDisabled || !displayAvatar} onClick={resetDisplayAvatar} type="button">恢复</button>
-                  </div>
-                </div>
-                <input
-                  accept="image/*"
-                  aria-label="上传头像"
-                  className="hidden"
-                  onChange={(event) => {
-                    void handleAvatarFile(event.target.files?.[0]);
-                    event.target.value = '';
-                  }}
-                  ref={avatarInputRef}
-                  type="file"
-                />
+          {/* Language Settings */}
+          <section>
+            <h2 className="mb-3 text-xs font-medium">{t('settings.language')}</h2>
+            <LanguageSection />
+          </section>
+
+          {/* Avatar */}
+          <section>
+            <h2 className="mb-3 text-xs font-medium">{t('settings.avatar')}</h2>
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-[var(--panel-border)] bg-black/20">
+                {avatarPreview ? (
+                  <img alt={currentDisplayName} className="h-full w-full object-cover" src={avatarPreview} />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-[10px] text-soft">--</div>
+                )}
               </div>
-
-              <div className="my-2.5 h-px bg-[var(--panel-border)]" />
-
-              <div>
-                <p className="text-xs font-medium">用户名</p>
-                <p className="text-[10px] text-soft">云端同步</p>
-                <input
-                  className="mt-1.5 w-full rounded-lg border border-[var(--panel-border)] bg-transparent px-2.5 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)] disabled:opacity-40"
-                  disabled={nameDisabled}
-                  onChange={(event) => setNameInput(event.target.value)}
-                  placeholder={user ? user.login : '请先登录'}
-                  type="text"
-                  value={nameInput}
-                />
-                <div className="mt-1.5 flex gap-1.5">
-                  <button className={btnCls} disabled={nameDisabled} onClick={() => void setDisplayName(nameInput)} type="button">保存</button>
-                  <button className={`${btnCls} text-soft`} disabled={nameDisabled || !displayName} onClick={resetDisplayName} type="button">恢复</button>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] text-soft">{user ? t('settings.cloudSync') : t('settings.loginRequired')}</p>
+                <div className="mt-2 flex gap-2">
+                  <button className={btnCls} disabled={avatarDisabled} onClick={() => avatarInputRef.current?.click()} type="button">{t('settings.upload')}</button>
+                  <button className={`${btnCls} text-soft`} disabled={avatarDisabled || !displayAvatar} onClick={resetDisplayAvatar} type="button">{t('settings.reset')}</button>
                 </div>
               </div>
-
-              <div className="my-2.5 h-px bg-[var(--panel-border)]" />
-
-              <div className="flex items-start gap-3">
-                <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-[var(--panel-border)] bg-black/20">
-                  {bgPreview ? (
-                    <img alt="背景预览" className="h-full w-full object-cover" src={bgPreview} />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-[10px] text-soft">默认</div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium">背景</p>
-                  <p className="text-[10px] text-soft">仅本地存储，不会上传</p>
-                  <div className="mt-1.5 flex gap-1.5">
-                    <button className={btnCls} onClick={() => bgInputRef.current?.click()} type="button">上传</button>
-                    <button className={`${btnCls} text-soft`} disabled={!backgroundImage} onClick={resetBackgroundImage} type="button">恢复</button>
-                  </div>
-                </div>
-              </div>
-              {backgroundImage ? (
-                <div className="mt-2.5 flex items-center gap-2.5">
-                  <span className="shrink-0 text-[10px] text-soft">透明度</span>
-                  <input
-                    aria-label="背景透明度"
-                    className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-white/10 accent-[var(--text-accent)]"
-                    max="100"
-                    min="10"
-                    onChange={(event) => setBackgroundOpacity(Number(event.target.value) / 100)}
-                    type="range"
-                    value={Math.round(backgroundOpacity * 100)}
-                  />
-                  <span className="w-7 text-right text-[10px] text-soft">{Math.round(backgroundOpacity * 100)}%</span>
-                </div>
-              ) : null}
               <input
                 accept="image/*"
-                aria-label="上传背景"
+                aria-label={t('settings.uploadAvatar')}
                 className="hidden"
                 onChange={(event) => {
-                  void handleBackgroundFile(event.target.files?.[0]);
+                  void handleAvatarFile(event.target.files?.[0]);
                   event.target.value = '';
                 }}
-                ref={bgInputRef}
+                ref={avatarInputRef}
                 type="file"
               />
             </div>
+          </section>
 
-            {auth.isAdmin && (
-              <div className="rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] p-3 backdrop-blur-xl">
-                <p className="mb-2 text-xs font-medium">邀请码管理</p>
-                <InviteCodeSection />
+          {/* Username */}
+          <section>
+            <h2 className="mb-3 text-xs font-medium">{t('settings.username')}</h2>
+            <p className="mb-2 text-[10px] text-soft">{t('settings.cloudSync')}</p>
+            <input
+              className="w-full rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-3 py-2.5 text-sm text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)] disabled:opacity-40"
+              disabled={nameDisabled}
+              onChange={(event) => setNameInput(event.target.value)}
+              placeholder={user ? user.login : t('settings.loginRequired')}
+              type="text"
+              value={nameInput}
+            />
+            <div className="mt-2 flex gap-2">
+              <button className={btnCls} disabled={nameDisabled} onClick={() => void setDisplayName(nameInput)} type="button">{t('settings.save')}</button>
+              <button className={`${btnCls} text-soft`} disabled={nameDisabled || !displayName} onClick={resetDisplayName} type="button">{t('settings.reset')}</button>
+            </div>
+          </section>
+
+          {/* Background */}
+          <section>
+            <h2 className="mb-3 text-xs font-medium">{t('settings.background')}</h2>
+            <div className="flex items-start gap-4">
+              <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-[var(--panel-border)] bg-black/20">
+                {bgPreview ? (
+                  <img alt={t('settings.backgroundPreview')} className="h-full w-full object-cover" src={bgPreview} />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-[10px] text-soft">{t('settings.default')}</div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] text-soft">{t('settings.localOnly')}</p>
+                <div className="mt-2 flex gap-2">
+                  <button className={btnCls} onClick={() => bgInputRef.current?.click()} type="button">{t('settings.upload')}</button>
+                  <button className={`${btnCls} text-soft`} disabled={!backgroundImage} onClick={resetBackgroundImage} type="button">{t('settings.reset')}</button>
+                </div>
+              </div>
+            </div>
+            {backgroundImage && (
+              <div className="mt-3 flex items-center gap-3">
+                <span className="shrink-0 text-[10px] text-soft">{t('settings.opacity')}</span>
+                <input
+                  aria-label={t('settings.backgroundOpacity')}
+                  className="h-1 flex-1 cursor-pointer appearance-none rounded-full bg-white/10 accent-[var(--text-accent)]"
+                  max="100"
+                  min="10"
+                  onChange={(event) => setBackgroundOpacity(Number(event.target.value) / 100)}
+                  type="range"
+                  value={Math.round(backgroundOpacity * 100)}
+                />
+                <span className="w-8 text-right text-[10px] text-soft">{Math.round(backgroundOpacity * 100)}%</span>
               </div>
             )}
+            <input
+              accept="image/*"
+              aria-label={t('settings.uploadBackground')}
+              className="hidden"
+              onChange={(event) => {
+                void handleBackgroundFile(event.target.files?.[0]);
+                event.target.value = '';
+              }}
+              ref={bgInputRef}
+              type="file"
+            />
+          </section>
 
-            {auth.isAdmin && (
-              <div className="rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] p-3 backdrop-blur-xl">
-                <p className="mb-2 text-xs font-medium">管理员邮箱</p>
-                <p className="mb-2 text-[10px] text-soft">用于接收新用户注册通知</p>
-                <AdminNotificationEmailSection />
-              </div>
-            )}
+          {/* Account Binding */}
+          {user && (
+            <section>
+              <h2 className="mb-3 text-xs font-medium">{t('settings.accountBinding')}</h2>
+              <AccountBindingSection />
+            </section>
+          )}
 
-            {user && (
-              <div className="rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] p-3 backdrop-blur-xl">
-                <p className="mb-2 text-xs font-medium">账号绑定</p>
-                <AccountBindingSection />
-              </div>
-            )}
-          </div>
+          {/* Admin: Invite Code */}
+          {auth.isAdmin && (
+            <section>
+              <h2 className="mb-3 text-xs font-medium">{t('settings.inviteCode')}</h2>
+              <InviteCodeSection />
+            </section>
+          )}
+
+          {/* Admin: Notification Email */}
+          {auth.isAdmin && (
+            <section>
+              <h2 className="mb-3 text-xs font-medium">{t('settings.adminEmail')}</h2>
+              <p className="mb-2 text-[10px] text-soft">{t('settings.adminEmailDesc')}</p>
+              <AdminNotificationEmailSection />
+            </section>
+          )}
         </div>
       </div>
     </div>

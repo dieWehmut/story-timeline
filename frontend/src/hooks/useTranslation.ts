@@ -16,11 +16,17 @@ function getNestedValue(obj: any, path: string): any {
 export function useTranslation() {
   const { language } = useLanguage();
 
-  const t = (key: TranslationKey): string => {
+  const t = (key: TranslationKey, params?: Record<string, string>): string => {
     const locale = locales[language];
-    const value = getNestedValue(locale, key);
+    let value = getNestedValue(locale, key);
 
     if (typeof value === 'string') {
+      // Replace template parameters like {{provider}}
+      if (params) {
+        Object.keys(params).forEach((param) => {
+          value = value.replace(new RegExp(`\\{\\{${param}\\}\\}`, 'g'), params[param]);
+        });
+      }
       return value;
     }
 
