@@ -149,7 +149,7 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
             <button
               aria-label={t('tooltips.githubRepo')}
               className={iconBtnCls}
-              onClick={() => window.open('https://github.com/story-timeline/story-timeline', '_blank')}
+              onClick={() => window.open('https://github.com/dieWehmut/story-timeline', '_blank')}
               type="button"
               title={t('tooltips.githubRepo')}
             >
