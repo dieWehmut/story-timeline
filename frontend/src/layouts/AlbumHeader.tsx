@@ -2,6 +2,7 @@ import { ArrowLeft, CalendarRange } from 'lucide-react';
 import { HomeButton } from './HomeButton';
 import { ThemeButton } from './ThemeButton';
 import { SettingsButton } from './SettingsButton';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface AlbumHeaderProps {
   title: string;
@@ -24,11 +25,13 @@ export function AlbumHeader({
   timelineOpen = false,
   showTimeline = false,
 }: AlbumHeaderProps) {
+  const { t } = useTranslation();
+
   return (
     <header className="fixed left-0 right-0 top-0 z-40 bg-[var(--panel-bg)] px-3 pt-3 backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
         <button
-          aria-label="返回"
+          aria-label={t('common.back')}
           className="inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition hover:text-[var(--text-accent)] active:scale-95"
           onClick={onBack}
           type="button"
@@ -51,7 +54,7 @@ export function AlbumHeader({
             >
               <button
                 aria-expanded={timelineOpen}
-                aria-label="切换时间列"
+                aria-label={t('tooltips.timelineToggle')}
                 className="inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition-all duration-300 hover:scale-110 hover:text-[var(--text-accent)] active:scale-95"
                 onClick={onTimelineToggle}
                 type="button"

@@ -1,5 +1,6 @@
 import { PencilLine } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface UploadButtonProps {
   busy: boolean;
@@ -21,14 +22,16 @@ export function UploadButton({
   busy,
   variant = 'icon',
   disabled = false,
-  label = '\u8a18\u9304',
+  label,
   subLabel,
   showIcon = true,
   className,
 }: UploadButtonProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const isDisabled = disabled || busy;
+  const resolvedLabel = label ?? t('story.record');
 
   const handleClick = () => {
     if (isDisabled) return;
@@ -38,7 +41,7 @@ export function UploadButton({
   if (variant === 'card') {
     return (
       <button
-        aria-label={label}
+        aria-label={resolvedLabel}
         className={`${cardBtnBase} ${className ?? ''} ${isDisabled ? 'cursor-not-allowed opacity-50' : 'hover:text-[var(--text-accent)]'}`}
         disabled={isDisabled}
         onClick={handleClick}
@@ -47,7 +50,7 @@ export function UploadButton({
         {showIcon ? (
           <PencilLine className="quick-actions-icon text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={20} />
         ) : null}
-        <span className="leading-none">{label}</span>
+        <span className="leading-none">{resolvedLabel}</span>
         {subLabel ? (
           <span className="quick-actions-sub text-xs text-soft">{subLabel}</span>
         ) : null}
@@ -57,7 +60,7 @@ export function UploadButton({
 
   return (
     <button
-      aria-label={label}
+      aria-label={resolvedLabel}
       className={`${iconBtnCls} ${isDisabled ? 'opacity-60' : ''}`}
       disabled={isDisabled}
       onClick={handleClick}

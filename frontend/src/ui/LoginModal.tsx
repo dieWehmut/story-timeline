@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useToast } from '../utils/useToast';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface LoginModalProps {
   open: boolean;
@@ -82,6 +83,7 @@ export function LoginModal({
   emailPolling = false,
 }: LoginModalProps) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [sending, setSending] = useState(false);
@@ -104,16 +106,16 @@ export function LoginModal({
     if (!onEmailLogin) return;
     const trimmed = email.trim();
     if (!trimmed) {
-      toast('请输入邮箱', 'error');
+      toast(t('messages.emailRequired'), 'error');
       return;
     }
     try {
       setSending(true);
       await onEmailLogin(trimmed);
-      toast('登录链接已发送，请检查邮箱', 'success');
+      toast(t('messages.loginLinkSent'), 'success');
       setEmailSent(true);
     } catch (err) {
-      const message = err instanceof Error ? err.message : '发送失败';
+      const message = err instanceof Error ? err.message : t('messages.sendFailed');
       toast(message, 'error');
     } finally {
       setSending(false);
@@ -134,7 +136,7 @@ export function LoginModal({
         onClick={(event) => event.stopPropagation()}
       >
         <button
-          aria-label="关闭"
+          aria-label={t('common.close')}
           className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center text-soft transition hover:text-[var(--text-main)]"
           onClick={onClose}
           type="button"
@@ -142,11 +144,11 @@ export function LoginModal({
           <X size={18} />
         </button>
 
-        <p className="text-center text-sm font-medium">选择登录方式</p>
+        <p className="text-center text-sm font-medium">{t('loginModal.chooseMethod')}</p>
 
         <div className="mt-5 flex items-center justify-center gap-5">
           <button
-            aria-label="GitHub 登录"
+            aria-label={t('auth.loginWith.github')}
             className="flex h-12 w-12 items-center justify-center transition hover:scale-110 hover:text-[var(--text-accent)] active:scale-95"
             onClick={() => {
               onSelect('github');
@@ -158,7 +160,7 @@ export function LoginModal({
           </button>
           {showGoogle ? (
             <button
-              aria-label="Google 登录"
+              aria-label={t('auth.loginWith.google')}
               className="flex h-12 w-12 items-center justify-center transition hover:scale-110 active:scale-95"
               onClick={() => {
                 onSelect('google');
@@ -171,7 +173,7 @@ export function LoginModal({
           ) : null}
           {showEmail ? (
             <button
-              aria-label="邮箱登录"
+              aria-label={t('auth.loginWith.email')}
               className={`flex h-12 w-12 items-center justify-center transition hover:scale-110 active:scale-95 ${
                 showEmailForm ? 'text-[var(--text-accent)]' : ''
               }`}
@@ -188,9 +190,9 @@ export function LoginModal({
             <div className="mt-5 space-y-2 text-center">
               <div className="flex items-center justify-center gap-2 text-sm text-soft">
                 <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[var(--text-accent)] border-t-transparent" />
-                等待邮件确认中...
+                {t('loginModal.waitingEmail')}
               </div>
-              <p className="text-xs text-soft">请打开邮箱，点击登录链接确认。确认后此页面会自动登录。</p>
+              <p className="text-xs text-soft">{t('loginModal.checkEmail')}</p>
             </div>
           ) : (
             <div className="mt-5 space-y-3">
@@ -202,7 +204,7 @@ export function LoginModal({
                     void handleEmailSubmit();
                   }
                 }}
-                placeholder="输入邮箱地址"
+                placeholder={t('auth.emailPlaceholder')}
                 type="email"
                 value={email}
               />
@@ -212,7 +214,7 @@ export function LoginModal({
                 onClick={() => void handleEmailSubmit()}
                 type="button"
               >
-                {sending ? '发送中...' : '发送登录链接'}
+                {sending ? t('loginModal.sendingLink') : t('loginModal.sendLink')}
               </button>
             </div>
           )

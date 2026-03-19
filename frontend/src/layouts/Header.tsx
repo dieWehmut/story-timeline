@@ -8,6 +8,7 @@ import { TagBar } from './TagBar';
 import { UserBar } from './UserBar';
 import { useProfile } from '../context/ProfileContext';
 import type { AuthUser, FeedUser, TimelineMonth } from '../types/image';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface HeaderProps {
   activeMonth: TimelineMonth | null;
@@ -54,6 +55,7 @@ export function Header({
   uploadBusy,
   showUploadButton = true,
 }: HeaderProps) {
+  const { t } = useTranslation();
   const profile = useProfile();
   const displayName = authUser ? profile.resolveName(authUser.login) : '';
   return (
@@ -62,7 +64,7 @@ export function Header({
         <div className="flex items-center gap-1.5">
           {isDetailView ? (
             <button
-              aria-label="返回"
+              aria-label={t('common.back')}
               className="inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition hover:text-[var(--text-accent)] active:scale-95"
               onClick={onBack}
               type="button"
@@ -112,7 +114,7 @@ export function Header({
               <div className={`transition-all duration-300 ${timelineOpen ? 'pointer-events-none scale-75 opacity-0' : 'opacity-100'}`}>
                 <button
                   aria-expanded={timelineOpen}
-                  aria-label="切换时间列"
+                  aria-label={t('tooltips.timelineToggle')}
                   className="inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition-all duration-300 hover:scale-110 hover:text-[var(--text-accent)] active:scale-95"
                   onClick={onTimelineToggle}
                   type="button"

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { ToastContext } from '../utils/ToastContext';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface ToastItem {
   id: number;
@@ -13,6 +14,7 @@ interface ToastItem {
 let nextId = 0;
 
 function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: (id: number) => void }) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -59,12 +61,12 @@ function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: (id: nu
           <div className="mt-4 flex justify-center gap-4">
             <button
               className="px-4 py-1.5 text-sm text-soft hover:text-[var(--text-main)] transition"
-              onClick={() => {
+            onClick={() => {
                 dismissConfirm();
               }}
               type="button"
             >
-              取消
+              {t('common.cancel')}
             </button>
             <button
               className="px-4 py-1.5 text-sm rounded bg-rose-600 text-white hover:bg-rose-500 font-medium transition"
@@ -75,7 +77,7 @@ function ToastMessage({ item, onDismiss }: { item: ToastItem; onDismiss: (id: nu
               }}
               type="button"
             >
-              确认删除
+              {t('common.confirm')}
             </button>
           </div>
         </div>

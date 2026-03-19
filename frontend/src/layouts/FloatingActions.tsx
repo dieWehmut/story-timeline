@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowUp } from 'lucide-react';
 import { getUIFlags, subscribeUIFlags } from '../lib/uiFlags';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface FloatingActionsProps {
   hidden?: boolean;
 }
 
 export function FloatingActions({ hidden = false }: FloatingActionsProps) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const [uiFlags, setUiFlags] = useState(getUIFlags());
   const [footerHeight, setFooterHeight] = useState(0);
@@ -64,7 +66,7 @@ export function FloatingActions({ hidden = false }: FloatingActionsProps) {
   const container = (
     <div className="fixed right-2 z-[220]" style={{ bottom: `calc(${bottomPx}px + env(safe-area-inset-bottom))` }}>
       <button
-        aria-label="返回顶部"
+        aria-label={t('tooltips.backToTop')}
         className={iconBtnCls}
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         type="button"

@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { broadcastAuthRefresh } from '../utils/authEvents';
 import { LOGIN_RETURN_KEY } from '../hooks/useAuth';
+import { useTranslation } from '../hooks/useTranslation';
 
 const sanitizeReturn = (value: string | null) => {
   const trimmed = (value ?? '').trim();
@@ -22,6 +23,7 @@ const buildAppLink = (scheme: string, token: string, returnTo: string) => {
 };
 
 export default function AuthEmail() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -40,7 +42,7 @@ export default function AuthEmail() {
   useEffect(() => {
     if (!token) {
       setStatus('error');
-      setMessage('登录链接已失效，请重新发送邮件。');
+      setMessage(t('authEmail.invalidLink'));
       return;
     }
 
@@ -72,23 +74,23 @@ export default function AuthEmail() {
         }, 2000); // Give user a moment to see success message
 
       } catch (err) {
-        const nextMessage = err instanceof Error ? err.message : '登录失败，请重试。';
+        const nextMessage = err instanceof Error ? err.message : t('authEmail.loginFailed');
         setStatus('error');
         setMessage(nextMessage);
       }
     };
 
     void run();
-  }, [token, client, navigate]);
+  }, [token, client, navigate, t]);
 
-  const title = status === 'loading' ? '正在确认登录...' : status === 'success' ? '已登录喵' : '登录失败';
+  const title = status === 'loading' ? t('authEmail.confirmingTitle') : status === 'success' ? t('authEmail.successTitle') : t('authEmail.errorTitle');
   const detail =
     status === 'loading'
-      ? '请稍候，我们正在为你确认登录。'
+      ? t('authEmail.confirmingDetail')
       : status === 'success'
         ? client === 'app'
-          ? '登录成功！请返回 App 继续使用。'
-          : '登录成功！页面即将自动跳转...'
+          ? t('authEmail.successDetailApp')
+          : t('authEmail.successDetailWeb')
         : message;
 
   return (
@@ -103,7 +105,7 @@ export default function AuthEmail() {
               onClick={() => window.location.assign(appLink)}
               type="button"
             >
-              打开 App
+              {t('common.openApp')}
             </button>
           </div>
         ) : null}
@@ -113,7 +115,7 @@ export default function AuthEmail() {
             onClick={() => window.location.assign('/')}
             type="button"
           >
-            返回首页
+            {t('nav.home')}
           </button>
         ) : null}
       </div>

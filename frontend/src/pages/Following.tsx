@@ -7,6 +7,7 @@ import { FollowButton } from '../ui/FollowButton';
 import { useAuth } from '../hooks/useAuth';
 import { useFollows } from '../hooks/useFollows';
 import { useProfile } from '../context/ProfileContext';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface FollowingProps {
   auth: ReturnType<typeof useAuth>;
@@ -16,6 +17,7 @@ interface FollowingProps {
 }
 
 export default function Following({ auth, follows, theme, onThemeToggle }: FollowingProps) {
+  const { t } = useTranslation();
   const profile = useProfile();
   const navigate = useNavigate();
   const list = follows.following;
@@ -34,7 +36,7 @@ export default function Following({ auth, follows, theme, onThemeToggle }: Follo
       <header className="fixed left-0 right-0 top-0 z-40 px-3 pt-3">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between">
           <button
-            aria-label="返回"
+            aria-label={t('common.back')}
             className="inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition hover:text-[var(--text-accent)] active:scale-95"
             onClick={handleBack}
             type="button"
@@ -42,7 +44,7 @@ export default function Following({ auth, follows, theme, onThemeToggle }: Follo
             <ArrowLeft size={22} />
           </button>
           <div className="flex flex-col items-center">
-            <span className="text-sm font-medium text-[var(--text-main)]">关注</span>
+            <span className="text-sm font-medium text-[var(--text-main)]">{t('social.followingTitle')}</span>
             <span className="text-xs text-soft">{count}</span>
           </div>
           <div className="flex items-center -space-x-1">
@@ -61,17 +63,17 @@ export default function Following({ auth, follows, theme, onThemeToggle }: Follo
         ) : null}
         {!auth.authenticated ? (
           <div className="mt-10 flex flex-col items-center gap-4 text-sm text-soft">
-            <p>请先登录查看关注列表</p>
+            <p>{t('social.loginToViewFollowing')}</p>
             <button
               className="rounded-full border border-[var(--panel-border)] px-4 py-2 text-sm text-[var(--text-main)] transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)]"
               onClick={() => navigate('/login')}
               type="button"
             >
-              登录
+              {t('nav.login')}
             </button>
           </div>
         ) : list.length === 0 ? (
-          <p className="mt-10 text-center text-sm text-soft">暂无关注</p>
+          <p className="mt-10 text-center text-sm text-soft">{t('social.noFollowing')}</p>
         ) : (
           <div className="divide-y divide-[var(--panel-border)]">
             {list.map((user) => {

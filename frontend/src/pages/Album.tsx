@@ -5,6 +5,7 @@ import { AlbumHeader } from '../layouts/AlbumHeader';
 import { TimeColumn } from '../layouts/TimeColumn';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
+import { useTranslation } from '../hooks/useTranslation';
 import { ImageViewer } from '../ui/ImageViewer';
 import { normalizeAssetTypes } from '../lib/media';
 import type { MediaItem } from '../lib/media';
@@ -53,6 +54,8 @@ type AlbumCard = {
 };
 
 function AlbumCardItem({ card, onClick }: { card: AlbumCard; onClick: () => void }) {
+  const { t } = useTranslation();
+
   return (
     <button
       className="group flex w-full flex-col overflow-hidden rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg)] text-left shadow-[var(--panel-shadow)] transition hover:-translate-y-0.5 hover:border-[var(--text-accent)]"
@@ -68,11 +71,11 @@ function AlbumCardItem({ card, onClick }: { card: AlbumCard; onClick: () => void
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-soft">
-            暂无封面
+            {t('album.noCover')}
           </div>
         )}
         <span className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-[11px] text-white">
-          {card.count} 张
+          {t('album.photoCount', { count: String(card.count) })}
         </span>
       </div>
       <div className="px-3 py-2">
@@ -233,7 +236,7 @@ const buildTimelineMonths = (entries: MediaEntry[], order: 'asc' | 'desc'): Time
       key,
       year,
       month,
-      label: `${year}年${month}月`,
+      label: `${year}-${String(month).padStart(2, '0')}`,
       count: 1,
     });
   });
@@ -243,6 +246,7 @@ const buildTimelineMonths = (entries: MediaEntry[], order: 'asc' | 'desc'): Time
 };
 
 export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps) {
+  const { t, language } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabKey>('albums');
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [activeMonth, setActiveMonth] = useState<TimelineMonth | null>(null);
@@ -291,7 +295,7 @@ export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps
   const activeAlbum = activeTagKey
     ? albumCards.find((card) => normalizeTag(card.tag) === activeTagKey)
     : null;
-  const activeAlbumTitle = activeAlbum?.tag ?? tagParam ?? '相册';
+  const activeAlbumTitle = activeAlbum?.tag ?? tagParam ?? t('album.title');
 
   const filteredAlbumPhotos = activeTagKey
     ? photoEntries.filter((entry) => entry.tags.includes(activeTagKey))
@@ -320,8 +324,19 @@ export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps
         : videoEntries;
 
   const timelineMonths = useMemo(
-    () => buildTimelineMonths(currentTimelineEntries, images.timeOrder),
-    [currentTimelineEntries, images.timeOrder]
+    () => {
+      const formatter = new Intl.DateTimeFormat(language, {
+        timeZone: 'UTC',
+        year: 'numeric',
+        month: 'long',
+      });
+
+      return buildTimelineMonths(currentTimelineEntries, images.timeOrder).map((month) => ({
+        ...month,
+        label: formatter.format(new Date(Date.UTC(month.year, month.month - 1, 1))),
+      }));
+    },
+    [currentTimelineEntries, images.timeOrder, language]
   );
 
   useEffect(() => {
@@ -434,19 +449,23 @@ export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps
     activeTab === 'albums'
       ? activeTagKey
         ? activeAlbumTitle
-        : '相册'
+        : t('album.title')
       : activeTab === 'photos'
-        ? '照片'
-        : '视频';
+        ? t('album.photos')
+        : t('album.videos');
 
   const headerSubtitle =
     activeTab === 'albums'
       ? activeTagKey
         ? undefined
-        : `${albumCount} 相册 ${photoCount} 照片 ${videoCount} 视频`
+        : t('album.summary', {
+            albumCount: String(albumCount),
+            photoCount: String(photoCount),
+            videoCount: String(videoCount),
+          })
       : activeTab === 'photos'
-        ? `${photoCount} 照片`
-        : `${videoCount} 视频`;
+        ? t('album.photosSummary', { count: String(photoCount) })
+        : t('album.videosSummary', { count: String(videoCount) });
 
   const tabBaseClass = 'album-tab flex flex-1 items-center justify-center gap-2 rounded-full px-3 py-2 text-sm transition';
   const tabActiveClass = 'album-tab-active bg-cyan-500/20 text-cyan-200';
@@ -480,10 +499,10 @@ export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps
 
       <main className="mx-auto w-full max-w-5xl px-4 pb-10 pt-24">
         {images.loading ? (
-          <p className="py-12 text-center text-sm text-soft">加载中...</p>
+          <p className="py-12 text-center text-sm text-soft">{t('common.loading')}</p>
         ) : activeTab === 'albums' && !activeTagKey ? (
           albumCards.length === 0 ? (
-            <p className="py-12 text-center text-sm text-soft">暂无相册</p>
+            <p className="py-12 text-center text-sm text-soft">{t('album.noAlbums')}</p>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {albumCards.map((card) => (
@@ -498,19 +517,19 @@ export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps
         ) : activeTab === 'albums' && activeTagKey ? (
           <MediaTimeline
             groups={albumGroups}
-            emptyLabel="该相册暂无照片"
+            emptyLabel={t('album.noAlbumPhotos')}
             onPhotoClick={handlePhotoClick}
             onSectionRef={registerSectionRef}
           />
         ) : activeTab === 'photos' ? (
           <MediaTimeline
             groups={photoGroups}
-            emptyLabel="暂无照片"
+            emptyLabel={t('album.noPhotos')}
             onPhotoClick={handlePhotoClick}
             onSectionRef={registerSectionRef}
           />
         ) : (
-          <MediaTimeline groups={videoGroups} emptyLabel="暂无视频" onSectionRef={registerSectionRef} />
+          <MediaTimeline groups={videoGroups} emptyLabel={t('album.noVideos')} onSectionRef={registerSectionRef} />
         )}
       </main>
 
@@ -522,7 +541,7 @@ export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps
             type="button"
           >
             <Layers size={16} />
-            相册
+            {t('album.title')}
           </button>
           <button
             className={`${tabBaseClass} ${activeTab === 'photos' ? tabActiveClass : tabInactiveClass}`}
@@ -530,7 +549,7 @@ export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps
             type="button"
           >
             <ImageIcon size={16} />
-            照片
+            {t('album.photos')}
           </button>
           <button
             className={`${tabBaseClass} ${activeTab === 'videos' ? tabActiveClass : tabInactiveClass}`}
@@ -538,7 +557,7 @@ export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps
             type="button"
           >
             <Video size={16} />
-            视频
+            {t('album.videos')}
           </button>
         </div>
       </nav>

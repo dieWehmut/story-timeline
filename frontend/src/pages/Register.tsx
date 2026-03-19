@@ -156,7 +156,7 @@ export default function Register({ auth, theme, onThemeToggle }: RegisterProps) 
         setTimeout(() => navigate('/login'), 1500);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : '注册失败';
+      const message = err instanceof Error ? err.message : t('messages.registerFailed');
       if (message.includes('invite_code_invalid')) {
         toast(t('messages.inviteCodeRequired'), 'error');
       } else if (message.includes('email_already_registered')) {

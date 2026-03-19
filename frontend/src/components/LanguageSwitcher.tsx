@@ -19,6 +19,9 @@ export function LanguageSwitcher({ className = '' }: LanguageSwitcherProps) {
     { code: 'en', name: t('languages.en') },
     { code: 'ja', name: t('languages.ja') },
     { code: 'de', name: t('languages.de') },
+    { code: 'fr', name: t('languages.fr') },
+    { code: 'es', name: t('languages.es') },
+    { code: 'la', name: t('languages.la') },
   ];
 
   useEffect(() => {

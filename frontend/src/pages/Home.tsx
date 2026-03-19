@@ -8,6 +8,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
 import { useFollows } from '../hooks/useFollows';
 import { useProfile } from '../context/ProfileContext';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface HomeProps {
   auth: ReturnType<typeof useAuth>;
@@ -28,6 +29,7 @@ interface NavCardProps {
 }
 
 function NavCard({ icon: Icon, label, subLabel, to, href, external, disabled }: NavCardProps) {
+  const { t } = useTranslation();
   const baseClass =
     'group flex h-28 w-full flex-col items-center justify-center gap-2 rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg)] text-[var(--text-main)] shadow-[var(--panel-shadow)] transition-all duration-300 hover:-translate-y-1 hover:border-[var(--text-accent)] hover:shadow-[0_8px_30px_rgba(125,211,252,0.12)]';
 
@@ -36,7 +38,7 @@ function NavCard({ icon: Icon, label, subLabel, to, href, external, disabled }: 
       <div
         aria-disabled="true"
         className={`${baseClass} cursor-not-allowed opacity-40`}
-        title="请先登录"
+        title={t('home.loginRequired')}
       >
         <Icon className="home-nav-icon text-cyan-300" size={26} />
         <span className="text-sm">{label}</span>
@@ -70,6 +72,7 @@ function NavCard({ icon: Icon, label, subLabel, to, href, external, disabled }: 
 }
 
 export default function Home({ auth, images, follows, theme, onThemeToggle }: HomeProps) {
+  const { t } = useTranslation();
   const profile = useProfile();
   const githubOwner = images.stats.githubOwner || auth.user?.login || 'GitHub';
   const repoUrl = `https://github.com/${githubOwner}/story-timeline`;
@@ -127,17 +130,17 @@ export default function Home({ auth, images, follows, theme, onThemeToggle }: Ho
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center px-4 pb-14 pt-0 text-center">
-        <h1 className="font-serif text-4xl font-semibold tracking-wide text-[var(--text-main)] md:text-5xl">物语集</h1>
-        <p className="mt-1 text-sm text-soft">  記錄一下  </p>
+        <h1 className="font-serif text-4xl font-semibold tracking-wide text-[var(--text-main)] md:text-5xl">{t('home.title')}</h1>
+        <p className="mt-1 text-sm text-soft">{t('home.subtitle')}</p>
 
         <div className="mt-6 grid w-full max-w-xl grid-cols-2 gap-4">
-          <div className="nav-card-enter"><NavCard icon={BookOpen} label="物语" to="/story" /></div>
-          <div className="nav-card-enter"><NavCard icon={ImageIcon} label="相册" to={albumUrl} disabled={albumDisabled} /></div>
-          <div className="nav-card-enter"><NavCard icon={UserCheck} label="关注" to="/following" disabled={followsDisabled} subLabel={auth.authenticated ? `${followingCount} 人` : undefined} /></div>
-          <div className="nav-card-enter"><NavCard icon={Users} label="粉丝" to="/follower" disabled={followsDisabled} subLabel={auth.authenticated ? `${followerCount} 人` : undefined} /></div>
+          <div className="nav-card-enter"><NavCard icon={BookOpen} label={t('nav.story')} to="/story" /></div>
+          <div className="nav-card-enter"><NavCard icon={ImageIcon} label={t('nav.album')} to={albumUrl} disabled={albumDisabled} /></div>
+          <div className="nav-card-enter"><NavCard icon={UserCheck} label={t('nav.following')} to="/following" disabled={followsDisabled} subLabel={auth.authenticated ? t('home.followingCount', { count: String(followingCount) }) : undefined} /></div>
+          <div className="nav-card-enter"><NavCard icon={Users} label={t('nav.followers')} to="/follower" disabled={followsDisabled} subLabel={auth.authenticated ? t('home.followerCount', { count: String(followerCount) }) : undefined} /></div>
 
-          <div className="nav-card-enter"><NavCard icon={Github} label="賞個star喵" href={repoUrl} external /></div>
-          <div className="nav-card-enter"><NavCard icon={Download} label="Android" href={androidUrl} external /></div>
+          <div className="nav-card-enter"><NavCard icon={Github} label={t('home.star')} href={repoUrl} external /></div>
+          <div className="nav-card-enter"><NavCard icon={Download} label={t('home.android')} href={androidUrl} external /></div>
         </div>
       </main>
     </div>

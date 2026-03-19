@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
 import { useProfile } from '../context/ProfileContext';
 import type { AssetOrderItem } from '../types/image';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface PostProps {
   auth: ReturnType<typeof useAuth>;
@@ -25,6 +26,7 @@ const toDateTimeInputValue = (value: string) => {
 };
 
 export default function Post({ auth, images }: PostProps) {
+  const { t } = useTranslation();
   const profile = useProfile();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -119,13 +121,13 @@ export default function Post({ auth, images }: PostProps) {
   if (mode === 'edit' && !item && !images.loading) {
     return (
       <div className="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center gap-4 px-6 text-center">
-        <p className="text-sm text-soft">找不到对应的帖子。</p>
+        <p className="text-sm text-soft">{t('post.notFound')}</p>
         <button
           className="rounded-full border border-[var(--panel-border)] px-4 py-2 text-sm text-[var(--text-main)] transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)]"
           onClick={handleClose}
           type="button"
         >
-          返回
+          {t('common.back')}
         </button>
       </div>
     );
@@ -134,7 +136,7 @@ export default function Post({ auth, images }: PostProps) {
   if (mode === 'edit' && !item && images.loading) {
     return (
       <div className="mx-auto flex min-h-screen max-w-xl items-center justify-center px-6 text-sm text-soft">
-        加载中...
+        {t('post.loading')}
       </div>
     );
   }

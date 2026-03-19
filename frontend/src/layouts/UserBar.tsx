@@ -1,5 +1,6 @@
 import type { FeedUser } from '../types/image';
 import { useProfile } from '../context/ProfileContext';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface UserBarProps {
   feedUsers: FeedUser[];
@@ -9,6 +10,7 @@ interface UserBarProps {
 
 export function UserBar({ feedUsers, filterUser, onFilterUser }: UserBarProps) {
   const profile = useProfile();
+  const { t } = useTranslation();
   if (feedUsers.length <= 1) return null;
 
   return (
@@ -23,7 +25,7 @@ export function UserBar({ feedUsers, filterUser, onFilterUser }: UserBarProps) {
         onClick={() => onFilterUser(null)}
         type="button"
       >
-        All
+        {t('common.all')}
       </button>
       {feedUsers.map((user) => {
         const isActive = filterUser === user.login;

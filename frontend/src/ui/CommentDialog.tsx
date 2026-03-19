@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, useCallback } from 'react';
 import { ImagePlus, LoaderCircle, Play, Send, X } from 'lucide-react';
 import { setCommentInputActive } from '../lib/uiFlags';
 import { mediaTypeFromFile } from '../lib/media';
+import { useTranslation } from '../hooks/useTranslation';
 
 // Module-level cache: persists draft files across dialog open/close within a session
 const commentFileCache = new Map<string, File[]>();
@@ -33,6 +34,7 @@ interface CommentDialogProps {
 }
 
 export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComment }: CommentDialogProps) {
+  const { t } = useTranslation();
   const inputId = useId();
   const [text, setText] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -129,13 +131,13 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
     const nextFiles = [...fileRef.current, ...selectedFiles];
 
     if (nextFiles.length > MAX_COMMENT_FILES) {
-      setError(`Up to ${MAX_COMMENT_FILES} files per comment`);
+      setError(t('comment.filesLimit', { count: String(MAX_COMMENT_FILES) }));
       return;
     }
 
     const videoCount = nextFiles.filter((file) => mediaTypeFromFile(file) === 'video').length;
     if (videoCount > MAX_COMMENT_VIDEOS) {
-      setError(`Up to ${MAX_COMMENT_VIDEOS} videos per comment`);
+      setError(t('comment.videosLimit', { count: String(MAX_COMMENT_VIDEOS) }));
       return;
     }
 
@@ -143,25 +145,25 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
     for (const selected of nextFiles) {
       if (mediaTypeFromFile(selected) === 'video') {
         if (selected.size > MAX_COMMENT_VIDEO_SIZE) {
-          setError(`Each video must be <= 200MB: ${selected.name}`);
+          setError(t('comment.videoTooLarge', { name: selected.name }));
           return;
         }
         continue;
       }
       if (selected.size > MAX_COMMENT_FILE_SIZE) {
-        setError(`Each image must be <= 5MB: ${selected.name}`);
+        setError(t('comment.imageTooLarge', { name: selected.name }));
         return;
       }
       imageTotalSize += selected.size;
     }
     if (imageTotalSize > MAX_COMMENT_TOTAL_SIZE) {
-      setError('Total image size must be <= 25MB');
+      setError(t('comment.totalImageTooLarge'));
       return;
     }
 
     replaceFiles(nextFiles);
     setError(null);
-  }, [replaceFiles]);
+  }, [replaceFiles, t]);
 
   const removeFile = useCallback((index: number) => {
     replaceFiles(fileRef.current.filter((_, currentIndex) => currentIndex !== index));
@@ -179,7 +181,7 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
       replaceFiles([]);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : '发送失败');
+      setError(e instanceof Error ? e.message : t('comment.sendFailed'));
     }
   };
 
@@ -271,7 +273,7 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
                     void handleSubmit();
                   }
                 }}
-                placeholder="鍐欒瘎璁?.."
+                placeholder={t('comment.placeholder')}
                 value={text}
               />
               <button
@@ -284,7 +286,7 @@ export function CommentDialog({ open, onClose, busy, draftKey, onSubmit, canComm
               </button>
             </>
           ) : (
-            <p className="flex-1 py-2 text-center text-sm text-soft">登录后才能评论</p>
+            <p className="flex-1 py-2 text-center text-sm text-soft">{t('comment.loginRequired')}</p>
           )}
         </div>
       </div>

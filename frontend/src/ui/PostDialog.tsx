@@ -4,6 +4,7 @@ import { ImageViewer } from './ImageViewer';
 import { useToast } from '../utils/useToast';
 import { setPostDialogOpen } from '../lib/uiFlags';
 import { isVideoUrl, mediaTypeFromFile } from '../lib/media';
+import { useTranslation } from '../hooks/useTranslation';
 import type { AssetOrderItem, MediaType } from '../types/image';
 
 interface PostDialogProps {
@@ -123,6 +124,7 @@ export function PostDialog({
   initialAssetTypes = [],
   onSubmit,
 }: PostDialogProps) {
+  const { t } = useTranslation();
   const resolvedCloseOnSubmit = closeOnSubmit ?? variant !== 'page';
   const isPage = variant === 'page';
   const descriptionId = useId();
@@ -312,7 +314,7 @@ export function PostDialog({
         if (item.mediaType === 'video') {
           if (item.file.size > MAX_VIDEO_SIZE) {
             revokeNew();
-            setError(`单个视频不能超过 200MB: ${item.file.name}`);
+            setError(t('postDialog.videoTooLarge', { name: item.file.name }));
             return;
           }
           continue;
@@ -320,14 +322,14 @@ export function PostDialog({
 
         if (item.file.size > MAX_IMAGE_FILE_SIZE) {
           revokeNew();
-          setError(`单张图片不能超过 5MB: ${item.file.name}`);
+          setError(t('postDialog.imageTooLarge', { name: item.file.name }));
           return;
         }
       }
       setError(null);
       setPreviews((current) => [...current, ...newItems]);
     },
-    [previews]
+    [t]
   );
 
   const movePreview = useCallback((fromIndex: number, toIndex: number) => {
@@ -357,7 +359,7 @@ export function PostDialog({
       return;
     }
     if (normalized.length > MAX_TAG_LENGTH) {
-      setError(`标签不能超过 ${MAX_TAG_LENGTH} 个字符`);
+      setError(t('postDialog.tagTooLong', { count: String(MAX_TAG_LENGTH) }));
       return;
     }
     if (tags.some((tag) => tag.toLowerCase() === normalized.toLowerCase())) {
@@ -365,7 +367,7 @@ export function PostDialog({
       return;
     }
     if (tags.length >= MAX_TAGS) {
-      setError(`最多添加 ${MAX_TAGS} 个标签`);
+      setError(t('postDialog.tooManyTags', { count: String(MAX_TAGS) }));
       return;
     }
     setTags((current) => [...current, normalized]);
@@ -376,7 +378,7 @@ export function PostDialog({
       saveTagHistory(next);
       return next;
     });
-  }, [tags]);
+  }, [tags, t]);
 
   const commitTagInput = useCallback(() => {
     applyTag(tagInput);
@@ -388,19 +390,19 @@ export function PostDialog({
 
   const handleSubmit = async () => {
     if (!startAt) {
-      setError('请选择开始时间');
+      setError(t('postDialog.startRequired'));
       return;
     }
     if (timeMode === 'range' && !endAt) {
-      setError('请选择结束时间');
+      setError(t('postDialog.endRequired'));
       return;
     }
     if (timeMode === 'range' && new Date(endAt).getTime() < new Date(startAt).getTime()) {
-      setError('结束时间不能早于开始时间');
+      setError(t('postDialog.endBeforeStart'));
       return;
     }
     if (!description.trim() && previews.length === 0) {
-      setError('请输入文字或选择图片/视频');
+      setError(t('postDialog.contentRequired'));
       return;
     }
 
@@ -441,7 +443,7 @@ export function PostDialog({
         postDraftFileCache.delete(DRAFT_KEY);
       }
     } catch (submitError) {
-      toast(submitError instanceof Error ? submitError.message : '提交失败', 'error');
+      toast(submitError instanceof Error ? submitError.message : t('postDialog.submitFailed'), 'error');
     }
   };
 
@@ -580,7 +582,7 @@ export function PostDialog({
       <div className={panelClass}>
         <div className="flex shrink-0 items-center justify-between px-4 py-3">
           <button className="text-sm text-soft hover:text-[var(--text-main)] transition" onClick={onClose} type="button">
-            取消
+            {t('common.cancel')}
           </button>
           <button
             className="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
@@ -588,7 +590,7 @@ export function PostDialog({
             onClick={() => void handleSubmit()}
             type="button"
           >
-            {busy ? '提交中...' : mode === 'create' ? '发表' : '修改'}
+            {busy ? t('postDialog.submitting') : mode === 'create' ? t('postDialog.create') : t('postDialog.update')}
           </button>
         </div>
 
@@ -597,7 +599,7 @@ export function PostDialog({
             className="min-h-20 w-full resize-none bg-transparent text-base text-[var(--text-main)] outline-none placeholder:text-soft/50"
             id={descriptionId}
             onChange={(event) => setDescription(event.target.value)}
-            placeholder="写点什么..."
+            placeholder={t('postDialog.descriptionPlaceholder')}
             value={description}
           />
 
@@ -628,7 +630,7 @@ export function PostDialog({
                   removeTag(tags[tags.length - 1]);
                 }
               }}
-              placeholder="添加标签，回车确认"
+              placeholder={t('postDialog.tagPlaceholder')}
               value={tagInput}
             />
             {availableTags.length > 0 ? (
@@ -745,14 +747,14 @@ export function PostDialog({
                 onClick={() => setTimeMode('point')}
                 type="button"
               >
-                时间点
+                {t('postDialog.timePoint')}
               </button>
               <button
                 className={`time-mode-btn rounded border border-transparent px-3 py-1.5 transition ${timeMode === 'range' ? 'time-mode-active bg-cyan-500/20 text-cyan-300 ring-1 ring-cyan-400/40' : 'bg-white/5 text-soft hover:text-[var(--text-main)]'}`}
                 onClick={() => setTimeMode('range')}
                 type="button"
               >
-                持续时间
+                {t('postDialog.timeRange')}
               </button>
             </div>
             <input
@@ -794,7 +796,7 @@ export function PostDialog({
             ref={deleteZoneRef}
           >
             <Trash2 size={18} />
-            <span>拖到此处删除</span>
+            <span>{t('postDialog.dragToDelete')}</span>
           </div>
         ) : null}
       </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface NotificationModalProps {
   open: boolean;
@@ -25,6 +26,7 @@ export function NotificationModal({
   onDismissToday,
   onSave,
 }: NotificationModalProps) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
   const [editContent, setEditContent] = useState(content);
@@ -61,9 +63,9 @@ export function NotificationModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold">{editing ? '编辑通知' : title}</p>
+          <p className="text-sm font-semibold">{editing ? t('notification.editTitle') : title}</p>
           <button
-            aria-label="关闭"
+            aria-label={t('common.close')}
             className="inline-flex h-7 w-7 items-center justify-center text-soft transition hover:text-[var(--text-main)]"
             onClick={onClose}
             type="button"
@@ -75,7 +77,7 @@ export function NotificationModal({
         {editing ? (
           <div className="mt-3 space-y-3">
             <div>
-              <label className="text-[10px] text-soft">标题</label>
+              <label className="text-[10px] text-soft">{t('notification.titleLabel')}</label>
               <input
                 className="mt-1 w-full rounded-lg border border-[var(--panel-border)] bg-transparent px-2.5 py-1.5 text-xs text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)]"
                 value={editTitle}
@@ -84,7 +86,7 @@ export function NotificationModal({
               />
             </div>
             <div>
-              <label className="text-[10px] text-soft">内容</label>
+              <label className="text-[10px] text-soft">{t('notification.contentLabel')}</label>
               <textarea
                 className="mt-1 w-full rounded-lg border border-[var(--panel-border)] bg-transparent px-2.5 py-2 text-xs leading-relaxed text-[var(--text-main)] outline-none transition focus:border-[var(--text-accent)]"
                 rows={5}
@@ -99,31 +101,31 @@ export function NotificationModal({
                 onChange={(e) => setEditEnabled(e.target.checked)}
                 className="accent-[var(--text-accent)]"
               />
-              打开应用时自动弹出
+              {t('notification.autoShow')}
             </label>
             <div className="flex justify-end gap-2">
               <button className={btnCls} onClick={() => setEditing(false)} type="button">
-                取消
+                {t('common.cancel')}
               </button>
               <button className={btnCls} disabled={saving} onClick={handleSave} type="button">
-                {saving ? '保存中...' : '保存'}
+                {saving ? t('settings.saveInProgress') : t('common.save')}
               </button>
             </div>
           </div>
         ) : (
           <>
             <div className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-soft">
-              {content || '暂无通知'}
+              {content || t('notification.noNotification')}
             </div>
 
             <div className="mt-4 flex justify-end gap-2">
               {isAdmin ? (
                 <button className={btnCls} onClick={handleEdit} type="button">
-                  编辑
+                  {t('common.edit')}
                 </button>
               ) : null}
               <button className={btnCls} onClick={onDismissToday} type="button">
-                今日不再显示
+                {t('notification.dismissToday')}
               </button>
             </div>
           </>

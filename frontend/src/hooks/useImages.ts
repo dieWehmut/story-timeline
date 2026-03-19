@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import { mediaTypeFromFile, normalizeAssetTypes } from '../lib/media';
+import { resolveStoredLanguage, translate } from './useTranslation';
 import type {
   CreateImagePayload,
   FeedUser,
@@ -51,6 +52,21 @@ const sortByDate = (itemsList: ImageItem[], order: TimeSortOrder) =>
     const delta = new Date(left.startAt).getTime() - new Date(right.startAt).getTime();
     return order === 'asc' ? delta : -delta;
   });
+
+const formatTimelineMonthLabel = (year: number, month: number) => {
+  const language = resolveStoredLanguage();
+  const date = new Date(Date.UTC(year, month - 1, 1));
+
+  try {
+    return new Intl.DateTimeFormat(language, {
+      timeZone: 'UTC',
+      year: 'numeric',
+      month: 'long',
+    }).format(date);
+  } catch {
+    return `${year}-${String(month).padStart(2, '0')}`;
+  }
+};
 
 const normalizeCachedItem = (item: ImageItem): ImageItem => {
   const imageUrls = item.imageUrls ?? [];
@@ -165,7 +181,7 @@ export const useImages = () => {
         }
       } catch (loadError) {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : '加载失败');
+          setError(loadError instanceof Error ? loadError.message : translate('messages.loadFailed'));
         }
       } finally {
         if (!cancelled) {
@@ -266,7 +282,7 @@ export const useImages = () => {
 
       monthMap.set(month.key, {
         ...month,
-        label: `${month.year}年${month.month}月`,
+        label: formatTimelineMonthLabel(month.year, month.month),
         count: 1,
       });
     });
@@ -334,7 +350,7 @@ export const useImages = () => {
       if (optimisticUser) {
         setItems((currentItems) => currentItems.filter((item) => item.id !== tempId));
       }
-      setError(submitError instanceof Error ? submitError.message : '上传失败');
+      setError(submitError instanceof Error ? submitError.message : translate('messages.uploadFailed'));
       if (optimisticUrls?.length) {
         const urls = optimisticUrls;
         window.setTimeout(() => urls.forEach((url) => URL.revokeObjectURL(url)), 0);
@@ -390,7 +406,7 @@ export const useImages = () => {
           return next;
         });
       }
-      setError(submitError instanceof Error ? submitError.message : '更新失败');
+      setError(submitError instanceof Error ? submitError.message : translate('messages.updateFailed'));
       throw submitError;
     } finally {
       setSubmitting(false);
@@ -419,7 +435,7 @@ export const useImages = () => {
           return next;
         });
       }
-      setError(submitError instanceof Error ? submitError.message : '删除失败');
+      setError(submitError instanceof Error ? submitError.message : translate('messages.deleteFailed'));
       throw submitError;
     } finally {
       setSubmitting(false);

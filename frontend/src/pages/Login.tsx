@@ -125,7 +125,7 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
       toast(t('messages.loginLinkSent'), 'success');
       setEmailSent(true);
     } catch (err) {
-      const message = err instanceof Error ? err.message : '发送失败';
+      const message = err instanceof Error ? err.message : t('messages.sendFailed');
       if (message.includes('user_not_registered')) {
         toast(t('messages.notRegistered'), 'error');
       } else if (message.includes('user_pending')) {

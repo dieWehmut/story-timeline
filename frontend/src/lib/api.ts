@@ -9,6 +9,7 @@ import type {
   LikeToggleResult,
   UpdateImagePayload,
 } from '../types/image';
+import { translate } from '../hooks/useTranslation';
 import { mediaTypeFromFile, normalizeAssetTypes } from './media';
 
 const normalizeApiBase = (value: string) => value.trim().replace(/\/$/, '');
@@ -39,6 +40,27 @@ const normalizeSession = (session: AuthSession): AuthSession => ({
   loginUrl: withApiBase(session.loginUrl),
   googleLoginUrl: session.googleLoginUrl ? withApiBase(session.googleLoginUrl) : undefined,
   emailLoginUrl: session.emailLoginUrl ? withApiBase(session.emailLoginUrl) : undefined,
+});
+
+type RawIdentity = Identity & {
+  user_login?: string;
+  provider_id?: string;
+  display_name?: string;
+  created_at?: string;
+  userLogin?: string;
+  providerId?: string;
+  displayName?: string;
+  createdAt?: string;
+};
+
+const normalizeIdentity = (identity: RawIdentity): Identity => ({
+  id: identity.id,
+  userLogin: identity.userLogin ?? identity.user_login ?? '',
+  provider: identity.provider,
+  providerId: identity.providerId ?? identity.provider_id ?? '',
+  email: identity.email ?? '',
+  displayName: identity.displayName ?? identity.display_name ?? '',
+  createdAt: identity.createdAt ?? identity.created_at ?? '',
 });
 
 const normalizeImageItem = (item: ImageItem): ImageItem => {
@@ -91,7 +113,7 @@ const extractErrorMessage = async (response: Response) => {
 
   const text = await response.text();
   if (text.includes('<!DOCTYPE html') || text.includes('<html')) {
-    return '后端返回了 HTML 页面，请检查 VITE_API_BASE 或 Vercel API 代理是否正常运行';
+    return translate('messages.loadFailed');
   }
 
   return text || 'Request failed';
@@ -586,7 +608,10 @@ export const api = {
     }),
   // Account binding APIs
   getIdentities: () =>
-    request<{ ok: boolean; identities: Identity[] }>(`${API_BASE}/api/auth/identities`),
+    request<{ ok: boolean; identities: RawIdentity[] }>(`${API_BASE}/api/auth/identities`).then((res) => ({
+      ...res,
+      identities: (res.identities ?? []).map(normalizeIdentity),
+    })),
   startBindGitHub: () =>
     request<{ ok: boolean; url: string }>(`${API_BASE}/api/auth/bind/github`, {
       method: 'POST',

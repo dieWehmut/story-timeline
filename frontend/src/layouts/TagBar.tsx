@@ -1,3 +1,5 @@
+import { useTranslation } from '../hooks/useTranslation';
+
 interface TagBarProps {
   tags: { tag: string; count: number }[];
   selectedTag: string | null;
@@ -6,6 +8,7 @@ interface TagBarProps {
 }
 
 export function TagBar({ tags, selectedTag, onSelect, className }: TagBarProps) {
+  const { t } = useTranslation();
   if (tags.length === 0) return null;
   const wrapperClass = `w-full max-w-6xl ${className ?? ''}`.trim();
 
@@ -19,7 +22,7 @@ export function TagBar({ tags, selectedTag, onSelect, className }: TagBarProps) 
           onClick={() => onSelect(null)}
           type="button"
         >
-          All
+          {t('common.all')}
         </button>
         {tags.map((entry) => {
           const isActive = selectedTag?.toLowerCase() === entry.tag.toLowerCase();

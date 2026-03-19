@@ -1,3 +1,5 @@
+import { useTranslation } from '../hooks/useTranslation';
+
 interface ConfirmModalProps {
   open: boolean;
   title: string;
@@ -12,11 +14,12 @@ export function ConfirmModal({
   open,
   title,
   message,
-  confirmText = '确认',
-  cancelText = '取消',
+  confirmText,
+  cancelText,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  const { t } = useTranslation();
   if (!open) return null;
 
   return (
@@ -30,14 +33,14 @@ export function ConfirmModal({
             onClick={onConfirm}
             type="button"
           >
-            {confirmText}
+            {confirmText ?? t('common.confirm')}
           </button>
           <button
             className="flex-1 rounded-full border border-[var(--panel-border)] px-3 py-2 text-xs text-soft transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)]"
             onClick={onCancel}
             type="button"
           >
-            {cancelText}
+            {cancelText ?? t('common.cancel')}
           </button>
         </div>
       </div>

@@ -257,13 +257,18 @@ func (s *RegistrationService) Register(ctx context.Context, req RegisterRequest)
 
 		// Allow re-application if previously rejected
 		if status == "rejected" && login != "" {
+			history, historyErr := s.storage.GetRejectionHistory(ctx, login)
+			if historyErr != nil {
+				return fmt.Errorf("failed to load rejection history: %w", historyErr)
+			}
+
 			// Update purpose and reset status to pending
 			if err := s.storage.UpdatePendingUser(ctx, login, req.Purpose, req.InviteCode); err != nil {
 				return fmt.Errorf("failed to update user: %w", err)
 			}
 			// Re-use username from existing record
 			req.Username = login
-			go s.notifyAdmin(context.Background(), req)
+			go s.notifyAdmin(context.Background(), req, len(history)+1)
 			return nil
 		}
 
@@ -280,7 +285,7 @@ func (s *RegistrationService) Register(ctx context.Context, req RegisterRequest)
 	}
 
 	// Notify admin asynchronously (best effort)
-	go s.notifyAdmin(context.Background(), req)
+	go s.notifyAdmin(context.Background(), req, 1)
 
 	return nil
 }
@@ -366,7 +371,7 @@ func (s *RegistrationService) GetUserByEmail(ctx context.Context, email string) 
 	return s.storage.GetUserByEmail(ctx, email)
 }
 
-func (s *RegistrationService) notifyAdmin(ctx context.Context, req RegisterRequest) {
+func (s *RegistrationService) notifyAdmin(ctx context.Context, req RegisterRequest, attemptCount int) {
 	if s.resend == nil || s.from == "" {
 		return
 	}
@@ -388,6 +393,7 @@ func (s *RegistrationService) notifyAdmin(ctx context.Context, req RegisterReque
 		Email          string
 		RegisterMethod string
 		Purpose        string
+		AttemptCount   int
 		BaseURL        string
 		UserID         string
 		Token          string
@@ -396,6 +402,7 @@ func (s *RegistrationService) notifyAdmin(ctx context.Context, req RegisterReque
 		Email:          req.Email,
 		RegisterMethod: req.RegisterMethod,
 		Purpose:        req.Purpose,
+		AttemptCount:   attemptCount,
 		BaseURL:        s.frontendURL,
 		UserID:         req.Username, // Using username as user identifier
 		Token:          approveToken,
@@ -411,7 +418,7 @@ func (s *RegistrationService) notifyAdmin(ctx context.Context, req RegisterReque
 	_, _ = s.resend.Emails.Send(&resend.SendEmailRequest{
 		From:    from,
 		To:      []string{adminEmail},
-		Subject: fmt.Sprintf("新用户注册审核 - %s", req.Username),
+		Subject: fmt.Sprintf("新用户注册审核 - %s（第 %d 次申请）", req.Username, attemptCount),
 		Html:    buf.String(),
 	})
 }

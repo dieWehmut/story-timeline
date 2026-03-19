@@ -1,4 +1,6 @@
-﻿interface FollowButtonProps {
+﻿import { useTranslation } from '../hooks/useTranslation';
+
+interface FollowButtonProps {
   following: boolean;
   disabled?: boolean;
   onClick: () => void;
@@ -6,6 +8,7 @@
 }
 
 export function FollowButton({ following, disabled, onClick, className }: FollowButtonProps) {
+  const { t } = useTranslation();
   const base =
     'follow-btn inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs transition';
   const stateClass = following
@@ -19,7 +22,7 @@ export function FollowButton({ following, disabled, onClick, className }: Follow
       onClick={onClick}
       type="button"
     >
-      {following ? '取关' : '关注'}
+      {following ? t('social.unfollowAction') : t('social.followAction')}
     </button>
   );
 }

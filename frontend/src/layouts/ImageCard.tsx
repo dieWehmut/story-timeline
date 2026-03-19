@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Heart, LoaderCircle, MessageCircle, PencilLine, Play, Trash2 } from 'lucide-react';
 
@@ -20,6 +20,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import type { CommentItem, ImageItem } from '../types/image';
 import { useProfile } from '../context/ProfileContext';
+import { useTranslation } from '../hooks/useTranslation';
 
 
 
@@ -57,37 +58,9 @@ interface ImageCardProps {
 
 
 
-const dateOnlyFormatter = new Intl.DateTimeFormat('zh-CN', {
+const toDateKey = (formatter: Intl.DateTimeFormat, value: Date) => {
 
-  timeZone: 'Asia/Shanghai',
-
-  year: 'numeric',
-
-  month: '2-digit',
-
-  day: '2-digit',
-
-});
-
-
-
-const timeOnlyFormatter = new Intl.DateTimeFormat('zh-CN', {
-
-  timeZone: 'Asia/Shanghai',
-
-  hour: '2-digit',
-
-  minute: '2-digit',
-
-  hour12: false,
-
-});
-
-
-
-const toDateKey = (value: Date) => {
-
-  const parts = dateOnlyFormatter.formatToParts(value);
+  const parts = formatter.formatToParts(value);
 
   const year = parts.find((part) => part.type === 'year')?.value ?? '';
 
@@ -105,7 +78,7 @@ const normalizeLogin = (value: string) => value.trim().toLowerCase();
 
 
 
-const getReplyTargetLabel = (comment: CommentItem) => {
+const getReplyTargetLabel = (comment: CommentItem, selfLabel: string) => {
 
   if (!comment.replyToUserLogin) return null;
 
@@ -113,7 +86,7 @@ const getReplyTargetLabel = (comment: CommentItem) => {
 
   if (normalizeLogin(target) === normalizeLogin(comment.authorLogin)) {
 
-    return '自己';
+    return selfLabel;
 
   }
 
@@ -123,17 +96,22 @@ const getReplyTargetLabel = (comment: CommentItem) => {
 
 
 
-const toDisplayDateTime = (value: string) => {
+const toDisplayDateTime = (
+  value: string,
+  dateOnlyFormatter: Intl.DateTimeFormat,
+  timeOnlyFormatter: Intl.DateTimeFormat,
+  labels: { today: string; yesterday: string; dayBeforeYesterday: string }
+) => {
 
   const date = new Date(value);
 
-  const dateKey = toDateKey(date);
+  const dateKey = toDateKey(dateOnlyFormatter, date);
 
-  const todayKey = toDateKey(new Date());
+  const todayKey = toDateKey(dateOnlyFormatter, new Date());
 
-  const yesterdayKey = toDateKey(new Date(Date.now() - 86400000));
+  const yesterdayKey = toDateKey(dateOnlyFormatter, new Date(Date.now() - 86400000));
 
-  const beforeYesterdayKey = toDateKey(new Date(Date.now() - 2 * 86400000));
+  const beforeYesterdayKey = toDateKey(dateOnlyFormatter, new Date(Date.now() - 2 * 86400000));
 
   const timeText = timeOnlyFormatter.format(date);
 
@@ -143,15 +121,15 @@ const toDisplayDateTime = (value: string) => {
 
   if (dateKey === todayKey) {
 
-    label = '今天';
+    label = labels.today;
 
   } else if (dateKey === yesterdayKey) {
 
-    label = '昨天';
+    label = labels.yesterday;
 
   } else if (dateKey === beforeYesterdayKey) {
 
-    label = '前天';
+    label = labels.dayBeforeYesterday;
 
   }
 
@@ -163,9 +141,14 @@ const toDisplayDateTime = (value: string) => {
 
 
 
-const toDisplayTime = (item: ImageItem) => {
+const toDisplayTime = (
+  item: ImageItem,
+  dateOnlyFormatter: Intl.DateTimeFormat,
+  timeOnlyFormatter: Intl.DateTimeFormat,
+  labels: { today: string; yesterday: string; dayBeforeYesterday: string }
+) => {
 
-  const startText = toDisplayDateTime(item.startAt);
+  const startText = toDisplayDateTime(item.startAt, dateOnlyFormatter, timeOnlyFormatter, labels);
 
   if (item.timeMode !== 'range' || !item.endAt) {
 
@@ -175,7 +158,7 @@ const toDisplayTime = (item: ImageItem) => {
 
 
 
-  return `${startText} - ${toDisplayDateTime(item.endAt)}`;
+  return `${startText} - ${toDisplayDateTime(item.endAt, dateOnlyFormatter, timeOnlyFormatter, labels)}`;
 
 };
 
@@ -203,6 +186,8 @@ function ImageGrid({
 
   alt,
 
+  collapseLabel,
+
   onImageClick,
 
 }: {
@@ -210,6 +195,8 @@ function ImageGrid({
   items: { url: string; type: 'image' | 'video' }[];
 
   alt: string;
+
+  collapseLabel: string;
 
   onImageClick: (index: number) => void;
 
@@ -339,7 +326,7 @@ function ImageGrid({
         onClick={(e) => { e.stopPropagation(); setExpanded(false); }}
         type="button"
       >
-        收起
+        {collapseLabel}
       </button>
     ) : null}
 
@@ -382,6 +369,7 @@ export const ImageCard = memo(function ImageCard({
   onFollowToggle,
 
 }: ImageCardProps) {
+  const { t, language } = useTranslation();
 
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
@@ -409,6 +397,28 @@ export const ImageCard = memo(function ImageCard({
   const navigate = useNavigate();
 
   const location = useLocation();
+
+  const dateOnlyFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(language, {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }),
+    [language]
+  );
+
+  const timeOnlyFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(language, {
+        timeZone: 'Asia/Shanghai',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }),
+    [language]
+  );
 
 
 
@@ -507,7 +517,7 @@ export const ImageCard = memo(function ImageCard({
 
   const handleDelete = () => {
 
-    confirm('确定要删除这张卡片吗？', () => {
+    confirm(t('comment.deleteCardConfirm'), () => {
 
       void onDelete(item.id);
 
@@ -804,7 +814,7 @@ export const ImageCard = memo(function ImageCard({
 
                 <button
 
-                  aria-label="编辑卡片"
+                  aria-label={t('tooltips.editCard')}
 
                   className={`${actionButtonBaseClass} text-soft hover:text-[var(--text-main)]`}
 
@@ -826,7 +836,7 @@ export const ImageCard = memo(function ImageCard({
 
                 <button
 
-                  aria-label="删除卡片"
+                  aria-label={t('tooltips.deleteCard')}
 
                   className={`${actionButtonBaseClass} text-rose-300 hover:text-rose-200`}
 
@@ -876,7 +886,12 @@ export const ImageCard = memo(function ImageCard({
 
           <div className="mt-2 cursor-pointer px-2" onClick={() => onOpenDetail?.()}>
 
-            <ImageGrid alt={item.description} onImageClick={setViewerIndex} items={mediaItems} />
+            <ImageGrid
+              alt={item.description}
+              collapseLabel={t('time.collapse')}
+              items={mediaItems}
+              onImageClick={setViewerIndex}
+            />
 
           </div>
 
@@ -950,7 +965,13 @@ export const ImageCard = memo(function ImageCard({
 
             {/* Time */}
 
-            <p className={`${tags.length > 0 ? 'mt-2' : 'pt-2'} text-xs text-soft`}>{toDisplayTime(item)}</p>
+            <p className={`${tags.length > 0 ? 'mt-2' : 'pt-2'} text-xs text-soft`}>
+              {toDisplayTime(item, dateOnlyFormatter, timeOnlyFormatter, {
+                today: t('time.today'),
+                yesterday: t('time.yesterday'),
+                dayBeforeYesterday: t('time.dayBeforeYesterday'),
+              })}
+            </p>
 
 
 
@@ -962,7 +983,7 @@ export const ImageCard = memo(function ImageCard({
 
                 {comments.map((c) => {
 
-                  const replyTarget = getReplyTargetLabel(c);
+                  const replyTarget = getReplyTargetLabel(c, t('time.self'));
                   const commentAuthor = profile.resolveName(c.authorLogin);
                   const replyTargetDisplay = replyTarget ? profile.resolveName(replyTarget) : null;
 
@@ -973,7 +994,7 @@ export const ImageCard = memo(function ImageCard({
                       <span className="font-medium text-[var(--text-main)]">{commentAuthor || c.authorLogin}</span>
 
                       {replyTarget ? (
-                        <span className="text-[var(--text-main)]"> replied to {replyTargetDisplay || replyTarget}: </span>
+                        <span className="text-[var(--text-main)]"> {t('comment.replyVerb')} {replyTargetDisplay || replyTarget}: </span>
                       ) : (
                         <span className="text-[var(--text-main)]">: </span>
                       )}
@@ -1042,7 +1063,7 @@ export const ImageCard = memo(function ImageCard({
 
                                 <img
 
-                                  alt="comment media"
+                                  alt=""
 
                                   className="absolute inset-0 h-full w-full object-cover"
 

@@ -169,9 +169,11 @@ create table if not exists public.user_identities (
   provider text not null,
   provider_id text not null,
   email text not null default '',
+  display_name text not null default '',
   created_at timestamptz not null default now(),
   unique(provider, provider_id)
 );
+alter table public.user_identities add column if not exists display_name text not null default '';
 create index if not exists user_identities_login_idx on public.user_identities (user_login);
 create index if not exists user_identities_provider_idx on public.user_identities (provider, provider_id);
 create index if not exists user_identities_email_idx on public.user_identities (email) where email <> '';

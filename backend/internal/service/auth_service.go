@@ -183,11 +183,12 @@ func (service *AuthService) CompleteLogin(ctx context.Context, provider string, 
 		}
 
 		user := model.AuthUser{
-			Provider:  "google",
-			ID:        googleUser.Id,
-			Login:     strings.Split(googleUser.Email, "@")[0],
-			AvatarURL: googleUser.Picture,
-			Email:     googleUser.Email,
+			Provider:    "google",
+			ID:          googleUser.Id,
+			Login:       strings.Split(googleUser.Email, "@")[0],
+			AvatarURL:   googleUser.Picture,
+			DisplayName: googleUser.Name,
+			Email:       googleUser.Email,
 		}
 
 		return model.Session{

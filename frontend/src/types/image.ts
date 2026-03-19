@@ -72,6 +72,7 @@ export interface AuthUser {
   login: string;
   avatarUrl: string;
   displayName?: string;
+  email?: string;
   provider?: string;
 }
 

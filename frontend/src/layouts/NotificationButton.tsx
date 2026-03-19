@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { NotificationModal } from '../ui/NotificationModal';
 import { api } from '../lib/api';
+import { useTranslation } from '../hooks/useTranslation';
 
 const iconBtnCls =
   'inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition-all duration-300 hover:scale-110 hover:text-[var(--text-accent)] active:scale-95';
@@ -35,6 +36,7 @@ interface NotificationButtonProps {
 }
 
 export function NotificationButton({ isAdmin = false }: NotificationButtonProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<{ enabled: boolean; title: string; content: string } | null>(null);
   const fetched = useRef(false);
@@ -67,7 +69,7 @@ export function NotificationButton({ isAdmin = false }: NotificationButtonProps)
   return (
     <>
       <button
-        aria-label="通知"
+        aria-label={t('tooltips.notifications')}
         className={`${iconBtnCls} relative`}
         onClick={() => setOpen(true)}
         type="button"
@@ -79,7 +81,7 @@ export function NotificationButton({ isAdmin = false }: NotificationButtonProps)
       </button>
       <NotificationModal
         open={open}
-        title={data?.title ?? '公告'}
+        title={data?.title ?? t('notification.defaultTitle')}
         content={data?.content ?? ''}
         enabled={data?.enabled ?? false}
         isAdmin={isAdmin}

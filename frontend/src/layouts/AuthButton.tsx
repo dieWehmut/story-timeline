@@ -2,6 +2,7 @@ import { type MouseEvent } from 'react';
 import { LogOut, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { AuthUser } from '../types/image';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface AuthButtonProps {
   authenticated: boolean;
@@ -20,6 +21,7 @@ export function AuthButton({
   user,
 }: AuthButtonProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -33,7 +35,7 @@ export function AuthButton({
   return (
     <button
       aria-busy={loading}
-      aria-label={authenticated ? `Log out ${user?.login ?? 'current account'}` : '登录'}
+      aria-label={authenticated ? `${t('nav.logout')} ${user?.login ?? ''}`.trim() : t('nav.login')}
       className={`${iconBtnCls} ${loading ? 'opacity-70' : ''}`}
       onClick={handleClick}
       type="button"

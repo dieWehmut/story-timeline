@@ -9,6 +9,7 @@ import { UploadButton } from '../layouts/UploadButton';
 import { useAuth } from '../hooks/useAuth';
 import { useImages } from '../hooks/useImages';
 import { useFollows } from '../hooks/useFollows';
+import { useTranslation } from '../hooks/useTranslation';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { TimelineMonth } from '../types/image';
 
@@ -50,6 +51,7 @@ export default function Story({
   theme,
   timelineOpen,
 }: StoryProps) {
+  const { t } = useTranslation();
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const quickActionsRef = useRef<HTMLDivElement | null>(null);
   const [quickActionsVisible, setQuickActionsVisible] = useState(true);
@@ -249,28 +251,28 @@ export default function Story({
           >
               <UploadButton
                 busy={images.submitting}
-              className="quick-actions-button border-r border-[var(--panel-border)]"
+                className="quick-actions-button border-r border-[var(--panel-border)]"
                 disabled={recordDisabled}
-              label="記錄"
-              showIcon={!isUserScoped}
-              subLabel={isUserScoped ? `\u603b ${recordCount} \u5e16` : undefined}
-              variant="card"
+                label={t('story.record')}
+                showIcon={!isUserScoped}
+                subLabel={isUserScoped ? t('story.totalPosts', { count: String(recordCount) }) : undefined}
+                variant="card"
               />
               <button
-              className={`quick-actions-button group flex w-full flex-col items-center justify-center gap-1 px-4 py-3 text-sm text-[var(--text-main)] transition ${
-                isUserScoped ? '' : 'hover:text-[var(--text-accent)]'
-              }`}
+                className={`quick-actions-button group flex w-full flex-col items-center justify-center gap-1 px-4 py-3 text-sm text-[var(--text-main)] transition ${
+                  isUserScoped ? '' : 'hover:text-[var(--text-accent)]'
+                }`}
                 onClick={() => navigate(albumHref)}
                 type="button"
               >
-              {!isUserScoped ? (
-                <ImageIcon className="quick-actions-icon text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={20} />
-              ) : null}
-              <span className="leading-none">{'相册'}</span>
-            {isUserScoped ? (
-                <span className="quick-actions-sub text-xs text-soft">{`${albumCount} \u9879`}</span>
-            ) : null}
-            </button>
+                {!isUserScoped ? (
+                  <ImageIcon className="quick-actions-icon text-cyan-300 transition group-hover:text-[var(--text-accent)]" size={20} />
+                ) : null}
+                <span className="leading-none">{t('story.album')}</span>
+                {isUserScoped ? (
+                  <span className="quick-actions-sub text-xs text-soft">{t('story.totalItems', { count: String(albumCount) })}</span>
+                ) : null}
+              </button>
           </div>
         ) : null}
         {images.error ? (
@@ -310,7 +312,7 @@ export default function Story({
                       onFollowToggle={handleFollowToggle}
                       onOpenDetail={() => navigate(`/story/${item.id}${location.search}`)}
                       onTagClick={(tag) => handleTagSelect(activeTag === tag ? null : tag)}
-                      roleLabel={item.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
+                      roleLabel={item.authorLogin === images.stats.githubOwner ? t('roles.admin') : undefined}
                       tagCounts={images.tagCountMap}
                     />
                   ))}
@@ -334,7 +336,7 @@ export default function Story({
           onLikeChange={images.updateLike}
           onFollowToggle={handleFollowToggle}
           onTagClick={(tag) => handleTagSelect(activeTag === tag ? null : tag)}
-          roleLabel={selectedItem.authorLogin === images.stats.githubOwner ? '管理员' : undefined}
+          roleLabel={selectedItem.authorLogin === images.stats.githubOwner ? t('roles.admin') : undefined}
           tagCounts={images.tagCountMap}
         />
       ) : null}

@@ -20,6 +20,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import type { CommentItem, ImageItem } from '../types/image';
 import { useProfile } from '../context/ProfileContext';
+import { useTranslation } from '../hooks/useTranslation';
 
 
 
@@ -63,37 +64,9 @@ const revokePreviewUrls = (items: PreviewItem[]) => {
 
 
 
-const dateOnlyFormatter = new Intl.DateTimeFormat('zh-CN', {
+const toDateKey = (formatter: Intl.DateTimeFormat, value: Date) => {
 
-  timeZone: 'Asia/Shanghai',
-
-  year: 'numeric',
-
-  month: '2-digit',
-
-  day: '2-digit',
-
-});
-
-
-
-const timeOnlyFormatter = new Intl.DateTimeFormat('zh-CN', {
-
-  timeZone: 'Asia/Shanghai',
-
-  hour: '2-digit',
-
-  minute: '2-digit',
-
-  hour12: false,
-
-});
-
-
-
-const toDateKey = (value: Date) => {
-
-  const parts = dateOnlyFormatter.formatToParts(value);
+  const parts = formatter.formatToParts(value);
 
   const year = parts.find((p) => p.type === 'year')?.value ?? '';
 
@@ -111,7 +84,7 @@ const normalizeLogin = (value: string) => value.trim().toLowerCase();
 
 
 
-const getReplyTargetLabel = (comment: CommentItem) => {
+const getReplyTargetLabel = (comment: CommentItem, selfLabel: string) => {
 
   if (!comment.replyToUserLogin) return null;
 
@@ -119,7 +92,7 @@ const getReplyTargetLabel = (comment: CommentItem) => {
 
   if (normalizeLogin(target) === normalizeLogin(comment.authorLogin)) {
 
-    return '自己';
+    return selfLabel;
 
   }
 
@@ -129,17 +102,22 @@ const getReplyTargetLabel = (comment: CommentItem) => {
 
 
 
-const toBeijingText = (value: string) => {
+const toBeijingText = (
+  value: string,
+  dateOnlyFormatter: Intl.DateTimeFormat,
+  timeOnlyFormatter: Intl.DateTimeFormat,
+  labels: { today: string; yesterday: string; dayBeforeYesterday: string }
+) => {
 
   const date = new Date(value);
 
-  const dateKey = toDateKey(date);
+  const dateKey = toDateKey(dateOnlyFormatter, date);
 
-  const todayKey = toDateKey(new Date());
+  const todayKey = toDateKey(dateOnlyFormatter, new Date());
 
-  const yesterdayKey = toDateKey(new Date(Date.now() - 86400000));
+  const yesterdayKey = toDateKey(dateOnlyFormatter, new Date(Date.now() - 86400000));
 
-  const beforeYesterdayKey = toDateKey(new Date(Date.now() - 2 * 86400000));
+  const beforeYesterdayKey = toDateKey(dateOnlyFormatter, new Date(Date.now() - 2 * 86400000));
 
   const timeText = timeOnlyFormatter.format(date);
 
@@ -149,15 +127,15 @@ const toBeijingText = (value: string) => {
 
   if (dateKey === todayKey) {
 
-    label = '今天';
+    label = labels.today;
 
   } else if (dateKey === yesterdayKey) {
 
-    label = '昨天';
+    label = labels.yesterday;
 
   } else if (dateKey === beforeYesterdayKey) {
 
-    label = '前天';
+    label = labels.dayBeforeYesterday;
 
   }
 
@@ -169,37 +147,24 @@ const toBeijingText = (value: string) => {
 
 
 
-const toCommentTime = (value: string) => {
-
-  const formatter = new Intl.DateTimeFormat('zh-CN', {
-
-    timeZone: 'Asia/Shanghai',
-
-    month: 'numeric',
-
-    day: 'numeric',
-
-    hour: '2-digit',
-
-    minute: '2-digit',
-
-    hour12: false,
-
-  });
-
+const toCommentTime = (value: string, formatter: Intl.DateTimeFormat) => {
   return formatter.format(new Date(value));
-
 };
 
 
 
-const toDisplayTime = (item: ImageItem) => {
+const toDisplayTime = (
+  item: ImageItem,
+  dateOnlyFormatter: Intl.DateTimeFormat,
+  timeOnlyFormatter: Intl.DateTimeFormat,
+  labels: { today: string; yesterday: string; dayBeforeYesterday: string }
+) => {
 
-  const startText = toBeijingText(item.startAt);
+  const startText = toBeijingText(item.startAt, dateOnlyFormatter, timeOnlyFormatter, labels);
 
   if (item.timeMode !== 'range' || !item.endAt) return startText;
 
-  return `${startText} - ${toBeijingText(item.endAt)}`;
+  return `${startText} - ${toBeijingText(item.endAt, dateOnlyFormatter, timeOnlyFormatter, labels)}`;
 
 };
 
@@ -214,6 +179,8 @@ function DetailImageGrid({
 
   alt,
 
+  collapseLabel,
+
   onImageClick,
 
 }: {
@@ -221,6 +188,8 @@ function DetailImageGrid({
   items: { url: string; type: 'image' | 'video' }[];
 
   alt: string;
+
+  collapseLabel: string;
 
   onImageClick: (index: number) => void;
 
@@ -350,7 +319,7 @@ function DetailImageGrid({
         onClick={() => setExpanded(false)}
         type="button"
       >
-        收起
+        {collapseLabel}
       </button>
     ) : null}
 
@@ -423,6 +392,7 @@ export function CardDetail({
   onFollowToggle,
 
 }: CardDetailProps) {
+  const { t, language } = useTranslation();
 
   const [comments, setComments] = useState<CommentViewItem[]>([]);
 
@@ -470,6 +440,41 @@ export function CardDetail({
   const fileRef = useRef<File[]>([]);
 
   const previewRef = useRef<PreviewItem[]>([]);
+
+  const dateOnlyFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(language, {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }),
+    [language]
+  );
+
+  const timeOnlyFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(language, {
+        timeZone: 'Asia/Shanghai',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }),
+    [language]
+  );
+
+  const commentTimeFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(language, {
+        timeZone: 'Asia/Shanghai',
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }),
+    [language]
+  );
 
 
 
@@ -702,7 +707,7 @@ export function CardDetail({
 
   const handleDeleteItem = () => {
 
-    confirm('确定要删除这张卡片吗？', () => {
+    confirm(t('comment.deleteCardConfirm'), () => {
 
       void onDelete?.(item.id);
 
@@ -724,7 +729,7 @@ export function CardDetail({
 
     if (nextFiles.length > MAX_COMMENT_FILES) {
 
-      setError(`Up to ${MAX_COMMENT_FILES} files per comment`);
+      setError(t('comment.filesLimit', { count: String(MAX_COMMENT_FILES) }));
 
       return;
 
@@ -736,7 +741,7 @@ export function CardDetail({
 
     if (videoCount > MAX_COMMENT_VIDEOS) {
 
-      setError(`Up to ${MAX_COMMENT_VIDEOS} videos per comment`);
+      setError(t('comment.videosLimit', { count: String(MAX_COMMENT_VIDEOS) }));
 
       return;
 
@@ -752,7 +757,7 @@ export function CardDetail({
 
         if (selected.size > MAX_COMMENT_VIDEO_SIZE) {
 
-          setError(`Each video must be <= 200MB: ${selected.name}`);
+          setError(t('comment.videoTooLarge', { name: selected.name }));
 
           return;
 
@@ -764,7 +769,7 @@ export function CardDetail({
 
       if (selected.size > MAX_COMMENT_FILE_SIZE) {
 
-        setError(`Each image must be <= 5MB: ${selected.name}`);
+        setError(t('comment.imageTooLarge', { name: selected.name }));
 
         return;
 
@@ -776,7 +781,7 @@ export function CardDetail({
 
     if (imageTotalSize > MAX_COMMENT_TOTAL_SIZE) {
 
-      setError('Total image size must be <= 25MB');
+      setError(t('comment.totalImageTooLarge'));
 
       return;
 
@@ -788,7 +793,7 @@ export function CardDetail({
 
     setError(null);
 
-  }, [replaceCommentFiles]);
+  }, [replaceCommentFiles, t]);
 
 
 
@@ -911,7 +916,7 @@ export function CardDetail({
 
       onCommentCountChange?.(item.id, -1);
 
-      setError(e instanceof Error ? e.message : '评论失败');
+      setError(e instanceof Error ? e.message : t('comment.sendFailed'));
 
     } finally {
 
@@ -1167,7 +1172,7 @@ export function CardDetail({
 
                   <button
 
-                    aria-label="修改卡片"
+                    aria-label={t('tooltips.editCard')}
 
                     className={`${actionButtonBaseClass} text-soft hover:text-[var(--text-main)]`}
 
@@ -1187,7 +1192,7 @@ export function CardDetail({
 
                   <button
 
-                    aria-label="删除卡片"
+                    aria-label={t('tooltips.deleteCard')}
 
                     className={`${actionButtonBaseClass} text-rose-300 hover:text-rose-200`}
 
@@ -1251,7 +1256,12 @@ export function CardDetail({
 
               <div className="mt-2 px-2">
 
-                <DetailImageGrid alt={item.description} onImageClick={setViewerIndex} items={mediaItems} />
+                <DetailImageGrid
+                  alt={item.description}
+                  collapseLabel={t('time.collapse')}
+                  items={mediaItems}
+                  onImageClick={setViewerIndex}
+                />
 
               </div>
 
@@ -1301,7 +1311,13 @@ export function CardDetail({
 
               <div className="min-w-0 flex-1 px-2 pt-3">
 
-                <p className="text-xs text-soft">{toDisplayTime(item)}</p>
+                <p className="text-xs text-soft">
+                  {toDisplayTime(item, dateOnlyFormatter, timeOnlyFormatter, {
+                    today: t('time.today'),
+                    yesterday: t('time.yesterday'),
+                    dayBeforeYesterday: t('time.dayBeforeYesterday'),
+                  })}
+                </p>
 
               </div>
 
@@ -1361,7 +1377,7 @@ export function CardDetail({
 
               ) : comments.length === 0 ? (
 
-                <p className="py-8 text-center text-sm text-soft">暂无评论</p>
+                <p className="py-8 text-center text-sm text-soft">{t('comment.noComments')}</p>
 
               ) : (
 
@@ -1406,7 +1422,7 @@ export function CardDetail({
 
                               <span className="text-sm font-medium text-[var(--text-main)]">{commentAuthor || c.authorLogin}</span>
 
-                              <span className="text-xs text-soft">{toCommentTime(c.createdAt)}</span>
+                              <span className="text-xs text-soft">{toCommentTime(c.createdAt, commentTimeFormatter)}</span>
 
                               {c.pending ? <LoaderCircle className="animate-spin text-soft" size={12} /> : null}
 
@@ -1464,7 +1480,7 @@ export function CardDetail({
 
                                       <img
 
-                                        alt="comment media"
+                                        alt=""
 
                                         className="absolute inset-0 h-full w-full object-cover"
 
@@ -1522,7 +1538,7 @@ export function CardDetail({
 
                                 <button
 
-                                  aria-label="删除评论"
+                                  aria-label={t('tooltips.deleteComment')}
 
                                   className="ml-auto inline-flex h-7 w-7 items-center justify-center text-soft transition hover:text-rose-300"
 
@@ -1530,7 +1546,7 @@ export function CardDetail({
 
                                   onClick={() => {
 
-                                    confirm('确定要删除这条评论吗？', () => { void handleDeleteComment(c); });
+                                    confirm(t('comment.deleteCommentConfirm'), () => { void handleDeleteComment(c); });
 
                                   }}
 
@@ -1558,7 +1574,7 @@ export function CardDetail({
 
                             {replies.map((reply) => {
 
-                              const replyTarget = getReplyTargetLabel(reply);
+                              const replyTarget = getReplyTargetLabel(reply, t('time.self'));
                               const replyAuthor = profile.resolveName(reply.authorLogin);
                               const replyTargetDisplay = replyTarget ? profile.resolveName(replyTarget) : null;
                               const replyAvatar = profile.resolveAvatar(
@@ -1568,7 +1584,7 @@ export function CardDetail({
 
                               const line = replyTarget
 
-                                ? `${replyAuthor || reply.authorLogin} 回复 ${replyTargetDisplay || replyTarget}: ${reply.text ?? ''}`.trim()
+                                ? `${replyAuthor || reply.authorLogin} ${t('comment.replyVerb')} ${replyTargetDisplay || replyTarget}: ${reply.text ?? ''}`.trim()
 
                                 : `${replyAuthor || reply.authorLogin}: ${reply.text ?? ''}`.trim();
 
@@ -1600,7 +1616,7 @@ export function CardDetail({
 
                                       <span className="text-sm text-[var(--text-main)] break-words">{line}</span>
 
-                                      <span>{toCommentTime(reply.createdAt)}</span>
+                                      <span>{toCommentTime(reply.createdAt, commentTimeFormatter)}</span>
 
                                       {reply.pending ? <LoaderCircle className="animate-spin" size={12} /> : null}
 
@@ -1652,7 +1668,7 @@ export function CardDetail({
 
                                               <img
 
-                                                alt="comment media"
+                                                alt=""
 
                                                 className="absolute inset-0 h-full w-full object-cover"
 
@@ -1710,7 +1726,7 @@ export function CardDetail({
 
                                         <button
 
-                                          aria-label="删除评论"
+                                          aria-label={t('tooltips.deleteComment')}
 
                                           className="ml-auto inline-flex h-6 w-6 items-center justify-center text-soft transition hover:text-rose-300"
 
@@ -1718,7 +1734,7 @@ export function CardDetail({
 
                                           onClick={() => {
 
-                                            confirm('确定要删除这条评论吗？', () => { void handleDeleteComment(reply); });
+                                            confirm(t('comment.deleteCommentConfirm'), () => { void handleDeleteComment(reply); });
 
                                           }}
 
@@ -1774,7 +1790,7 @@ export function CardDetail({
 
               <div className="mb-2 flex items-center gap-2 text-xs text-soft">
 
-                <span>回复 {replyTarget.replyToUserLogin}</span>
+                <span>{t('comment.replyTo', { user: replyTarget.replyToUserLogin })}</span>
 
                 <button
 
@@ -1788,7 +1804,7 @@ export function CardDetail({
 
                   <X size={12} />
 
-                  取消回复
+                  {t('comment.cancelReply')}
 
                 </button>
 
@@ -1929,7 +1945,11 @@ export function CardDetail({
 
                 }}
 
-                placeholder={replyTarget ? `回复 ${replyTarget.replyToUserLogin}...` : '写评论..'}
+                placeholder={
+                  replyTarget
+                    ? t('comment.replyPlaceholder', { user: replyTarget.replyToUserLogin })
+                    : t('comment.placeholder')
+                }
 
                 ref={commentInputRef}
 
@@ -1994,4 +2014,3 @@ export function CardDetail({
   );
 
 }
-

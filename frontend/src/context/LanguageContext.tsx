@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
-export type Language = 'zh-CN' | 'zh-TW' | 'en' | 'ja' | 'de';
+export const SUPPORTED_LANGUAGES = ['zh-CN', 'zh-TW', 'en', 'ja', 'de', 'fr', 'es', 'la'] as const;
+
+export type Language = (typeof SUPPORTED_LANGUAGES)[number];
 
 interface LanguageContextType {
   language: Language;
@@ -15,7 +17,7 @@ const STORAGE_KEY = 'story-language';
 const resolveLanguage = (): Language => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved && ['zh-CN', 'zh-TW', 'en', 'ja', 'de'].includes(saved)) {
+    if (saved && SUPPORTED_LANGUAGES.includes(saved as Language)) {
       return saved as Language;
     }
   } catch {

@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom';
 import { ArrowDownUp } from 'lucide-react';
 import type { TimelineMonth } from '../types/image';
+import { useTranslation } from '../hooks/useTranslation';
 
 interface TimeColumnProps {
   activeMonth: TimelineMonth | null;
@@ -12,6 +13,8 @@ interface TimeColumnProps {
 }
 
 export function TimeColumn({ activeMonth, months, onJump, onToggleOrder, open, order }: TimeColumnProps) {
+  const { t } = useTranslation();
+
   const content = (
     <aside
       className={`fixed right-0 top-0 z-[220] flex h-screen w-[5.5rem] flex-col overflow-x-hidden bg-[var(--page-bg-soft)] px-3 py-6 shadow-[var(--timeline-shadow)] transition-transform duration-300 ease-in-out md:w-24 md:px-4 ${
@@ -20,10 +23,10 @@ export function TimeColumn({ activeMonth, months, onJump, onToggleOrder, open, o
     >
       <div className="-mx-3 flex shrink-0 justify-center bg-[var(--page-bg-soft)] px-3 pb-2 pt-1 text-center md:-mx-4 md:px-4">
         <button
-          aria-label="Toggle timeline order"
+          aria-label={order === 'asc' ? t('tooltips.timeOrderAsc') : t('tooltips.timeOrderDesc')}
           className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--panel-border)] text-[var(--text-main)] transition hover:text-[var(--text-accent)]"
           onClick={onToggleOrder}
-          title={order === 'asc' ? 'Time order: old to new' : 'Time order: new to old'}
+          title={order === 'asc' ? t('tooltips.timeOrderAsc') : t('tooltips.timeOrderDesc')}
           type="button"
         >
           <ArrowDownUp className={order === 'asc' ? 'rotate-180' : ''} size={18} />
@@ -52,7 +55,7 @@ export function TimeColumn({ activeMonth, months, onJump, onToggleOrder, open, o
                 type="button"
               >
                 <span className="text-4xl tracking-tight">{month.month}</span>
-                <span className="text-base text-soft">月</span>
+                <span className="text-base text-soft">{t('time.monthUnit')}</span>
               </button>
             </div>
           );

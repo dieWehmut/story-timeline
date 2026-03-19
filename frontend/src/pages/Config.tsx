@@ -54,6 +54,7 @@ const iconBtnCls =
   'inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--panel-border)] text-soft transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)] disabled:opacity-40';
 
 function InviteCodeSection() {
+  const { t, language } = useTranslation();
   const [code, setCode] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
   const [loading, setLoading] = useState(true);
@@ -127,10 +128,10 @@ function InviteCodeSection() {
   };
 
   const formatExpiry = (iso: string) => {
-    if (!iso) return '无限期';
+    if (!iso) return t('settings.inviteNeverExpires');
     const d = new Date(iso);
-    if (isNaN(d.getTime())) return '无限期';
-    return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    if (isNaN(d.getTime())) return t('settings.inviteNeverExpires');
+    return d.toLocaleString(language, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   };
 
   if (loading) {
@@ -148,46 +149,48 @@ function InviteCodeSection() {
           <code className="flex-1 truncate rounded-lg bg-black/20 px-2.5 py-1.5 font-mono text-xs text-[var(--text-accent)]">
             {code}
           </code>
-          <button aria-label="复制邀请码" className={iconBtnCls} onClick={() => void handleCopy()} title="复制邀请码" type="button">
+          <button aria-label={t('settings.inviteCode')} className={iconBtnCls} onClick={() => void handleCopy()} title={t('settings.inviteCode')} type="button">
             <Copy size={12} />
           </button>
-          <button aria-label="复制邀请链接" className={iconBtnCls} onClick={() => void handleCopyLink()} title="复制邀请链接" type="button">
+          <button aria-label={t('settings.inviteLinkCopied')} className={iconBtnCls} onClick={() => void handleCopyLink()} title={t('settings.inviteLinkCopied')} type="button">
             <Link size={12} />
           </button>
-          <button aria-label="刷新" className={iconBtnCls} disabled={busy} onClick={() => void handleGenerate()} title="重新生成" type="button">
+          <button aria-label={t('settings.inviteRegenerate')} className={iconBtnCls} disabled={busy} onClick={() => void handleGenerate()} title={t('settings.inviteRegenerate')} type="button">
             <RefreshCw size={12} />
           </button>
-          <button aria-label="删除" className={iconBtnCls} disabled={busy} onClick={() => void handleDelete()} title="删除" type="button">
+          <button aria-label={t('settings.inviteDelete')} className={iconBtnCls} disabled={busy} onClick={() => void handleDelete()} title={t('settings.inviteDelete')} type="button">
             <Trash2 size={12} />
           </button>
         </div>
       ) : (
-        <p className="text-[10px] text-soft">当前无有效邀请码</p>
+        <p className="text-[10px] text-soft">{t('settings.inviteNoCode')}</p>
       )}
 
       {code && (
         <p className="text-[10px] text-soft">
-          {copied ? (copied === 'link' ? '邀请链接已复制!' : '邀请码已复制!') : `有效期: ${formatExpiry(expiresAt)}`}
+          {copied
+            ? (copied === 'link' ? t('settings.inviteLinkCopied') : t('settings.inviteCodeCopied'))
+            : t('settings.inviteValidUntil', { value: formatExpiry(expiresAt) })}
         </p>
       )}
 
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-soft">有效期</span>
+        <span className="text-[10px] text-soft">{t('settings.inviteTtl')}</span>
         <select
-          aria-label="邀请码有效期"
+          aria-label={t('settings.inviteTtl')}
           className="rounded-lg border border-[var(--panel-border)] bg-transparent px-2 py-1 text-[10px] text-[var(--text-main)] outline-none"
           disabled={busy}
           onChange={(e) => setTtlDays(Number(e.target.value))}
           value={ttlDays}
         >
-          <option value={0}>无限期</option>
-          <option value={1}>1 天</option>
-          <option value={7}>7 天</option>
-          <option value={30}>30 天</option>
+          <option value={0}>{t('settings.inviteNeverExpires')}</option>
+          <option value={1}>1 d</option>
+          <option value={7}>7 d</option>
+          <option value={30}>30 d</option>
         </select>
         {!code && (
           <button className={btnCls} disabled={busy} onClick={() => void handleGenerate()} type="button">
-            生成邀请码
+            {t('settings.inviteGenerate')}
           </button>
         )}
       </div>
@@ -196,6 +199,7 @@ function InviteCodeSection() {
 }
 
 function AdminNotificationEmailSection() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [savedEmail, setSavedEmail] = useState('');
@@ -224,16 +228,16 @@ function AdminNotificationEmailSection() {
   const handleSave = async () => {
     const trimmed = email.trim();
     if (!trimmed) {
-      toast('请输入邮箱', 'error');
+      toast(t('messages.emailRequired'), 'error');
       return;
     }
     try {
       setSaving(true);
       await api.setAdminEmail(trimmed);
       setSavedEmail(trimmed);
-      toast('管理员邮箱已保存', 'success');
+      toast(t('common.save'), 'success');
     } catch {
-      toast('保存失败', 'error');
+      toast(t('messages.saveFailed'), 'error');
     } finally {
       setSaving(false);
     }
@@ -258,9 +262,9 @@ function AdminNotificationEmailSection() {
       />
       <div className="mt-1.5 flex items-center gap-1.5">
         <button className={btnCls} disabled={saving || email.trim() === savedEmail} onClick={() => void handleSave()} type="button">
-          {saving ? '保存中..' : '保存'}
+          {saving ? t('settings.saveInProgress') : t('common.save')}
         </button>
-        {savedEmail && <span className="text-[10px] text-soft">当前: {savedEmail}</span>}
+        {savedEmail && <span className="text-[10px] text-soft">{t('settings.current', { value: savedEmail })}</span>}
       </div>
     </div>
   );
@@ -299,92 +303,52 @@ function EmailIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function AccountBindingSection() {
+function AccountBindingSection({ authUser }: { authUser: ReturnType<typeof useAuth>['user'] }) {
   const { toast } = useToast();
   const { t } = useTranslation();
   const [identities, setIdentities] = useState<Identity[]>([]);
+  const [contactEmail, setContactEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [bindingInProgress, setBingingInProgress] = useState<string | null>(null);
-  const [emailBindInput, setEmailBindInput] = useState('');
-  const [showEmailInput, setShowEmailInput] = useState(false);
   const [unbindConfirm, setUnbindConfirm] = useState<string | null>(null);
-  const emailFormRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchIdentities = async () => {
+    let cancelled = false;
+    const fetchData = async () => {
       try {
-        const res = await api.getIdentities();
-        setIdentities(res.identities || []);
+        const [identityRes, emailRes] = await Promise.all([
+          api.getIdentities(),
+          api.getUserEmail().catch(() => ({ ok: true, email: authUser?.email ?? '' })),
+        ]);
+        if (cancelled) return;
+        setIdentities(identityRes.identities || []);
+        setContactEmail(emailRes.email || authUser?.email || '');
       } catch (err) {
         console.error('Failed to fetch identities:', err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
-    void fetchIdentities();
-  }, []);
-
-  // Click outside email form to collapse
-  useEffect(() => {
-    if (!showEmailInput) return;
-    const handler = (e: MouseEvent) => {
-      if (emailFormRef.current && !emailFormRef.current.contains(e.target as Node)) {
-        setShowEmailInput(false);
-      }
+    void fetchData();
+    return () => {
+      cancelled = true;
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showEmailInput]);
+  }, [authUser?.email]);
 
   const handleBind = async (targetProvider: string) => {
     if (bindingInProgress) return;
 
     try {
       setBingingInProgress(targetProvider);
-
       if (targetProvider === 'github') {
         const res = await api.startBindGitHub();
         window.location.href = res.url;
-      } else if (targetProvider === 'google') {
-        const res = await api.startBindGoogle();
-        window.location.href = res.url;
-      } else if (targetProvider === 'email') {
-        setShowEmailInput(true);
-        setBingingInProgress(null);
+        return;
       }
+      const res = await api.startBindGoogle();
+      window.location.href = res.url;
     } catch {
       toast(t('messages.bindFailed'), 'error');
-      setBingingInProgress(null);
-    }
-  };
-
-  const handleEmailBind = async () => {
-    const email = emailBindInput.trim();
-    if (!email) {
-      toast(t('messages.emailRequired'), 'error');
-      return;
-    }
-    if (!EMAIL_RE.test(email)) {
-      toast(t('messages.invalidEmail'), 'error');
-      return;
-    }
-
-    try {
-      setBingingInProgress('email');
-      await api.bindEmail(email);
-      toast(t('messages.verificationEmailSent'), 'success');
-      setShowEmailInput(false);
-      setEmailBindInput('');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : t('messages.bindFailed');
-      if (message.includes('email_already_bound')) {
-        toast(t('messages.emailAlreadyBound'), 'error');
-      } else {
-        toast(message, 'error');
-      }
-    } finally {
       setBingingInProgress(null);
     }
   };
@@ -394,7 +358,6 @@ function AccountBindingSection() {
       toast(t('messages.cannotUnbindOnly'), 'error');
       return;
     }
-
     setUnbindConfirm(targetProvider);
   };
 
@@ -403,7 +366,7 @@ function AccountBindingSection() {
 
     try {
       await api.unbindProvider(unbindConfirm);
-      setIdentities(identities.filter(id => id.provider !== unbindConfirm));
+      setIdentities(identities.filter((id) => id.provider !== unbindConfirm));
       toast(t('messages.unbindSuccess'), 'success');
     } catch {
       toast(t('messages.unbindFailed'), 'error');
@@ -421,33 +384,26 @@ function AccountBindingSection() {
     }
   };
 
-  const getIdentityDisplayName = (identity: Identity) => {
-    // For GitHub: prefer displayName (username), fallback to providerId
-    if (identity.provider === 'github') {
-      return identity.displayName || identity.providerId || 'GitHub';
-    }
-    // For Google: prefer email, fallback to displayName or providerId
-    if (identity.provider === 'google') {
-      return identity.email || identity.displayName || identity.providerId || 'Google';
-    }
-    // For email provider: show email
-    if (identity.provider === 'email') {
-      return identity.email || identity.providerId || 'Email';
-    }
-    // Fallback for any other provider
-    return identity.displayName || identity.email || identity.providerId || identity.provider;
-  };
-
   const getProviderLabel = (prov: string) => {
     switch (prov) {
-      case 'github': return 'GitHub';
-      case 'google': return 'Google';
-      case 'email': return t('settings.email');
+      case 'github': return t('settings.providerGitHub');
+      case 'google': return t('settings.providerGoogle');
+      case 'email': return t('settings.providerEmail');
       default: return prov;
     }
   };
 
-  const isBound = (prov: string) => identities.some(id => id.provider === prov);
+  const getIdentityDisplayName = (identity: Identity) => {
+    if (identity.provider === 'github') {
+      return identity.displayName || (authUser?.provider === 'github' ? authUser.login : '') || getProviderLabel('github');
+    }
+    if (identity.provider === 'google') {
+      return identity.email || identity.displayName || (authUser?.provider === 'google' ? authUser.email || authUser.displayName || authUser.login : '') || getProviderLabel('google');
+    }
+    return identity.email || identity.displayName || getProviderLabel(identity.provider);
+  };
+
+  const isBound = (prov: string) => identities.some((id) => id.provider === prov);
 
   if (loading) {
     return (
@@ -457,28 +413,25 @@ function AccountBindingSection() {
     );
   }
 
-  const emailIdentity = identities.find(id => id.provider === 'email');
   const oauthProviders = ['github', 'google'];
 
   return (
     <div className="space-y-3">
-      {/* Email row - show if email is bound */}
-      {emailIdentity && (
-        <div className="flex h-[46px] items-center rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 backdrop-blur-xl">
-          <div className="flex items-center gap-3">
-            <EmailIcon size={25} />
-            <span className="text-sm">{emailIdentity.email || t('settings.noEmailBound')}</span>
+      <div className="flex items-center rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 py-3 backdrop-blur-xl">
+        <div className="flex items-center gap-3">
+          <EmailIcon size={25} />
+          <div className="min-w-0">
+            <p className="truncate text-sm">{contactEmail || authUser?.email || t('settings.noEmailBound')}</p>
+            <p className="text-[10px] text-soft">{t('settings.contactEmail')}</p>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* OAuth providers - GitHub and Google */}
-      {oauthProviders.map(targetProvider => {
+      {oauthProviders.map((targetProvider) => {
         const bound = isBound(targetProvider);
-        const identity = identities.find(id => id.provider === targetProvider);
+        const identity = identities.find((id) => id.provider === targetProvider);
 
         if (bound && identity) {
-          // Show bound state with actual name
           return (
             <div
               key={targetProvider}
@@ -501,7 +454,6 @@ function AccountBindingSection() {
           );
         }
 
-        // Show unbound state - clickable to bind
         return (
           <button
             key={targetProvider}
@@ -520,69 +472,6 @@ function AccountBindingSection() {
         );
       })}
 
-      {/* Email binding - expandable like Login.tsx */}
-      {!emailIdentity && (
-        <div
-          ref={emailFormRef}
-          className={`flex h-[46px] cursor-pointer items-center rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 backdrop-blur-xl transition-all duration-300 hover:border-[var(--text-accent)] ${showEmailInput ? '' : 'justify-center'}`}
-          onClick={() => { if (!showEmailInput) setShowEmailInput(true); }}
-          {...(!showEmailInput && { role: 'button' })}
-        >
-          <div className="flex items-center gap-3">
-            <EmailIcon size={25} />
-            <span
-              className="text-sm transition-all duration-300 whitespace-nowrap"
-              style={{
-                maxWidth: showEmailInput ? 0 : '12rem',
-                opacity: showEmailInput ? 0 : 1,
-                overflow: 'hidden',
-              }}
-            >
-              {t('settings.bindEmail')}
-            </span>
-          </div>
-          <div
-            className="flex items-center gap-2 transition-all duration-300"
-            style={{
-              maxWidth: showEmailInput ? '20rem' : 0,
-              opacity: showEmailInput ? 1 : 0,
-              overflow: 'hidden',
-              marginLeft: showEmailInput ? '0.5rem' : 0,
-              flex: showEmailInput ? 1 : 0,
-            }}
-          >
-            <input
-              className="min-w-0 flex-1 bg-transparent text-sm text-[var(--text-main)] outline-none placeholder:text-soft"
-              onChange={(event) => setEmailBindInput(event.target.value)}
-              onFocus={() => setShowEmailInput(true)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  void handleEmailBind();
-                }
-              }}
-              placeholder={t('auth.emailPlaceholder')}
-              ref={(el) => { if (el && showEmailInput) el.focus(); }}
-              type="email"
-              value={emailBindInput}
-            />
-            <button
-              aria-label={t('settings.sendVerification')}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--text-main)] transition-all duration-300 hover:translate-x-1 hover:scale-110 hover:text-[var(--text-accent)] disabled:opacity-40"
-              disabled={bindingInProgress === 'email'}
-              onClick={(e) => { e.stopPropagation(); void handleEmailBind(); }}
-              type="button"
-            >
-              {bindingInProgress === 'email' ? (
-                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              ) : (
-                <svg aria-hidden="true" height={18} viewBox="0 0 24 24" width={18} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Unbind confirmation modal */}
       <ConfirmModal
         open={!!unbindConfirm}
         title={t('settings.confirmUnbind')}
@@ -606,6 +495,9 @@ function LanguageSection() {
     { code: 'en', name: t('languages.en') },
     { code: 'ja', name: t('languages.ja') },
     { code: 'de', name: t('languages.de') },
+    { code: 'fr', name: t('languages.fr') },
+    { code: 'es', name: t('languages.es') },
+    { code: 'la', name: t('languages.la') },
   ];
 
   return (
@@ -852,7 +744,7 @@ export default function Config({ auth, theme, onThemeToggle }: ConfigProps) {
           {user && (
             <section>
               <h2 className="mb-3 text-xs font-medium">{t('settings.accountBinding')}</h2>
-              <AccountBindingSection />
+              <AccountBindingSection authUser={user} />
             </section>
           )}
 

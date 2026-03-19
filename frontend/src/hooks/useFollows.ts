@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import type { FeedUser } from '../types/image';
 import { useAuth } from './useAuth';
+import { translate } from './useTranslation';
 
 interface UseFollowsOptions {
   onChange?: () => void;
@@ -39,7 +40,7 @@ export const useFollows = (auth: ReturnType<typeof useAuth>, options?: UseFollow
       setFollowing(nextFollowing);
       setFollowers(nextFollowers);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '加载失败');
+      setError(err instanceof Error ? err.message : translate('messages.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -70,7 +71,7 @@ export const useFollows = (auth: ReturnType<typeof useAuth>, options?: UseFollow
         });
         options?.onChange?.();
       } catch (err) {
-        setError(err instanceof Error ? err.message : '关注失败');
+        setError(err instanceof Error ? err.message : translate('messages.followFailed'));
       }
     },
     [auth.authenticated, isFollowing, options]
@@ -84,7 +85,7 @@ export const useFollows = (auth: ReturnType<typeof useAuth>, options?: UseFollow
         setFollowing((prev) => prev.filter((user) => normalizeLogin(user.login) !== normalizeLogin(login)));
         options?.onChange?.();
       } catch (err) {
-        setError(err instanceof Error ? err.message : '取关失败');
+        setError(err instanceof Error ? err.message : translate('messages.unfollowFailed'));
       }
     },
     [auth.authenticated, options]
