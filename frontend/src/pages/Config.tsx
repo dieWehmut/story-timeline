@@ -424,18 +424,18 @@ function AccountBindingSection() {
   const getIdentityDisplayName = (identity: Identity) => {
     // For GitHub: prefer displayName (username), fallback to providerId
     if (identity.provider === 'github') {
-      return identity.displayName || `GitHub (${identity.providerId})`;
+      return identity.displayName || identity.providerId || 'GitHub';
     }
     // For Google: prefer email, fallback to displayName or providerId
     if (identity.provider === 'google') {
-      return identity.email || identity.displayName || `Google (${identity.providerId})`;
+      return identity.email || identity.displayName || identity.providerId || 'Google';
     }
     // For email provider: show email
     if (identity.provider === 'email') {
-      return identity.email || identity.providerId;
+      return identity.email || identity.providerId || 'Email';
     }
     // Fallback for any other provider
-    return identity.displayName || identity.email || identity.providerId;
+    return identity.displayName || identity.email || identity.providerId || identity.provider;
   };
 
   const getProviderLabel = (prov: string) => {
