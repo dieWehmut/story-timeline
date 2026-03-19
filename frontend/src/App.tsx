@@ -1,27 +1,29 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { LoaderCircle } from 'lucide-react';
 import { LOGIN_RETURN_KEY, useAuth } from './hooks/useAuth';
 import { useImages } from './hooks/useImages';
 import { useFollows } from './hooks/useFollows';
 import { AppLayout } from './layouts/AppLayout';
 import { StandaloneLayout } from './layouts/StandaloneLayout';
-import Home from './pages/Home';
-import Story from './pages/Story';
-import Album from './pages/Album';
-import Post from './pages/Post';
-import Following from './pages/Following';
-import Follower from './pages/Follower';
-import Config from './pages/Config';
-import AuthEmail from './pages/AuthEmail';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import InviteRedirect from './pages/InviteRedirect';
 import { ToastProvider } from './ui/Toast';
 import { ProfileProvider } from './context/ProfileContext';
 import { AuthProvider } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { isPublicPath } from './utils/AuthGuard';
 import type { TimelineMonth } from './types/image';
+
+const Home = lazy(() => import('./pages/Home'));
+const Story = lazy(() => import('./pages/Story'));
+const Album = lazy(() => import('./pages/Album'));
+const Post = lazy(() => import('./pages/Post'));
+const Following = lazy(() => import('./pages/Following'));
+const Follower = lazy(() => import('./pages/Follower'));
+const Config = lazy(() => import('./pages/Config'));
+const AuthEmail = lazy(() => import('./pages/AuthEmail'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const InviteRedirect = lazy(() => import('./pages/InviteRedirect'));
 
 const resolveTheme = (): 'dark' | 'light' => {
   const savedTheme = window.localStorage.getItem('story-theme');
@@ -107,81 +109,87 @@ function App() {
           <BrowserRouter>
           <LoginReturnHandler authenticated={auth.authenticated} />
           <RequireAuth loading={auth.loading} authenticated={auth.authenticated}>
-            <Routes>
-              <Route element={<AppLayout footerStats={footerStats} />}>
-                <Route
-                  path="/"
-                  element={<Home auth={auth} images={images} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
-                />
-                <Route
-                  path="/story"
-                  element={
-                    <Story
-                      activeMonth={activeMonth}
-                      auth={auth}
-                      follows={follows}
-                      images={images}
-                      onActiveMonthChange={setActiveMonth}
-                      onThemeToggle={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
-                      onTimelineClose={() => setTimelineOpen(false)}
-                      onTimelineToggle={() => setTimelineOpen((open) => !open)}
-                      theme={theme}
-                      timelineOpen={timelineOpen}
-                    />
-                  }
-                />
-                <Route
-                  path="/story/:id"
-                  element={
-                    <Story
-                      activeMonth={activeMonth}
-                      auth={auth}
-                      follows={follows}
-                      images={images}
-                      onActiveMonthChange={setActiveMonth}
-                      onThemeToggle={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
-                      onTimelineClose={() => setTimelineOpen(false)}
-                      onTimelineToggle={() => setTimelineOpen((open) => !open)}
-                      theme={theme}
-                      timelineOpen={timelineOpen}
-                    />
-                  }
-                />
-                <Route
-                  path="/album"
-                  element={<Album auth={auth} images={images} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
-                />
-                <Route
-                  path="/post"
-                  element={<Post auth={auth} images={images} />}
-                />
-                <Route
-                  path="/following"
-                  element={<Following auth={auth} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
-                />
-                <Route
-                  path="/follower"
-                  element={<Follower auth={auth} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
-                />
-              </Route>
-              <Route element={<StandaloneLayout />}>
-                <Route
-                  path="/config"
-                  element={<Config auth={auth} theme={theme} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} />}
-                />
-                <Route
-                  path="/login"
-                  element={<Login auth={auth} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
-                />
-                <Route
-                  path="/register"
-                  element={<Register auth={auth} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
-                />
-                <Route path="/invites/:code" element={<InviteRedirect />} />
-                <Route path="/auth/email" element={<AuthEmail />} />
-              </Route>
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+            <Suspense fallback={
+              <div className="flex min-h-screen items-center justify-center bg-[var(--bg)]">
+                <LoaderCircle className="animate-spin text-cyan-300" size={32} />
+              </div>
+            }>
+              <Routes>
+                <Route element={<AppLayout footerStats={footerStats} />}>
+                  <Route
+                    path="/"
+                    element={<Home auth={auth} images={images} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+                  />
+                  <Route
+                    path="/story"
+                    element={
+                      <Story
+                        activeMonth={activeMonth}
+                        auth={auth}
+                        follows={follows}
+                        images={images}
+                        onActiveMonthChange={setActiveMonth}
+                        onThemeToggle={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
+                        onTimelineClose={() => setTimelineOpen(false)}
+                        onTimelineToggle={() => setTimelineOpen((open) => !open)}
+                        theme={theme}
+                        timelineOpen={timelineOpen}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/story/:id"
+                    element={
+                      <Story
+                        activeMonth={activeMonth}
+                        auth={auth}
+                        follows={follows}
+                        images={images}
+                        onActiveMonthChange={setActiveMonth}
+                        onThemeToggle={() => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))}
+                        onTimelineClose={() => setTimelineOpen(false)}
+                        onTimelineToggle={() => setTimelineOpen((open) => !open)}
+                        theme={theme}
+                        timelineOpen={timelineOpen}
+                      />
+                    }
+                  />
+                  <Route
+                    path="/album"
+                    element={<Album auth={auth} images={images} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+                  />
+                  <Route
+                    path="/post"
+                    element={<Post auth={auth} images={images} />}
+                  />
+                  <Route
+                    path="/following"
+                    element={<Following auth={auth} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+                  />
+                  <Route
+                    path="/follower"
+                    element={<Follower auth={auth} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+                  />
+                </Route>
+                <Route element={<StandaloneLayout />}>
+                  <Route
+                    path="/config"
+                    element={<Config auth={auth} theme={theme} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} />}
+                  />
+                  <Route
+                    path="/login"
+                    element={<Login auth={auth} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+                  />
+                  <Route
+                    path="/register"
+                    element={<Register auth={auth} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+                  />
+                  <Route path="/invites/:code" element={<InviteRedirect />} />
+                  <Route path="/auth/email" element={<AuthEmail />} />
+                </Route>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
           </RequireAuth>
           </BrowserRouter>
         </ProfileProvider>

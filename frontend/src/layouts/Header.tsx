@@ -57,7 +57,7 @@ export function Header({
   const profile = useProfile();
   const displayName = authUser ? profile.resolveName(authUser.login) : '';
   return (
-    <header className="fixed left-0 right-0 top-0 z-40 bg-[color:var(--panel-bg)] px-2 pt-2 backdrop-blur-xl md:px-3 md:pt-3">
+    <header className="fixed left-0 right-0 top-0 z-40 bg-[var(--panel-bg)] px-2 pt-2 backdrop-blur-xl md:px-3 md:pt-3">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
         <div className="flex items-center gap-1.5">
           {isDetailView ? (

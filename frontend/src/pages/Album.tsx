@@ -514,7 +514,7 @@ export default function Album({ auth, images, theme, onThemeToggle }: AlbumProps
         )}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 py-3 backdrop-blur-xl">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 py-3 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-md items-center justify-between">
           <button
             className={`${tabBaseClass} ${activeTab === 'albums' ? tabActiveClass : tabInactiveClass}`}

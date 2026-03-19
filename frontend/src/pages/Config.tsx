@@ -422,6 +422,19 @@ function AccountBindingSection() {
   };
 
   const getIdentityDisplayName = (identity: Identity) => {
+    // For GitHub: prefer displayName (username), fallback to providerId
+    if (identity.provider === 'github') {
+      return identity.displayName || `GitHub (${identity.providerId})`;
+    }
+    // For Google: prefer email, fallback to displayName or providerId
+    if (identity.provider === 'google') {
+      return identity.email || identity.displayName || `Google (${identity.providerId})`;
+    }
+    // For email provider: show email
+    if (identity.provider === 'email') {
+      return identity.email || identity.providerId;
+    }
+    // Fallback for any other provider
     return identity.displayName || identity.email || identity.providerId;
   };
 
@@ -449,13 +462,15 @@ function AccountBindingSection() {
 
   return (
     <div className="space-y-3">
-      {/* Email row - always show since all users have email */}
-      <div className="flex h-[46px] items-center rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 backdrop-blur-xl">
-        <div className="flex items-center gap-3">
-          <EmailIcon size={25} />
-          <span className="text-sm">{emailIdentity?.email || t('settings.noEmailBound')}</span>
+      {/* Email row - show if email is bound */}
+      {emailIdentity && (
+        <div className="flex h-[46px] items-center rounded-xl border border-[var(--panel-border)] bg-[var(--panel-bg)] px-4 backdrop-blur-xl">
+          <div className="flex items-center gap-3">
+            <EmailIcon size={25} />
+            <span className="text-sm">{emailIdentity.email || t('settings.noEmailBound')}</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* OAuth providers - GitHub and Google */}
       {oauthProviders.map(targetProvider => {
@@ -705,7 +720,7 @@ export default function Config({ auth, theme, onThemeToggle }: ConfigProps) {
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg-base)]">
-      <header className="fixed left-0 right-0 top-0 z-40 px-3 pt-3">
+      <header className="fixed left-0 right-0 top-0 z-40 bg-[var(--panel-bg)] px-3 pt-3 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
           <button
             aria-label={t('common.back')}

@@ -25,7 +25,7 @@ export function AlbumHeader({
   showTimeline = false,
 }: AlbumHeaderProps) {
   return (
-    <header className="fixed left-0 right-0 top-0 z-40 px-3 pt-3">
+    <header className="fixed left-0 right-0 top-0 z-40 bg-[var(--panel-bg)] px-3 pt-3 backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
         <button
           aria-label="返回"

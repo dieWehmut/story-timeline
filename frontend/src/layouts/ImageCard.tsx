@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 
 import { Heart, LoaderCircle, MessageCircle, PencilLine, Play, Trash2 } from 'lucide-react';
 
@@ -351,7 +351,7 @@ function ImageGrid({
 
 
 
-export function ImageCard({
+export const ImageCard = memo(function ImageCard({
 
   canInteract,
 
@@ -1172,4 +1172,15 @@ export function ImageCard({
 
   );
 
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison function to prevent unnecessary re-renders
+  return (
+    prevProps.item.id === nextProps.item.id &&
+    prevProps.item.likeCount === nextProps.item.likeCount &&
+    prevProps.item.liked === nextProps.item.liked &&
+    prevProps.item.commentCount === nextProps.item.commentCount &&
+    prevProps.canInteract === nextProps.canInteract &&
+    prevProps.editable === nextProps.editable &&
+    prevProps.followed === nextProps.followed
+  );
+});
