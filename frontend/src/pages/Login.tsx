@@ -1,7 +1,9 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Globe, MoonStar, SunMedium } from 'lucide-react';
+import { MoonStar, SunMedium } from 'lucide-react';
 
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
+import { useTranslation } from '../hooks/useTranslation';
 import { useToast } from '../utils/useToast';
 import { useAuth, LOGIN_RETURN_KEY } from '../hooks/useAuth';
 
@@ -49,6 +51,7 @@ const iconBtnCls =
 
 export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -84,13 +87,13 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
     if (!error) return;
     switch (error) {
       case 'pending':
-        toast('账号审核中喵~', 'error');
+        toast(t('messages.accountPending'), 'error');
         break;
       case 'rejected':
-        toast('账号审核未通过喵~', 'error');
+        toast(t('messages.accountRejected'), 'error');
         break;
       case 'not_registered':
-        toast('你还没有注册过喵~', 'error');
+        toast(t('messages.notRegistered'), 'error');
         break;
     }
     // Clear error param after showing toast.
@@ -113,22 +116,22 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
   const handleEmailSubmit = async () => {
     const trimmed = email.trim();
     if (!trimmed) {
-      toast('请输入邮箱', 'error');
+      toast(t('messages.emailRequired'), 'error');
       return;
     }
     try {
       setSending(true);
       await auth.requestEmailLogin(trimmed);
-      toast('登录链接已发送，请检查邮箱', 'success');
+      toast(t('messages.loginLinkSent'), 'success');
       setEmailSent(true);
     } catch (err) {
       const message = err instanceof Error ? err.message : '发送失败';
       if (message.includes('user_not_registered')) {
-        toast('该邮箱还没有注册过喵~', 'error');
+        toast(t('messages.notRegistered'), 'error');
       } else if (message.includes('user_pending')) {
-        toast('账号审核中，请耐心等待喵~', 'error');
+        toast(t('messages.accountPending'), 'error');
       } else if (message.includes('user_rejected')) {
-        toast('账号审核未通过喵~', 'error');
+        toast(t('messages.accountRejected'), 'error');
       } else {
         toast(message, 'error');
       }
@@ -144,15 +147,17 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
           {/* Top-right action buttons */}
           <div className="mb-0 mt-2 flex justify-end gap-0.5">
             <button
-              aria-label="语言切换"
+              aria-label={t('tooltips.githubRepo')}
               className={iconBtnCls}
+              onClick={() => window.open('https://github.com/story-timeline/story-timeline', '_blank')}
               type="button"
-              title="语言切换（即将推出）"
+              title={t('tooltips.githubRepo')}
             >
-              <Globe size={18} />
+              <GitHubIcon size={18} />
             </button>
+            <LanguageSwitcher />
             <button
-              aria-label="切换主题"
+              aria-label={t('tooltips.themeSwitcher')}
               className={iconBtnCls}
               onClick={onThemeToggle}
               type="button"
@@ -162,7 +167,7 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
           </div>
 
           {/* Title */}
-          <h1 className="text-center text-2xl font-semibold">登录</h1>
+          <h1 className="text-center text-2xl font-semibold">{t('auth.login')}</h1>
 
           {/* Login buttons */}
           <div className="mt-6 flex flex-col gap-3">
@@ -172,7 +177,7 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
               type="button"
             >
               <GitHubIcon size={20} />
-              <span>使用GitHub登录</span>
+              <span>{t('auth.loginWith.github')}</span>
             </button>
 
             {showGoogle && (
@@ -182,14 +187,14 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
                 type="button"
               >
                 <GoogleIcon size={20} />
-                <span>使用Google登录</span>
+                <span>{t('auth.loginWith.google')}</span>
               </button>
             )}
 
             {/* or divider */}
             <div className="flex items-center gap-1">
               <div className="h-px flex-1 bg-[var(--panel-border)]" />
-              <span className="text-xs text-soft">or</span>
+              <span className="text-xs text-soft">{t('common.or')}</span>
               <div className="h-px flex-1 bg-[var(--panel-border)]" />
             </div>
 
@@ -198,9 +203,9 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
               <div className="space-y-2 text-center">
                 <div className="flex items-center justify-center gap-2 text-sm text-soft">
                   <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-[var(--text-accent)] border-t-transparent" />
-                  等待邮件确认中..
+                  {t('auth.waitingEmail')}
                 </div>
-                <p className="text-xs text-soft">请打开邮箱，点击登录链接确认。确认后此页面会自动登录。</p>
+                <p className="text-xs text-soft">{t('auth.checkEmail')}</p>
               </div>
             ) : (
               <div
@@ -219,7 +224,7 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
                       overflow: 'hidden',
                     }}
                   >
-                    使用邮箱登录
+                    {t('auth.loginWith.email')}
                   </span>
                 </div>
                 <div
@@ -241,13 +246,13 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
                         void handleEmailSubmit();
                       }
                     }}
-                    placeholder="输入邮箱地址"
+                    placeholder={t('auth.emailPlaceholder')}
                     ref={(el) => { if (el && showEmailForm) el.focus(); }}
                     type="email"
                     value={email}
                   />
                   <button
-                    aria-label="发送登录链接"
+                    aria-label={t('auth.sendLoginLink')}
                     className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--text-main)] transition-all duration-300 hover:translate-x-1 hover:scale-110 hover:text-[var(--text-accent)] disabled:opacity-40"
                     disabled={sending}
                     onClick={(e) => { e.stopPropagation(); void handleEmailSubmit(); }}
@@ -279,7 +284,7 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
                 <line x1="19" y1="8" x2="19" y2="14" />
                 <line x1="22" y1="11" x2="16" y2="11" />
               </svg>
-              <span>没有账户？注册喵~</span>
+              <span>{t('auth.noAccount')}</span>
             </button>
           </div>
         </div>

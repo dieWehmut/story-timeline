@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Globe, MoonStar, SunMedium } from 'lucide-react';
+import { MoonStar, SunMedium } from 'lucide-react';
 
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
+import { useTranslation } from '../hooks/useTranslation';
 import { useToast } from '../utils/useToast';
 import { api } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
@@ -77,7 +79,7 @@ const inputCls =
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const MethodIcon = ({ method, size = 20 }: { method: RegisterMethod; size?: number }) => {
+const MethodIcon = ({ method, size = 25 }: { method: RegisterMethod; size?: number }) => {
   switch (method) {
     case 'github': return <GitHubIcon size={size} />;
     case 'google': return <GoogleIcon size={size} />;
@@ -87,6 +89,7 @@ const MethodIcon = ({ method, size = 20 }: { method: RegisterMethod; size?: numb
 
 export default function Register({ auth, theme, onThemeToggle }: RegisterProps) {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<'choose' | 'form'>('choose');
@@ -107,23 +110,23 @@ export default function Register({ auth, theme, onThemeToggle }: RegisterProps) 
 
   const validate = (): boolean => {
     if (!username.trim()) {
-      toast('用户名不能为空喵~', 'error');
+      toast(t('messages.usernameRequired'), 'error');
       return false;
     }
     if (!email.trim()) {
-      toast('邮箱不能为空喵~', 'error');
+      toast(t('messages.emailRequired'), 'error');
       return false;
     }
     if (!EMAIL_RE.test(email.trim())) {
-      toast('邮箱不正确喵~', 'error');
+      toast(t('messages.emailInvalid'), 'error');
       return false;
     }
     if ([...purpose.trim()].length < 10) {
-      toast('来意不能少于10个字喵~', 'error');
+      toast(t('messages.purposeTooShort'), 'error');
       return false;
     }
     if (!hasInviteFromLink && !inviteCode.trim()) {
-      toast('请填写邀请码喵~', 'error');
+      toast(t('messages.inviteCodeRequired'), 'error');
       return false;
     }
     return true;
@@ -146,18 +149,18 @@ export default function Register({ auth, theme, onThemeToggle }: RegisterProps) 
       sessionStorage.removeItem('invite_code');
 
       if (method === 'github' || method === 'google') {
-        toast('注册成功，即将跳转登录喵~', 'success');
+        toast(t('messages.registerSuccessOAuth'), 'success');
         setTimeout(() => auth.loginWith(method), 800);
       } else {
-        toast('注册成功，请等待管理员审核喵~', 'success');
+        toast(t('messages.registerSuccessEmail'), 'success');
         setTimeout(() => navigate('/login'), 1500);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : '注册失败';
       if (message.includes('invite_code_invalid')) {
-        toast('邀请码不正确喵~', 'error');
+        toast(t('messages.inviteCodeRequired'), 'error');
       } else if (message.includes('email_already_registered')) {
-        toast('该邮箱已注册过啦喵~', 'error');
+        toast(t('messages.emailAlreadyRegistered'), 'error');
       } else {
         toast(message, 'error');
       }
@@ -172,16 +175,23 @@ export default function Register({ auth, theme, onThemeToggle }: RegisterProps) 
         <div className="w-full max-w-xs text-[var(--text-main)]">
           {/* Top-right action buttons */}
           <div className="mb-0 mt-2 flex justify-end gap-0.5">
-            <button aria-label="语言切换" className={iconBtnCls} type="button" title="语言切换（即将推出）">
-              <Globe size={18} />
+            <button
+              aria-label={t('tooltips.githubRepo')}
+              className={iconBtnCls}
+              onClick={() => window.open('https://github.com/story-timeline/story-timeline', '_blank')}
+              type="button"
+              title={t('tooltips.githubRepo')}
+            >
+              <GitHubIcon size={18} />
             </button>
-            <button aria-label="切换主题" className={iconBtnCls} onClick={onThemeToggle} type="button">
+            <LanguageSwitcher />
+            <button aria-label={t('tooltips.themeSwitcher')} className={iconBtnCls} onClick={onThemeToggle} type="button">
               {theme === 'dark' ? <SunMedium size={18} /> : <MoonStar size={18} />}
             </button>
           </div>
 
           {/* Title */}
-          <h1 className="text-center text-2xl font-semibold">注册</h1>
+          <h1 className="text-center text-2xl font-semibold">{t('auth.register')}</h1>
 
           {step === 'choose' ? (
             <div key="choose" className="step-transition">
@@ -189,22 +199,22 @@ export default function Register({ auth, theme, onThemeToggle }: RegisterProps) 
               <div className="mt-6 flex flex-col gap-3">
                 <button className={btnCls} onClick={() => chooseMethod('github')} type="button">
                   <GitHubIcon size={20} />
-                  <span>使用GitHub注册</span>
+                  <span>{t('auth.registerWith.github')}</span>
                 </button>
                 <button className={btnCls} onClick={() => chooseMethod('google')} type="button">
                   <GoogleIcon size={20} />
-                  <span>使用Google注册</span>
+                  <span>{t('auth.registerWith.google')}</span>
                 </button>
 
                 <div className="flex items-center gap-1">
                   <div className="h-px flex-1 bg-[var(--panel-border)]" />
-                  <span className="text-xs text-soft">or</span>
+                  <span className="text-xs text-soft">{t('common.or')}</span>
                   <div className="h-px flex-1 bg-[var(--panel-border)]" />
                 </div>
 
                 <button className={btnCls} onClick={() => chooseMethod('email')} type="button">
-                  <EmailIcon size={20} />
-                  <span>使用邮箱注册</span>
+                  <EmailIcon size={25} />
+                  <span>{t('auth.registerWith.email')}</span>
                 </button>
               </div>
 
@@ -212,7 +222,7 @@ export default function Register({ auth, theme, onThemeToggle }: RegisterProps) 
               <div className="mt-3">
                 <button className={btnCls} onClick={() => navigate('/login')} type="button">
                   <LoginIcon size={20} />
-                  <span>已有账户？登录喵~</span>
+                  <span>{t('auth.hasAccount')}</span>
                 </button>
               </div>
             </div>
@@ -225,21 +235,21 @@ export default function Register({ auth, theme, onThemeToggle }: RegisterProps) 
                 <input
                   className={inputCls}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="用户名"
+                  placeholder={t('register.username')}
                   type="text"
                   value={username}
                 />
                 <input
                   className={inputCls}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="联系邮箱"
+                  placeholder={t('register.email')}
                   type="email"
                   value={email}
                 />
                 <textarea
                   className={`${inputCls} min-h-[80px] resize-none`}
                   onChange={(e) => setPurpose(e.target.value)}
-                  placeholder="来意（至少10个字）"
+                  placeholder={t('register.purpose')}
                   rows={3}
                   value={purpose}
                 />
@@ -247,7 +257,7 @@ export default function Register({ auth, theme, onThemeToggle }: RegisterProps) 
                   <input
                     className={inputCls}
                     onChange={(e) => setInviteCode(e.target.value)}
-                    placeholder="邀请码"
+                    placeholder={t('register.inviteCode')}
                     type="text"
                     value={inviteCode}
                   />
@@ -265,21 +275,21 @@ export default function Register({ auth, theme, onThemeToggle }: RegisterProps) 
                   {submitting ? (
                     <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   ) : (
-                    <MethodIcon method={method} size={18} />
+                    <MethodIcon method={method} size={20} />
                   )}
-                  <span>注册</span>
+                  <span>{t('register.submit')}</span>
                 </button>
 
                 {/* Back to choose method */}
                 <button className={btnCls} onClick={() => setStep('choose')} type="button">
                   <ArrowLeftIcon size={16} />
-                  <span>返回选择注册方式</span>
+                  <span>{t('register.backToMethod')}</span>
                 </button>
 
                 {/* Switch to login */}
                 <button className={btnCls} onClick={() => navigate('/login')} type="button">
                   <LoginIcon size={20} />
-                  <span>已有账户？登录喵~</span>
+                  <span>{t('auth.hasAccount')}</span>
                 </button>
               </div>
             </div>

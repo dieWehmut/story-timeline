@@ -19,6 +19,7 @@ import InviteRedirect from './pages/InviteRedirect';
 import { ToastProvider } from './ui/Toast';
 import { ProfileProvider } from './context/ProfileContext';
 import { AuthProvider } from './context/AuthContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { isPublicPath } from './utils/AuthGuard';
 import type { TimelineMonth } from './types/image';
 
@@ -100,9 +101,10 @@ function App() {
 
   return (
     <ToastProvider>
-      <AuthProvider isAdmin={auth.isAdmin}>
-      <ProfileProvider user={auth.user}>
-        <BrowserRouter>
+      <LanguageProvider>
+        <AuthProvider isAdmin={auth.isAdmin}>
+        <ProfileProvider user={auth.user}>
+          <BrowserRouter>
           <LoginReturnHandler authenticated={auth.authenticated} />
           <RequireAuth loading={auth.loading} authenticated={auth.authenticated}>
             <Routes>
@@ -165,7 +167,7 @@ function App() {
               <Route element={<StandaloneLayout />}>
                 <Route
                   path="/config"
-                  element={<Config auth={auth} />}
+                  element={<Config auth={auth} theme={theme} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} />}
                 />
                 <Route
                   path="/login"
@@ -181,9 +183,10 @@ function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </RequireAuth>
-        </BrowserRouter>
-      </ProfileProvider>
-      </AuthProvider>
+          </BrowserRouter>
+        </ProfileProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </ToastProvider>
   );
 }

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Copy, Link, RefreshCw, Trash2 } from 'lucide-react';
+import { HomeButton } from '../layouts/HomeButton';
+import { ThemeButton } from '../layouts/ThemeButton';
 import { useProfile } from '../context/ProfileContext';
 import { api } from '../lib/api';
 import { useToast } from '../utils/useToast';
@@ -9,6 +11,8 @@ import type { Identity } from '../types/image';
 
 interface ConfigProps {
   auth: ReturnType<typeof useAuth>;
+  theme: 'dark' | 'light';
+  onThemeToggle: () => void;
 }
 
 const readAsDataUrl = (file: File) =>
@@ -301,6 +305,7 @@ function AccountBindingSection() {
   const [bindingInProgress, setBingingInProgress] = useState<string | null>(null);
   const [emailBindInput, setEmailBindInput] = useState('');
   const [showEmailInput, setShowEmailInput] = useState(false);
+  const [unbindConfirm, setUnbindConfirm] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchIdentities = async () => {
@@ -367,22 +372,26 @@ function AccountBindingSection() {
     }
   };
 
-  const handleUnbind = async (targetProvider: string) => {
+  const handleUnbind = (targetProvider: string) => {
     if (identities.length <= 1) {
       toast('不能解绑唯一的登录方式', 'error');
       return;
     }
 
-    if (!confirm(`确定要解绑 ${getProviderName(targetProvider)} 吗？`)) {
-      return;
-    }
+    setUnbindConfirm(targetProvider);
+  };
+
+  const confirmUnbind = async () => {
+    if (!unbindConfirm) return;
 
     try {
-      await api.unbindProvider(targetProvider);
-      setIdentities(identities.filter(id => id.provider !== targetProvider));
+      await api.unbindProvider(unbindConfirm);
+      setIdentities(identities.filter(id => id.provider !== unbindConfirm));
       toast('解绑成功', 'success');
     } catch (err) {
       toast('解绑失败', 'error');
+    } finally {
+      setUnbindConfirm(null);
     }
   };
 
@@ -429,7 +438,7 @@ function AccountBindingSection() {
               <span className="text-xs">{getProviderName(targetProvider)}</span>
               {bound && identity && (
                 <span className="text-[10px] text-soft">
-                  {identity.email || identity.providerId}
+                  {identity.displayName || identity.email || identity.providerId}
                 </span>
               )}
             </div>
@@ -496,11 +505,39 @@ function AccountBindingSection() {
           </p>
         </div>
       )}
+
+      {/* Unbind confirmation modal */}
+      {unbindConfirm && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-sm rounded-2xl border border-[var(--panel-border)] bg-[var(--panel-bg)] p-4 text-[var(--text-main)] shadow-xl backdrop-blur-xl">
+            <p className="mb-3 text-sm font-medium">确认解绑</p>
+            <p className="mb-4 text-xs text-soft">
+              确定要解绑 {getProviderName(unbindConfirm)} 吗？解绑后将无法使用此方式登录。
+            </p>
+            <div className="flex gap-2">
+              <button
+                className={`${btnCls} flex-1`}
+                onClick={confirmUnbind}
+                type="button"
+              >
+                确认解绑
+              </button>
+              <button
+                className={`${btnCls} text-soft flex-1`}
+                onClick={() => setUnbindConfirm(null)}
+                type="button"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-export default function Config({ auth }: ConfigProps) {
+export default function Config({ auth, theme, onThemeToggle }: ConfigProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
@@ -591,20 +628,30 @@ export default function Config({ auth }: ConfigProps) {
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--bg-base)]">
-      <div className="flex flex-1 items-start justify-center px-4 py-8">
-        <div className="w-full max-w-xl text-[var(--text-main)]">
-          {/* Header with back button */}
-          <div className="mb-4 flex items-center gap-3">
-            <button
-              aria-label="返回"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--panel-border)] text-soft transition hover:border-[var(--text-accent)] hover:text-[var(--text-accent)]"
-              onClick={() => navigate(-1)}
-              type="button"
-            >
-              <ArrowLeft size={16} />
-            </button>
-            <h1 className="text-lg font-semibold">设置</h1>
+      <header className="fixed left-0 right-0 top-0 z-40 px-3 pt-3">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
+          <button
+            aria-label="返回"
+            className="inline-flex h-9 w-9 items-center justify-center text-[var(--text-main)] transition hover:text-[var(--text-accent)] active:scale-95"
+            onClick={() => navigate(-1)}
+            type="button"
+          >
+            <ArrowLeft size={22} />
+          </button>
+
+          <div className="flex flex-1 flex-col items-center">
+            <p className="text-base font-semibold text-[var(--text-main)]">设置</p>
           </div>
+
+          <div className="flex items-center -space-x-1">
+            <HomeButton />
+            <ThemeButton onToggle={onThemeToggle} theme={theme} />
+          </div>
+        </div>
+      </header>
+
+      <div className="flex flex-1 items-start justify-center px-4 pt-20 pb-8">
+        <div className="w-full max-w-xl text-[var(--text-main)]">
 
           <div className="space-y-3">
             {/* Avatar + Username + Background */}

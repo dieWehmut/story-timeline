@@ -7,7 +7,6 @@ interface AlbumHeaderProps {
   title: string;
   subtitle?: string;
   theme: 'dark' | 'light';
-  isAdmin?: boolean;
   onBack: () => void;
   onThemeToggle: () => void;
   onTimelineToggle?: () => void;
@@ -19,7 +18,6 @@ export function AlbumHeader({
   title,
   subtitle,
   theme,
-  isAdmin = false,
   onBack,
   onThemeToggle,
   onTimelineToggle,
@@ -45,7 +43,7 @@ export function AlbumHeader({
 
         <div className="flex items-center -space-x-1">
           <HomeButton />
-          <SettingsButton isAdmin={isAdmin} />
+          <SettingsButton />
           <ThemeButton onToggle={onThemeToggle} theme={theme} />
           {showTimeline && onTimelineToggle ? (
             <div

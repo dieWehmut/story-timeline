@@ -1034,28 +1034,30 @@ func (storage *SupabaseStorage) GetRejectionHistory(ctx context.Context, login s
 // --- User identities (multi-provider binding) ---
 
 type UserIdentity struct {
-	ID         int       `json:"id"`
-	UserLogin  string    `json:"user_login"`
-	Provider   string    `json:"provider"`
-	ProviderID string    `json:"provider_id"`
-	Email      string    `json:"email"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID          int       `json:"id"`
+	UserLogin   string    `json:"user_login"`
+	Provider    string    `json:"provider"`
+	ProviderID  string    `json:"provider_id"`
+	Email       string    `json:"email"`
+	DisplayName string    `json:"display_name"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
-func (storage *SupabaseStorage) CreateUserIdentity(ctx context.Context, login, provider, providerID, email string) error {
+func (storage *SupabaseStorage) CreateUserIdentity(ctx context.Context, login, provider, providerID, email, displayName string) error {
 	payload := []map[string]any{{
-		"user_login":  login,
-		"provider":    provider,
-		"provider_id": providerID,
-		"email":       email,
-		"created_at":  time.Now().UTC(),
+		"user_login":   login,
+		"provider":     provider,
+		"provider_id":  providerID,
+		"email":        email,
+		"display_name": displayName,
+		"created_at":   time.Now().UTC(),
 	}}
 	return storage.requestJSON(ctx, http.MethodPost, "/user_identities", nil, payload, nil, nil)
 }
 
 func (storage *SupabaseStorage) GetUserIdentities(ctx context.Context, login string) ([]UserIdentity, error) {
 	params := url.Values{}
-	params.Set("select", "id,user_login,provider,provider_id,email,created_at")
+	params.Set("select", "id,user_login,provider,provider_id,email,display_name,created_at")
 	params.Set("user_login", "eq."+login)
 	params.Set("order", "created_at.asc")
 

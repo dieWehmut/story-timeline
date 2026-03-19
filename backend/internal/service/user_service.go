@@ -255,11 +255,11 @@ func (service *UserService) FindUserByIdentityEmail(ctx context.Context, email s
 }
 
 // CreateUserIdentity links a new identity to a user
-func (service *UserService) CreateUserIdentity(ctx context.Context, login, provider, providerID, email string) error {
+func (service *UserService) CreateUserIdentity(ctx context.Context, login, provider, providerID, email, displayName string) error {
 	if service.database == nil {
 		return fmt.Errorf("database not configured")
 	}
-	return service.database.CreateUserIdentity(ctx, login, provider, providerID, email)
+	return service.database.CreateUserIdentity(ctx, login, provider, providerID, email, displayName)
 }
 
 // DeleteUserIdentity removes an identity from a user

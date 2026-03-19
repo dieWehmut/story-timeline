@@ -47,7 +47,7 @@ export default function Follower({ auth, follows, theme, onThemeToggle }: Follow
           </div>
           <div className="flex items-center -space-x-1">
             <HomeButton />
-            <SettingsButton isAdmin={auth.isAdmin} />
+            <SettingsButton />
             <ThemeButton onToggle={onThemeToggle} theme={theme} />
           </div>
         </div>

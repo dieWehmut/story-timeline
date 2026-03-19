@@ -113,5 +113,6 @@ export interface Identity {
   provider: string;      // github/google/email
   providerId: string;    // 第三方 ID
   email?: string;        // 对于 email 类型
+  displayName?: string;  // 显示名称
   createdAt: string;
 }

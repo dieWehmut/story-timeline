@@ -221,7 +221,11 @@ func (controller *AuthController) callback(c *gin.Context, provider string) {
 				// User is registered and active - auto-bind this identity
 				session.User.Login = login
 				if controller.userService != nil {
-					_ = controller.userService.CreateUserIdentity(c.Request.Context(), login, provider, session.User.ID, session.User.Email)
+					displayName := session.User.Login
+					if provider == "google" && session.User.DisplayName != "" {
+						displayName = session.User.DisplayName
+					}
+					_ = controller.userService.CreateUserIdentity(c.Request.Context(), login, provider, session.User.ID, session.User.Email, displayName)
 				}
 				identityFound = true
 			}
@@ -307,7 +311,11 @@ func (controller *AuthController) handleBindCallback(c *gin.Context, provider st
 
 	// Create the identity binding
 	email := ""
-	if err := controller.userService.CreateUserIdentity(c.Request.Context(), statePayload.BindUser, provider, session.User.ID, email); err != nil {
+	displayName := session.User.Login
+	if provider == "google" && session.User.DisplayName != "" {
+		displayName = session.User.DisplayName
+	}
+	if err := controller.userService.CreateUserIdentity(c.Request.Context(), statePayload.BindUser, provider, session.User.ID, email, displayName); err != nil {
 		c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL+"/config?error=bind_failed")
 		return
 	}
@@ -1126,7 +1134,7 @@ func (controller *AuthController) VerifyEmailBinding(c *gin.Context) {
 	}
 
 	// Create the identity binding
-	if err := controller.userService.CreateUserIdentity(c.Request.Context(), login, "email", email, email); err != nil {
+	if err := controller.userService.CreateUserIdentity(c.Request.Context(), login, "email", email, email, email); err != nil {
 		c.Redirect(http.StatusTemporaryRedirect, controller.frontendBaseURL+"/config?error=bind_failed")
 		return
 	}
