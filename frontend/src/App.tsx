@@ -4,12 +4,14 @@ import { LOGIN_RETURN_KEY, useAuth } from './hooks/useAuth';
 import { useImages } from './hooks/useImages';
 import { useFollows } from './hooks/useFollows';
 import { AppLayout } from './layouts/AppLayout';
+import { StandaloneLayout } from './layouts/StandaloneLayout';
 import Home from './pages/Home';
 import Story from './pages/Story';
 import Album from './pages/Album';
 import Post from './pages/Post';
 import Following from './pages/Following';
 import Follower from './pages/Follower';
+import Config from './pages/Config';
 import AuthEmail from './pages/AuthEmail';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -160,16 +162,22 @@ function App() {
                   element={<Follower auth={auth} follows={follows} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
                 />
               </Route>
-              <Route
-                path="/login"
-                element={<Login auth={auth} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
-              />
-              <Route
-                path="/register"
-                element={<Register auth={auth} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
-              />
-              <Route path="/invites/:code" element={<InviteRedirect />} />
-              <Route path="/auth/email" element={<AuthEmail />} />
+              <Route element={<StandaloneLayout />}>
+                <Route
+                  path="/config"
+                  element={<Config auth={auth} />}
+                />
+                <Route
+                  path="/login"
+                  element={<Login auth={auth} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+                />
+                <Route
+                  path="/register"
+                  element={<Register auth={auth} onThemeToggle={() => setTheme((current) => (current === 'dark' ? 'light' : 'dark'))} theme={theme} />}
+                />
+                <Route path="/invites/:code" element={<InviteRedirect />} />
+                <Route path="/auth/email" element={<AuthEmail />} />
+              </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </RequireAuth>

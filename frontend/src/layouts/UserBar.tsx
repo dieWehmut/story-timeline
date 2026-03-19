@@ -13,7 +13,7 @@ export function UserBar({ feedUsers, filterUser, onFilterUser }: UserBarProps) {
 
   return (
     <div
-      className="mt-1 flex w-full max-w-6xl items-center justify-start gap-1 overflow-x-auto pb-0.5"
+      className="mt-1 flex w-full max-w-6xl items-center justify-start gap-0 overflow-x-auto pb-0.5"
       style={{ scrollbarWidth: 'none' }}
     >
       <button

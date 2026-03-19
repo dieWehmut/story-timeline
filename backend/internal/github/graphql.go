@@ -79,13 +79,14 @@ func (c *GraphQLClient) execute(ctx context.Context, token string, query string,
 
 // FetchUser gets the authenticated user's info via GraphQL.
 func (c *GraphQLClient) FetchUser(ctx context.Context, token string) (model.GitHubUser, error) {
-	query := `query { viewer { databaseId login avatarUrl } }`
+	query := `query { viewer { databaseId login avatarUrl email } }`
 
 	var data struct {
 		Viewer struct {
 			DatabaseID int64  `json:"databaseId"`
 			Login      string `json:"login"`
 			AvatarURL  string `json:"avatarUrl"`
+			Email      string `json:"email"`
 		} `json:"viewer"`
 	}
 
@@ -97,6 +98,7 @@ func (c *GraphQLClient) FetchUser(ctx context.Context, token string) (model.GitH
 		ID:        data.Viewer.DatabaseID,
 		Login:     data.Viewer.Login,
 		AvatarURL: data.Viewer.AvatarURL,
+		Email:     data.Viewer.Email,
 	}, nil
 }
 

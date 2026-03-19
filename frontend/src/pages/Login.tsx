@@ -1,9 +1,8 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Globe, MoonStar, Settings, SunMedium } from 'lucide-react';
+import { Globe, MoonStar, SunMedium } from 'lucide-react';
 
 import { useToast } from '../utils/useToast';
-import { ConfigModal } from '../ui/ConfigModal';
 import { useAuth, LOGIN_RETURN_KEY } from '../hooks/useAuth';
 
 interface LoginProps {
@@ -58,7 +57,6 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [sending, setSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
-  const [configOpen, setConfigOpen] = useState(false);
   const emailFormRef = useRef<HTMLDivElement>(null);
 
   const showGoogle = !!auth.googleLoginUrl;
@@ -160,14 +158,6 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
               type="button"
             >
               {theme === 'dark' ? <SunMedium size={18} /> : <MoonStar size={18} />}
-            </button>
-            <button
-              aria-label="设置"
-              className={iconBtnCls}
-              onClick={() => setConfigOpen(true)}
-              type="button"
-            >
-              <Settings size={18} />
             </button>
           </div>
 
@@ -294,8 +284,6 @@ export default function Login({ auth, theme, onThemeToggle }: LoginProps) {
           </div>
         </div>
       </div>
-
-      <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} isAdmin={auth.isAdmin} />
     </div>
   );
 }

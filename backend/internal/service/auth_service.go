@@ -187,6 +187,7 @@ func (service *AuthService) CompleteLogin(ctx context.Context, provider string, 
 			ID:        googleUser.Id,
 			Login:     strings.Split(googleUser.Email, "@")[0],
 			AvatarURL: googleUser.Picture,
+			Email:     googleUser.Email,
 		}
 
 		return model.Session{
@@ -211,6 +212,7 @@ func (service *AuthService) CompleteLogin(ctx context.Context, provider string, 
 		ID:        fmt.Sprintf("%d", githubUser.ID),
 		Login:     githubUser.Login,
 		AvatarURL: githubUser.AvatarURL,
+		Email:     githubUser.Email,
 	}
 
 	return model.Session{

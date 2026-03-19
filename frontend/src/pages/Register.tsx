@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Globe, MoonStar, Settings, SunMedium } from 'lucide-react';
+import { Globe, MoonStar, SunMedium } from 'lucide-react';
 
 import { useToast } from '../utils/useToast';
-import { ConfigModal } from '../ui/ConfigModal';
 import { api } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -97,7 +96,6 @@ export default function Register({ auth, theme, onThemeToggle }: RegisterProps) 
   const [purpose, setPurpose] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [configOpen, setConfigOpen] = useState(false);
 
   const cachedCode = sessionStorage.getItem('invite_code') ?? '';
   const hasInviteFromLink = !!cachedCode;
@@ -179,9 +177,6 @@ export default function Register({ auth, theme, onThemeToggle }: RegisterProps) 
             </button>
             <button aria-label="切换主题" className={iconBtnCls} onClick={onThemeToggle} type="button">
               {theme === 'dark' ? <SunMedium size={18} /> : <MoonStar size={18} />}
-            </button>
-            <button aria-label="设置" className={iconBtnCls} onClick={() => setConfigOpen(true)} type="button">
-              <Settings size={18} />
             </button>
           </div>
 
@@ -291,8 +286,6 @@ export default function Register({ auth, theme, onThemeToggle }: RegisterProps) 
           )}
         </div>
       </div>
-
-      <ConfigModal open={configOpen} onClose={() => setConfigOpen(false)} isAdmin={auth.isAdmin} />
     </div>
   );
 }

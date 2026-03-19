@@ -235,8 +235,14 @@
     color: #f9fafb;
   }
 
+  /* Page content transition (fallback for browsers without View Transitions) */
+  .page-content {
+    animation: page-fade-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Legacy class for backwards compatibility */
   .page-transition {
-    animation: page-enter 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: page-fade-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
   .image-card-reveal {
@@ -290,13 +296,110 @@
   }
 }
 
-@keyframes page-enter {
+/* Page fade in animation */
+@keyframes page-fade-in {
   from {
     opacity: 0;
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
   }
+}
+
+/* View Transitions API animations */
+@keyframes view-slide-in-forward {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes view-slide-out-forward {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+}
+
+@keyframes view-slide-in-backward {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes view-slide-out-backward {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+}
+
+@keyframes view-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes view-fade-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+/* View Transitions API styling */
+::view-transition-old(root) {
+  animation: view-fade-out 200ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+::view-transition-new(root) {
+  animation: view-fade-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Directional transitions - forward navigation */
+:root[data-transition-direction='forward']::view-transition-old(root) {
+  animation: view-slide-out-forward 200ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+:root[data-transition-direction='forward']::view-transition-new(root) {
+  animation: view-slide-in-forward 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Directional transitions - backward navigation */
+:root[data-transition-direction='backward']::view-transition-old(root) {
+  animation: view-slide-out-backward 200ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+:root[data-transition-direction='backward']::view-transition-new(root) {
+  animation: view-slide-in-backward 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes nav-card-in {
@@ -347,6 +450,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .page-content,
   .page-transition {
     animation: none;
   }
@@ -379,5 +483,11 @@
 
   .step-transition {
     animation: none;
+  }
+
+  /* Disable View Transitions for reduced motion */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
   }
 }
