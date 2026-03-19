@@ -33,6 +33,16 @@ export const la: LocaleKeys = {
     ...en.auth,
     login: 'Intra',
     register: 'Adscribe',
+    loginWith: {
+      github: 'GitHub adhibere intra',
+      google: 'Google adhibere intra',
+      email: 'Epistula adhibere intra',
+    },
+    registerWith: {
+      github: 'GitHub adhibere adscribe',
+      google: 'Google adhibere adscribe',
+      email: 'Epistula adhibere adscribe',
+    },
     noAccount: 'Nullumne habes? Adscribe',
     hasAccount: 'Iam habes? Intra',
     waitingEmail: 'Confirmatio epistulae exspectatur...',

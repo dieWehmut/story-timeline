@@ -32,6 +32,16 @@ export const es: LocaleKeys = {
     ...en.auth,
     login: 'Iniciar sesión',
     register: 'Registrarse',
+    loginWith: {
+      github: 'Iniciar sesión con GitHub',
+      google: 'Iniciar sesión con Google',
+      email: 'Iniciar sesión con correo',
+    },
+    registerWith: {
+      github: 'Registrarse con GitHub',
+      google: 'Registrarse con Google',
+      email: 'Registrarse con correo',
+    },
     noAccount: '¿No tienes cuenta? Regístrate',
     hasAccount: '¿Ya tienes cuenta? Inicia sesión',
     waitingEmail: 'Esperando la confirmación por correo...',

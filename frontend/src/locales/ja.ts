@@ -33,6 +33,16 @@ export const ja: LocaleKeys = {
     ...en.auth,
     login: 'ログイン',
     register: '登録',
+    loginWith: {
+      github: 'GitHub でログイン',
+      google: 'Google でログイン',
+      email: 'メールでログイン',
+    },
+    registerWith: {
+      github: 'GitHub で登録',
+      google: 'Google で登録',
+      email: 'メールで登録',
+    },
     noAccount: 'アカウントがありませんか？ 登録',
     hasAccount: 'アカウントがありますか？ ログイン',
     waitingEmail: 'メール確認を待っています...',

@@ -32,6 +32,16 @@ export const de: LocaleKeys = {
     ...en.auth,
     login: 'Anmelden',
     register: 'Registrieren',
+    loginWith: {
+      github: 'Mit GitHub anmelden',
+      google: 'Mit Google anmelden',
+      email: 'Mit E-Mail anmelden',
+    },
+    registerWith: {
+      github: 'Mit GitHub registrieren',
+      google: 'Mit Google registrieren',
+      email: 'Mit E-Mail registrieren',
+    },
     noAccount: 'Kein Konto? Registrieren',
     hasAccount: 'Schon ein Konto? Anmelden',
     waitingEmail: 'Warte auf E-Mail-Bestätigung...',
