@@ -18,7 +18,7 @@ func NewOAuthClient(clientID string, clientSecret string, callbackURL string) *O
 			ClientSecret: clientSecret,
 			Endpoint:     github.Endpoint,
 			RedirectURL:  callbackURL,
-			Scopes:       []string{"read:user", "repo"},
+			Scopes:       []string{"read:user"},
 		},
 	}
 }
