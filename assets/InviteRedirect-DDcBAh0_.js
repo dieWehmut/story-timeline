@@ -1,0 +1,1 @@
+import{a as r}from"./vendor-ui-BmwYIqOs.js";import{i as s,c as a}from"./index-QP3o7TpY.js";import"./vendor-react-BmugN4i5.js";function n(){const{code:e}=s(),t=a();return r.useEffect(()=>{e&&sessionStorage.setItem("invite_code",e),t("/register",{replace:!0})},[e,t]),null}export{n as default};

@@ -1,0 +1,1 @@
+import{a as o}from"./vendor-ui-BmwYIqOs.js";import{T as r}from"./index-QP3o7TpY.js";function a(){const t=o.useContext(r);if(!t)throw new Error("useToast must be used within ToastProvider");return t}export{a as u};
