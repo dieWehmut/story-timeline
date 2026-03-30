@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
-import { api, API_BASE, HF_SPACE_FALLBACK } from '../lib/api';
+import { api, API_BASE, API_BASE_FALLBACK } from '../lib/api';
 import type { AuthSession } from '../types/image';
 import { subscribeAuthRefresh } from '../utils/authEvents';
 
@@ -277,7 +277,7 @@ export const useAuth = () => {
       const base =
         API_BASE ||
         (hasHttpOrigin ? origin : '') ||
-        (isNative ? HF_SPACE_FALLBACK : '');
+        (isNative ? API_BASE_FALLBACK : '');
       const resolved = base ? new URL(raw, base) : new URL(raw);
       resolved.searchParams.set('return', currentPath);
       resolved.searchParams.set('client', isNative ? 'app' : 'web');

@@ -14,13 +14,10 @@ import { mediaTypeFromFile, normalizeAssetTypes } from './media';
 
 const normalizeApiBase = (value: string) => value.trim().replace(/\/$/, '');
 
-// When VITE_API_BASE is unset we use same-origin (empty string) so requests go
-// to the current host (e.g. Vercel), where serverless proxy forwards to HF with HF_TOKEN.
-// Set VITE_API_BASE to the HF Space URL only when you need the client to call HF directly
-// (e.g. local dev against public space without proxy).
-export const HF_SPACE_FALLBACK = 'https://REDACTED.hf.space';
+export const API_BASE_FALLBACK = 'https://REDACTED.hf.space';
 
 export const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE ?? '');
+const usesHostedFallbackBase = (value: string) => value.includes('.hf.space');
 
 // log the computed base so we can spot misconfiguration in client consoles
 if (typeof window !== 'undefined') {
@@ -141,12 +138,10 @@ const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise
   try {
     return await doFetch(input as any);
   } catch (err: any) {
-    // if we hit a HTML page from the HF space base, fall back to proxying via
-    // the same origin. this guards against accidentally building the app with
-    // VITE_API_BASE set to the space URL while running on Vercel.
+    // If a direct backend URL returns HTML, retry through the same-origin proxy.
     if (
       API_BASE &&
-      API_BASE.includes('.hf.space') &&
+      usesHostedFallbackBase(API_BASE) &&
       typeof input === 'string' &&
       input.startsWith(API_BASE) &&
       err instanceof Error &&
@@ -154,22 +149,21 @@ const request = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise
       err.message.includes('HTML 页面')
     ) {
       const alt = input.replace(API_BASE, '');
-      console.warn('API request failed against HF URL, retrying via proxy', input, '->', alt);
+      console.warn('API request failed against configured backend, retrying via proxy', input, '->', alt);
       return await doFetch(alt);
     }
 
-    // When we use same-origin proxy (API_BASE empty), do not fall back to calling
-    // HF directly: the browser would send no HF_TOKEN and get 502. Only retry
-    // direct to HF when we had an explicit API_BASE that looks like proxy and failed.
+    // When same-origin proxying is already in use, only try the fallback base
+    // after an explicit backend URL has failed.
     if (
       API_BASE &&
       typeof input === 'string' &&
       (input.startsWith('/') || input.startsWith(API_BASE)) &&
       (err instanceof Error && (err.message.includes('redirect') || err.message.includes('Too many redirects') || err instanceof TypeError))
     ) {
-      const alt = input.startsWith('/') ? HF_SPACE_FALLBACK + input : input.replace(API_BASE, HF_SPACE_FALLBACK);
+      const alt = input.startsWith('/') ? API_BASE_FALLBACK + input : input.replace(API_BASE, API_BASE_FALLBACK);
       try {
-        console.warn('API request failed via proxy, retrying direct to HF space', input, '->', alt);
+        console.warn('API request failed via configured backend, retrying via fallback base', input, '->', alt);
         return await doFetch(alt);
       } catch (innerErr) {
         // continue to throw original error below if direct retry also fails
@@ -405,9 +399,9 @@ export const api = {
   unfollowUser: (login: string) =>
     request<{ ok: boolean }>(`${API_BASE}/api/follow/${encodeURIComponent(login)}`, { method: 'DELETE' }),
   createImage: async (payload: CreateImagePayload) => {
-    // Use trailing slash when using proxy (API_BASE empty) or direct HF to avoid redirect loops.
+    // Use a trailing slash for hosted fallback and same-origin proxy paths to avoid redirect loops.
     const imagesEndpoint =
-      API_BASE === '' || API_BASE.includes('.hf.space')
+      API_BASE === '' || usesHostedFallbackBase(API_BASE)
         ? `${API_BASE}/api/images/`
         : `${API_BASE}/api/images`;
 

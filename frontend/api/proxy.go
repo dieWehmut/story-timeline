@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const defaultHFSpaceBaseURL = "https://REDACTED.hf.space"
+const defaultBackendBaseURL = "https://REDACTED.hf.space"
 
 type errorResponse struct {
 	Error string `json:"error"`
@@ -35,7 +35,7 @@ type proxyOptions struct {
 	Timeout        time.Duration
 	// Any query string that should be forwarded to the target (excluding
 	// the internal proxy parameters).  This is computed by the Handler and
-	// passed through so proxyToHF can construct the proper URL.
+	// passed through so proxyToBackend can construct the proper URL.
 	CleanQuery string
 }
 
@@ -55,17 +55,17 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	q.Del("path")
 	cleanQuery := q.Encode()
 
-	       // 某些端点（如图片创建路由）需要结尾斜杠，原逻辑保留，仅变量名替换
-	       if targetPath == "/api/images" && r.Method == http.MethodPost {
-		       targetBaseURL := strings.TrimRight(firstNonEmpty(
-			       os.Getenv("BACKEND_URL"),
-			       defaultHFSpaceBaseURL,
-		       ), "/")
-		       publicURL := publicBaseURL(r)
-		       if publicURL == "" || !strings.HasPrefix(targetBaseURL, publicURL) {
-			       targetPath = "/api/images/"
-		       }
-	       }
+	// 某些端点（如图片创建路由）需要结尾斜杠，原逻辑保留。
+	if targetPath == "/api/images" && r.Method == http.MethodPost {
+		targetBaseURL := strings.TrimRight(firstNonEmpty(
+			os.Getenv("BACKEND_URL"),
+			defaultBackendBaseURL,
+		), "/")
+		publicURL := publicBaseURL(r)
+		if publicURL == "" || !strings.HasPrefix(targetBaseURL, publicURL) {
+			targetPath = "/api/images/"
+		}
+	}
 
 	options := proxyOptions{
 		AllowedMethods: map[string]struct{}{
@@ -91,10 +91,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		options.Timeout = 15 * time.Second
 	}
 
-	proxyToHF(w, r, options)
+	proxyToBackend(w, r, options)
 }
 
-func proxyToHF(w http.ResponseWriter, r *http.Request, options proxyOptions) {
+func proxyToBackend(w http.ResponseWriter, r *http.Request, options proxyOptions) {
 	if len(options.AllowedMethods) > 0 {
 		if _, ok := options.AllowedMethods[r.Method]; !ok {
 			w.Header().Set("Allow", joinAllowedMethods(options.AllowedMethods))
@@ -103,12 +103,11 @@ func proxyToHF(w http.ResponseWriter, r *http.Request, options proxyOptions) {
 		}
 	}
 
-
 	// determine where the proxy should send the request
-	       targetBaseURL := strings.TrimRight(firstNonEmpty(
-		       os.Getenv("BACKEND_URL"),
-		       defaultHFSpaceBaseURL,
-	       ), "/")
+	targetBaseURL := strings.TrimRight(firstNonEmpty(
+		os.Getenv("BACKEND_URL"),
+		defaultBackendBaseURL,
+	), "/")
 	// compute public base for the current request so we can detect loops
 	publicURL := publicBaseURL(r)
 	if publicURL != "" && strings.HasPrefix(targetBaseURL, publicURL) {
@@ -116,7 +115,7 @@ func proxyToHF(w http.ResponseWriter, r *http.Request, options proxyOptions) {
 		// infinite rewrites.  This error is easier to diagnose than chasing a
 		// redirect loop in the browser.
 		log.Printf("proxy misconfigured: targetBaseURL %q matches public URL %q", targetBaseURL, publicURL)
-		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "proxy misconfigured: HF_SPACE_BASE_URL should not point to the frontend domain"})
+		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "proxy misconfigured: BACKEND_URL should not point to the frontend domain"})
 		return
 	}
 
@@ -144,11 +143,10 @@ func proxyToHF(w http.ResponseWriter, r *http.Request, options proxyOptions) {
 		return
 	}
 
-	       copyRequestHeaders(req.Header, r.Header)
-	       // 不再需要token
-	       if options.UserAgent != "" {
-		       req.Header.Set("User-Agent", options.UserAgent)
-	       }
+	copyRequestHeaders(req.Header, r.Header)
+	if options.UserAgent != "" {
+		req.Header.Set("User-Agent", options.UserAgent)
+	}
 
 	client := &http.Client{
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
@@ -161,7 +159,7 @@ func proxyToHF(w http.ResponseWriter, r *http.Request, options proxyOptions) {
 		// record the underlying error so we can see why the proxy failed
 		// (network issue, name resolution, TLS, etc.)
 		log.Printf("proxy request failed: %v", err)
-		writeJSON(w, http.StatusBadGateway, errorResponse{Error: "failed to reach private Hugging Face Space: " + err.Error()})
+		writeJSON(w, http.StatusBadGateway, errorResponse{Error: "failed to reach upstream backend: " + err.Error()})
 		return
 	}
 	defer response.Body.Close()

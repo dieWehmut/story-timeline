@@ -13,10 +13,11 @@ import { mediaTypeFromFile, normalizeAssetTypes } from './media';
 
 const normalizeApiBase = (value: string) => value.trim().replace(/\/$/, '');
 
-const HF_SPACE_FALLBACK = 'https://REDACTED.example.com';
+const API_BASE_FALLBACK = 'https://REDACTED.example.com';
 const rawApiBase = typeof process !== 'undefined' ? process.env.EXPO_PUBLIC_API_BASE ?? '' : '';
 const hasExplicitBase = !!rawApiBase;
-export const API_BASE = normalizeApiBase(rawApiBase || HF_SPACE_FALLBACK);
+export const API_BASE = normalizeApiBase(rawApiBase || API_BASE_FALLBACK);
+const usesHostedFallbackBase = (value: string) => value.includes('.hf.space');
 
 const withApiBase = (value: string) => {
   if (!value || value.startsWith('http://') || value.startsWith('https://')) {
@@ -99,7 +100,7 @@ const request = async <T>(input: string, init?: RequestInit): Promise<T> => {
   } catch (err: any) {
     if (
       hasExplicitBase &&
-      API_BASE.includes('.hf.space') &&
+      usesHostedFallbackBase(API_BASE) &&
       input.startsWith(API_BASE) &&
       err instanceof Error &&
       typeof err.message === 'string' &&
@@ -115,7 +116,7 @@ const request = async <T>(input: string, init?: RequestInit): Promise<T> => {
       err instanceof Error &&
       (err.message.includes('redirect') || err.message.includes('Too many redirects'))
     ) {
-      const alt = input.startsWith('/') ? HF_SPACE_FALLBACK + input : input.replace(API_BASE, HF_SPACE_FALLBACK);
+      const alt = input.startsWith('/') ? API_BASE_FALLBACK + input : input.replace(API_BASE, API_BASE_FALLBACK);
       try {
         return await doFetch(alt);
       } catch {
@@ -237,7 +238,7 @@ export const api = {
     request<{ ok: boolean }>(`${API_BASE}/api/follow/${encodeURIComponent(login)}`, { method: 'DELETE' }),
   createImage: async (payload: CreateImagePayload) => {
     const imagesEndpoint =
-      API_BASE === '' || API_BASE.includes('.hf.space')
+      API_BASE === '' || usesHostedFallbackBase(API_BASE)
         ? `${API_BASE}/api/images/`
         : `${API_BASE}/api/images`;
 
