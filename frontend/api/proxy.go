@@ -55,27 +55,17 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	q.Del("path")
 	cleanQuery := q.Encode()
 
-	// Some endpoints (currently only the image creation route) require a
-	// trailing slash when talking directly to the Hugging Face space.  The
-	// Vercel rewrite rules strip the trailing slash, which makes the space
-	// return 404.  We only need to append the slash when the proxy is
-	// forwarding to the *external* HF URL – not when the target base URL is
-	// the same as the public frontend domain.  If the two are identical we
-	// are accidentally proxying to ourselves and the slash hack will cause a
-	// redirect loop (see: ERR_TOO_MANY_REDIRECTS).
-	if targetPath == "/api/images" && r.Method == http.MethodPost {
-		// compute base URL so we can decide whether to apply the hack
-		targetBaseURL := strings.TrimRight(firstNonEmpty(
-			os.Getenv("HF_SPACE_BASE_URL"),
-			os.Getenv("HUGGINGFACE_SPACE_URL"),
-			defaultHFSpaceBaseURL,
-		), "/")
-		publicURL := publicBaseURL(r)
-		if publicURL == "" || !strings.HasPrefix(targetBaseURL, publicURL) {
-			// only add when the request will actually go out to Hugging Face
-			targetPath = "/api/images/"
-		}
-	}
+	       // 某些端点（如图片创建路由）需要结尾斜杠，原逻辑保留，仅变量名替换
+	       if targetPath == "/api/images" && r.Method == http.MethodPost {
+		       targetBaseURL := strings.TrimRight(firstNonEmpty(
+			       os.Getenv("BACKEND_URL"),
+			       defaultHFSpaceBaseURL,
+		       ), "/")
+		       publicURL := publicBaseURL(r)
+		       if publicURL == "" || !strings.HasPrefix(targetBaseURL, publicURL) {
+			       targetPath = "/api/images/"
+		       }
+	       }
 
 	options := proxyOptions{
 		AllowedMethods: map[string]struct{}{
@@ -113,18 +103,12 @@ func proxyToHF(w http.ResponseWriter, r *http.Request, options proxyOptions) {
 		}
 	}
 
-	hfToken := strings.TrimSpace(os.Getenv("HF_TOKEN"))
-	if hfToken == "" {
-		writeJSON(w, http.StatusInternalServerError, errorResponse{Error: "HF_TOKEN is not configured"})
-		return
-	}
 
 	// determine where the proxy should send the request
-	targetBaseURL := strings.TrimRight(firstNonEmpty(
-		os.Getenv("HF_SPACE_BASE_URL"),
-		os.Getenv("HUGGINGFACE_SPACE_URL"),
-		defaultHFSpaceBaseURL,
-	), "/")
+	       targetBaseURL := strings.TrimRight(firstNonEmpty(
+		       os.Getenv("BACKEND_URL"),
+		       defaultHFSpaceBaseURL,
+	       ), "/")
 	// compute public base for the current request so we can detect loops
 	publicURL := publicBaseURL(r)
 	if publicURL != "" && strings.HasPrefix(targetBaseURL, publicURL) {
@@ -160,11 +144,11 @@ func proxyToHF(w http.ResponseWriter, r *http.Request, options proxyOptions) {
 		return
 	}
 
-	copyRequestHeaders(req.Header, r.Header)
-	req.Header.Set("Authorization", "Bearer "+hfToken)
-	if options.UserAgent != "" {
-		req.Header.Set("User-Agent", options.UserAgent)
-	}
+	       copyRequestHeaders(req.Header, r.Header)
+	       // 不再需要token
+	       if options.UserAgent != "" {
+		       req.Header.Set("User-Agent", options.UserAgent)
+	       }
 
 	client := &http.Client{
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
